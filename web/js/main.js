@@ -17,6 +17,7 @@ document.documentElement.lang = getLanguage();
 restoreLastPlayer();
 
 const root = document.getElementById("app");
+document.getElementById("kmg-boot")?.remove();
 buildShell(root);
 startRouter(document.getElementById("kmg-main"));
 
@@ -89,7 +90,4 @@ window.addEventListener("beforeinstallprompt", (event) => {
   setTimeout(() => button.remove(), 15000);
 });
 
-// The splash placeholder in index.html is only there so the page is not blank
-// while the modules download; the app has rendered by the time we get here.
-document.getElementById("kmg-boot")?.remove();
 document.title = t("app.title");

@@ -1,0 +1,8 @@
+{
+  "name": "Reken Spelletjes",
+  "description": "Interactive educational math games for primary-school children with 12 games, difficulty levels, and progress tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

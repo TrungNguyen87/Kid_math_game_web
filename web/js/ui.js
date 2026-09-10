@@ -18,8 +18,9 @@
  */
 import { el, clear, nextFrame, raw } from "./dom.js";
 import { t, tMd } from "./i18n.js";
-import { MAX_LEVEL, getLevel, setLevel, state } from "./state.js";
-import { LEVELS, levelLabel } from "./ui-bits.js";
+import { MAX_LEVEL, getMaxLevel, getLevel, setLevel, state } from "./state.js";
+import { LEVELS, getLevels, levelLabel } from "./ui-bits.js";
+import { getGameIllustration } from "./illustrations.js";
 import * as sound from "./sound.js";
 
 /** How long a correct answer's celebration shows before the next question. */
@@ -29,11 +30,13 @@ const AUTO_ADVANCE_MS = 1150;
 // Page scaffolding
 // ---------------------------------------------------------------------------
 
-export function pageHeader(titleKey, { subtitleKey = null, emoji = "" } = {}) {
-  return el("header.kmg-page-head", {}, [
+export function pageHeader(titleKey, { subtitleKey = null, emoji = "", illustration = null } = {}) {
+  const heroNode = illustration ? raw("div.kmg-page-hero", illustration) : null;
+  const textNode = el("div.kmg-page-head-text", {}, [
     el("h1.kmg-page-title", {}, [emoji ? el("span.kmg-page-emoji", { text: emoji }) : null, t(titleKey)]),
     subtitleKey ? el("p.kmg-page-sub", { text: t(subtitleKey) }) : null,
   ]);
+  return el("header.kmg-page-head", {}, [heroNode, textNode]);
 }
 
 /** A collapsible section - the equivalent of st.expander. */
@@ -57,6 +60,8 @@ export function levelPicker(gameKey, onChange) {
   const label = el("div.kmg-levelpicker-label", { text: t("common.choose_level") });
   const row = el("div.kmg-levelrow");
   const badge = el("div.kmg-level-badge");
+  const max = getMaxLevel(gameKey);
+  const levels = getLevels(gameKey);
 
   const paint = (animate = false) => {
     const current = getLevel(gameKey);
@@ -65,7 +70,7 @@ export function levelPicker(gameKey, onChange) {
       btn.classList.toggle("is-current", isCurrent);
       btn.setAttribute("aria-pressed", String(isCurrent));
     });
-    badge.textContent = `⭐ ${t("common.level")} ${current}/${MAX_LEVEL} — ${levelLabel(current)}`;
+    badge.textContent = `⭐ ${t("common.level")} ${current}/${max} — ${levelLabel(current)}`;
     // The badge pops once when the level actually changed and then sits
     // still: a badge that bounced on every repaint would stop meaning
     // "you levelled up".
@@ -76,7 +81,7 @@ export function levelPicker(gameKey, onChange) {
     }
   };
 
-  for (const level of LEVELS) {
+  for (const level of levels) {
     row.append(
       el("button.kmg-levelbtn", {
         type: "button",
@@ -367,7 +372,7 @@ export function gameShell({
 }) {
   const root = el("section.kmg-game", { dataset: { game: gameKey } });
 
-  const head = pageHeader(titleKey, { emoji });
+  const head = pageHeader(titleKey, { emoji, illustration: getGameIllustration(gameKey) });
   const tagline = taglineKey ? el("p.kmg-tagline", { text: t(taglineKey) }) : null;
   const intro = introKey ? raw("div.kmg-intro", tMd(introKey)) : null;
   const picker = levelPicker(gameKey, onLevelChange);

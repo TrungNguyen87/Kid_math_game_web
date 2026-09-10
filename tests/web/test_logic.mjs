@@ -174,19 +174,26 @@ test("a correct answer resets the wrong-streak, so 1 wrong + 1 right + 1 wrong d
   assert.equal(state.getLevel("tafel"), 3);
 });
 
-test("levels never leave 0..5", () => {
-  state.setLevel("tafel", 5);
-  for (let i = 0; i < 20; i++) state.registerAttempt("tafel", true);
-  assert.equal(state.getLevel("tafel"), state.MAX_LEVEL);
+test("levels never leave 0..5 for standard games", () => {
+  state.setLevel("breuken", 5);
+  for (let i = 0; i < 20; i++) state.registerAttempt("breuken", true);
+  assert.equal(state.getLevel("breuken"), state.MAX_LEVEL);
 
-  state.setLevel("tafel", 0);
-  for (let i = 0; i < 20; i++) state.registerAttempt("tafel", false);
-  assert.equal(state.getLevel("tafel"), state.MIN_LEVEL);
+  state.setLevel("breuken", 0);
+  for (let i = 0; i < 20; i++) state.registerAttempt("breuken", false);
+  assert.equal(state.getLevel("breuken"), state.MIN_LEVEL);
+});
+
+test("tafel monster level can reach level 6 and clamps at 6", () => {
+  state.setLevel("tafel", 5);
+  for (let i = 0; i < 3; i++) state.registerAttempt("tafel", true);
+  assert.equal(state.getLevel("tafel"), 6);
+  assert.equal(state.setLevel("tafel", 99), 6);
 });
 
 test("setLevel clamps out-of-range input", () => {
-  assert.equal(state.setLevel("tafel", 99), state.MAX_LEVEL);
-  assert.equal(state.setLevel("tafel", -4), state.MIN_LEVEL);
+  assert.equal(state.setLevel("breuken", 99), state.MAX_LEVEL);
+  assert.equal(state.setLevel("breuken", -4), state.MIN_LEVEL);
 });
 
 test("changing level resets that game's streak counters", () => {
@@ -285,7 +292,7 @@ test("tafel: division questions divide exactly", () => {
   });
 });
 
-test("tafel: only levels 2+ ask missing-factor, 3+ division, 4+ word problems", () => {
+test("tafel: only levels 2+ ask missing-factor, 3+ division, 4+ word problems, 6+ three_factor", () => {
   const allowed = {
     0: ["mult"],
     1: ["mult"],
@@ -293,12 +300,22 @@ test("tafel: only levels 2+ ask missing-factor, 3+ division, 4+ word problems", 
     3: ["mult", "missing_factor", "division"],
     4: ["mult", "missing_factor", "division", "word"],
     5: ["mult", "missing_factor", "division", "word"],
+    6: ["mult", "missing_factor", "division", "word", "three_factor"],
   };
-  eachLevel((level) => {
+  [0, 1, 2, 3, 4, 5, 6].forEach((level) => {
     for (let i = 0; i < REPS; i++) {
       assert.ok(allowed[level].includes(tafel.generate(level).qType));
     }
   });
+});
+
+test("tafel: level 6 monster-level produces valid questions and whole positive answers", () => {
+  for (let i = 0; i < REPS; i++) {
+    const problem = tafel.generate(6);
+    assert.ok(problem && problem.text.length > 0);
+    assert.ok(Number.isInteger(problem.answer) && problem.answer > 0);
+    assert.ok(!problem.text.includes("undefined") && !problem.text.includes("NaN"));
+  }
 });
 
 test("breuken: the answer fraction has a positive denominator", () => {

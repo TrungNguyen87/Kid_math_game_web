@@ -5,6 +5,7 @@
 import { t, tMd } from "../i18n.js";
 import { el, raw } from "../dom.js";
 import { expander, pageHeader } from "../ui.js";
+import { getGameIllustration } from "../illustrations.js";
 
 // [topic key suffix, emoji] - the order the concepts are met in the games.
 const TOPICS = [
@@ -25,7 +26,11 @@ export function render(container) {
   const root = el("section.kmg-uitleg");
 
   root.append(
-    pageHeader("uitleg.title", { subtitleKey: "uitleg.subtitle", emoji: "📖" }),
+    pageHeader("uitleg.title", {
+      subtitleKey: "uitleg.subtitle",
+      emoji: "📖",
+      illustration: getGameIllustration("uitleg"),
+    }),
     raw("div.kmg-intro", tMd("uitleg.intro")),
   );
 

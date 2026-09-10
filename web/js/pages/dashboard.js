@@ -14,6 +14,7 @@ import { el, raw, clear } from "../dom.js";
 import { allAttempts, clearHistory, downloadCsv, toCsv, sessionAttempts } from "../log.js";
 import { clearAllProfiles, state } from "../state.js";
 import { expander, pageHeader, statRow } from "../ui.js";
+import { getGameIllustration } from "../illustrations.js";
 import { barChartH, chartTable, columnChart } from "../charts.js";
 
 /** Minutes between the first and last attempt of each session, summed. */
@@ -79,7 +80,11 @@ export function render(container) {
   );
 
   root.append(
-    pageHeader("dash.title", { subtitleKey: "dash.subtitle", emoji: "📊" }),
+    pageHeader("dash.title", {
+      subtitleKey: "dash.subtitle",
+      emoji: "📊",
+      illustration: getGameIllustration("dashboard"),
+    }),
     raw("div.kmg-intro", tMd("dash.intro")),
   );
 

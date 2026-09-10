@@ -18,6 +18,7 @@ import { t } from "./i18n.js";
 let container = null;
 let cleanup = null;
 let currentPath = null;
+let renderSeq = 0;
 const listeners = new Set();
 
 export function onRouteChange(fn) {
@@ -45,6 +46,7 @@ export function navigate(path, { replace = false } = {}) {
 }
 
 async function render() {
+  const seq = ++renderSeq;
   const path = parseHash();
   const route = findRoute(path);
 
@@ -62,21 +64,16 @@ async function render() {
   cleanup = null;
   currentPath = path;
 
-  clear(container);
-  container.scrollTop = 0;
-  window.scrollTo({ top: 0 });
   document.title = `${t(route.key)} · ${t("app.title")}`;
-
   listeners.forEach((fn) => fn(path, route));
 
   let module;
   try {
     module = await route.load();
   } catch (error) {
+    if (seq !== renderSeq) return;
     console.error("[router] failed to load", path, error);
-    // A chunk that will not load is almost always a stale cached index
-    // pointing at a filename the new deploy no longer has. Say so in plain
-    // language and offer the one action that fixes it.
+    clear(container);
     container.innerHTML =
       `<div class="kmg-banner kmg-banner-bad"><span class="kmg-banner-icon">⚠️</span>` +
       `<span class="kmg-banner-body"><span class="kmg-banner-msg">${t("app.load_error")}</span></span></div>`;
@@ -90,8 +87,13 @@ async function render() {
     return;
   }
 
-  // The route may have changed again while the chunk was downloading.
-  if (currentPath !== path) return;
+  // Abort if a newer route navigation has started while this module was loading.
+  if (seq !== renderSeq || currentPath !== path) return;
+
+  // Clear immediately before rendering so concurrent loads never double-render
+  clear(container);
+  container.scrollTop = 0;
+  window.scrollTo({ top: 0 });
 
   container.classList.remove("is-in");
   cleanup = module.render(container) || null;
@@ -103,8 +105,9 @@ export function startRouter(target) {
   window.addEventListener("hashchange", render);
   if (!window.location.hash) {
     navigate(DEFAULT_ROUTE, { replace: true });
+  } else {
+    render();
   }
-  render();
 }
 
 /** Re-render the current page - used when the language changes. */

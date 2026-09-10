@@ -204,12 +204,18 @@ export function resetStreak() {
   emitChange();
 }
 
+export function getMaxLevel(gameKey = null) {
+  if (gameKey === "tafel") return 6;
+  return MAX_LEVEL;
+}
+
 export function getLevel(gameKey) {
   return state.levels[gameKey] ?? MIN_LEVEL;
 }
 
 export function setLevel(gameKey, level) {
-  const clamped = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
+  const max = getMaxLevel(gameKey);
+  const clamped = Math.max(MIN_LEVEL, Math.min(max, level));
   state.levels[gameKey] = clamped;
   // Starting fresh at the new level: the old streak counters described a
   // difficulty the child is no longer playing.
@@ -230,12 +236,13 @@ export function registerAttempt(gameKey, isCorrect) {
   let leveledUp = false;
   let leveledDown = false;
   const currentLevel = getLevel(gameKey);
+  const max = getMaxLevel(gameKey);
 
   if (isCorrect) {
     state.correctAnswered += 1;
     streak.correct += 1;
     streak.wrong = 0;
-    if (streak.correct >= LEVEL_UP_STREAK && currentLevel < MAX_LEVEL) {
+    if (streak.correct >= LEVEL_UP_STREAK && currentLevel < max) {
       setLevel(gameKey, currentLevel + 1);
       leveledUp = true;
     }

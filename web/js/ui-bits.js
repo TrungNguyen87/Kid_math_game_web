@@ -4,7 +4,7 @@
  * gameflow itself).
  */
 import { t } from "./i18n.js";
-import { MAX_LEVEL, MIN_LEVEL } from "./state.js";
+import { MAX_LEVEL, MIN_LEVEL, getMaxLevel } from "./state.js";
 
 export const DIFFICULTY_KEYS = [
   "common.difficulty_warmup",
@@ -13,6 +13,7 @@ export const DIFFICULTY_KEYS = [
   "common.difficulty_hard",
   "common.difficulty_expert",
   "common.difficulty_master",
+  "common.difficulty_monster",
 ];
 
 export function levelLabel(level) {
@@ -21,6 +22,11 @@ export function levelLabel(level) {
 }
 
 export const LEVELS = Array.from({ length: MAX_LEVEL - MIN_LEVEL + 1 }, (_, i) => MIN_LEVEL + i);
+
+export function getLevels(gameKey = null) {
+  const max = gameKey ? getMaxLevel(gameKey) : MAX_LEVEL;
+  return Array.from({ length: max - MIN_LEVEL + 1 }, (_, i) => MIN_LEVEL + i);
+}
 
 /** Format a number the way the selected language writes it. */
 export function formatDecimal(value, digits = null) {

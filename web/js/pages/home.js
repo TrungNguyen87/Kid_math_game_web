@@ -21,6 +21,7 @@ import {
 import { BADGE_DEFS, BADGE_EMOJI } from "../badges.js";
 import { levelLabel } from "../ui-bits.js";
 import { pageHeader } from "../ui.js";
+import { getGameIllustration } from "../illustrations.js";
 import { confetti } from "../fx.js";
 import * as sound from "../sound.js";
 
@@ -136,7 +137,11 @@ export function render(container) {
   const overallPct = Math.round((100 * totalLevels) / (GAME_KEYS.length * MAX_LEVEL));
 
   root.append(
-    pageHeader("home.title", { subtitleKey: "home.subtitle", emoji: "🎮" }),
+    pageHeader("home.title", {
+      subtitleKey: "home.subtitle",
+      emoji: "🎮",
+      illustration: getGameIllustration("home"),
+    }),
 
     el("div.kmg-card.kmg-namecard", {}, [
       el("label.kmg-answer-label", { for: "", text: t("dash.player_name_label") }),

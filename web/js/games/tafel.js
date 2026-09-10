@@ -21,7 +21,12 @@ export function generate(level) {
   else if (level === 2) [a, b] = [randInt(2, 10), randInt(2, 10)];
   else if (level === 3) [a, b] = [randInt(2, 12), randInt(2, 12)];
   else if (level === 4) [a, b] = [randInt(11, 20), randInt(2, 9)];
-  else [a, b] = [randInt(11, 20), randInt(11, 20)];
+  else if (level === 5) [a, b] = [randInt(11, 20), randInt(11, 20)];
+  else {
+    // Level 6+: Monster-level!
+    // Challenging multi-digit arithmetic for champions: [12..35] × [12..25]
+    [a, b] = coinFlip() ? [randInt(12, 35), randInt(12, 25)] : [randInt(20, 50), randInt(11, 20)];
+  }
 
   const product = a * b;
 
@@ -29,6 +34,7 @@ export function generate(level) {
   if (level >= 2) typeChoices.push("missing_factor");
   if (level >= 3) typeChoices.push("division");
   if (level >= 4) typeChoices.push("word");
+  if (level >= 6) typeChoices.push("three_factor");
   const qType = choice(typeChoices);
 
   let text;
@@ -36,6 +42,26 @@ export function generate(level) {
   // Set for missing_factor/division: the one factor still given in the
   // question, which is what the skip-counting hint is allowed to show.
   let knownFactor = null;
+
+  if (qType === "three_factor") {
+    // 3-factor multiplication (e.g. 4 × 7 × 25 = 700 or 5 × 16 × 2 = 160)
+    const f1 = choice([2, 4, 5, 8]);
+    const f2 = randInt(6, 25);
+    const f3 = choice([2, 5, 10, 20, 25]);
+    const threeProduct = f1 * f2 * f3;
+    text = t("tafel.q_three_factor", { a: f1, b: f2, c: f3 });
+    answer = threeProduct;
+    return {
+      text,
+      answer,
+      a: f1,
+      b: f2,
+      c: f3,
+      product: threeProduct,
+      qType,
+      knownFactor: f1,
+    };
+  }
 
   if (qType === "mult") {
     text = t("tafel.q_mult", { a, b });
@@ -55,7 +81,8 @@ export function generate(level) {
     answer = b;
     knownFactor = a;
   } else {
-    text = t(choice(WORD_TEMPLATES), { a, b });
+    const templates = level >= 6 ? [...WORD_TEMPLATES, "tafel.word_monster"] : WORD_TEMPLATES;
+    text = t(choice(templates), { a, b });
     answer = product;
   }
 
@@ -71,7 +98,19 @@ export function generate(level) {
  */
 function hintNode(problem) {
   const body = el("div");
-  if (problem.qType === "missing_factor" || problem.qType === "division") {
+  if (problem.qType === "three_factor") {
+    body.append(
+      el("p", {
+        text: t("tafel.hint_three_factor", {
+          a: problem.a,
+          b: problem.b,
+          c: problem.c,
+          ab: problem.a * problem.b,
+        }),
+      }),
+      raw("div.kmg-visual", arrayGridSvg(Math.min(problem.a, 12), Math.min(problem.b, 12))),
+    );
+  } else if (problem.qType === "missing_factor" || problem.qType === "division") {
     body.append(
       el("p", { text: t("common.skip_count_hint", { step: problem.knownFactor }) }),
       raw("div.kmg-visual", skipCountSvg(problem.knownFactor, problem.product)),
