@@ -15,6 +15,19 @@ IGNORED_PATTERNS = {
     "asset-manifest.json",
     "precache-manifest.*",
 }
+PRECACHEABLE_SUFFIXES = {
+    ".css",
+    ".gif",
+    ".html",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".js",
+    ".png",
+    ".svg",
+    ".webmanifest",
+    ".webp",
+}
 
 
 def extract_precache_body(source: str) -> str:
@@ -109,6 +122,8 @@ def find_web_files() -> set[str]:
 
         relative = path.relative_to(WEB_ROOT).as_posix()
         if any(fnmatch(relative, pattern) for pattern in IGNORED_PATTERNS):
+            continue
+        if path.suffix.lower() not in PRECACHEABLE_SUFFIXES:
             continue
 
         files.add(f"./{relative}")

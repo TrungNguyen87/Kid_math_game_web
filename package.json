@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "echo 'Build complete'",
-    "check:precache": "python3 tools/check_precache.py",
+    "check:precache": "node tools/run-check-precache.mjs",
     "start": "node server.js",
     "lint": "node --check server.js && node --check web/js/main.js",
     "test": "node --test \"tests/web/test_*.mjs\"",
