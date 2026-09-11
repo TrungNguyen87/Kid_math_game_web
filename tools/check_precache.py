@@ -18,10 +18,15 @@ def parse_precache_entries() -> set[str]:
     if not match:
         raise RuntimeError("Could not find PRECACHE array in web/sw.js")
 
-    entries = {
-        value
-        for _, value in re.findall(r"(['\"])(.+?)\1", match.group(1))
-    }
+    entries = set()
+    for raw_line in match.group(1).splitlines():
+        line = raw_line.split("//", 1)[0].strip().rstrip(",")
+        if not line:
+            continue
+
+        entry = re.fullmatch(r"(['\"])(.+?)\1", line)
+        if entry:
+            entries.add(entry.group(2))
     return entries
 
 
