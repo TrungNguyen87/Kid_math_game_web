@@ -121,7 +121,7 @@ def parse_precache_entries() -> set[str]:
     body = extract_precache_body(source)
     entries = set()
     for raw_line in body.splitlines():
-        line = raw_line.split("//", 1)[0].strip().rstrip(",")
+        line = raw_line.strip().rstrip(",")
         if not line:
             continue
 

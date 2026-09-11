@@ -8,6 +8,25 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+function findPythonCommandSpec() {
+  const candidates = [
+    ["python3", ["-c", "print('ok')"], "python3"],
+    ["python", ["-c", "print('ok')"], "python"],
+    ["py", ["-3", "-c", "print('ok')"], "py -3"],
+  ];
+
+  for (const [command, args, spec] of candidates) {
+    const result = spawnSync(command, args, { encoding: "utf8" });
+    if (!result.error && result.status === 0) {
+      return spec;
+    }
+  }
+
+  throw new Error("No Python interpreter available for precache tests.");
+}
+
+const pythonCommandSpec = findPythonCommandSpec();
+
 function makeFixture(name) {
   const root = mkdtempSync(path.join(tmpdir(), `kmg-${name}-`));
   mkdirSync(path.join(root, "web"), { recursive: true });
@@ -31,7 +50,7 @@ function runPrecacheCheck(root, extraEnv = {}) {
       KMG_PRECACHE_WEB_ROOT: path.join(root, "web"),
       KMG_PRECACHE_SERVICE_WORKER: path.join(root, "web", "sw.js"),
       KMG_PRECACHE_IGNORE_FILE: path.join(root, "tools", "check_precache.ignore"),
-      KMG_PYTHON_COMMANDS: "missingcmd,python3",
+      KMG_PYTHON_COMMANDS: `missingcmd;${pythonCommandSpec}`,
       ...extraEnv,
     },
   });
