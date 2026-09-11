@@ -1,10 +1,15 @@
 import { spawnSync } from "node:child_process";
 
-const commands = [
-  ["python3", ["tools/check_precache.py"]],
-  ["python", ["tools/check_precache.py"]],
-  ["py", ["-3", "tools/check_precache.py"]],
-];
+const commands = process.env.KMG_PYTHON_COMMANDS
+  ? process.env.KMG_PYTHON_COMMANDS.split(",")
+      .map((command) => command.trim())
+      .filter(Boolean)
+      .map((command) => [command, ["tools/check_precache.py"]])
+  : [
+      ["python3", ["tools/check_precache.py"]],
+      ["python", ["tools/check_precache.py"]],
+      ["py", ["-3", "tools/check_precache.py"]],
+    ];
 
 for (const [command, args] of commands) {
   const result = spawnSync(command, args, { stdio: "inherit" });

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import os
 import re
 import sys
 from fnmatch import fnmatch
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-WEB_ROOT = ROOT / "web"
-SERVICE_WORKER = WEB_ROOT / "sw.js"
+DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("KMG_PRECACHE_ROOT", str(DEFAULT_ROOT))).resolve()
+WEB_ROOT = Path(os.environ.get("KMG_PRECACHE_WEB_ROOT", str(ROOT / "web"))).resolve()
+SERVICE_WORKER = Path(os.environ.get("KMG_PRECACHE_SERVICE_WORKER", str(WEB_ROOT / "sw.js"))).resolve()
+IGNORE_FILE = Path(
+    os.environ.get("KMG_PRECACHE_IGNORE_FILE", str(ROOT / "tools" / "check_precache.ignore"))
+).resolve()
 VIRTUAL_ENTRIES = {"./"}
-IGNORED_PATTERNS = {
+DEFAULT_IGNORED_PATTERNS = {
     "sw.js",
     "asset-manifest.json",
     "precache-manifest.*",
@@ -28,6 +33,18 @@ PRECACHEABLE_SUFFIXES = {
     ".webmanifest",
     ".webp",
 }
+
+
+def load_ignored_patterns() -> set[str]:
+    patterns = set(DEFAULT_IGNORED_PATTERNS)
+    if not IGNORE_FILE.exists():
+        return patterns
+
+    for raw_line in IGNORE_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if line:
+            patterns.add(line)
+    return patterns
 
 
 def extract_precache_body(source: str) -> str:
@@ -115,13 +132,14 @@ def parse_precache_entries() -> set[str]:
 
 
 def find_web_files() -> set[str]:
+    ignored_patterns = load_ignored_patterns()
     files = set()
     for path in WEB_ROOT.rglob("*"):
         if not path.is_file():
             continue
 
         relative = path.relative_to(WEB_ROOT).as_posix()
-        if any(fnmatch(relative, pattern) for pattern in IGNORED_PATTERNS):
+        if any(fnmatch(relative, pattern) for pattern in ignored_patterns):
             continue
         if path.suffix.lower() not in PRECACHEABLE_SUFFIXES:
             continue
