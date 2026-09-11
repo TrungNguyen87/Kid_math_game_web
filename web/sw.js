@@ -40,6 +40,7 @@ const PRECACHE = [
   "./js/log.js",
   "./js/sound.js",
   "./js/fx.js",
+  "./js/illustrations.js",
   "./js/rng.js",
   "./js/visuals.js",
   "./js/charts.js",
