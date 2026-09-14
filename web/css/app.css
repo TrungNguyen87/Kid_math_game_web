@@ -1489,6 +1489,132 @@ table.kmg-table th {
 }
 
 /* ==========================================================================
+   Reward shop
+   ========================================================================== */
+
+.kmg-reward-balance {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.85rem 1.1rem;
+  margin: 0.25rem 0 1.5rem;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface));
+  border: 2px solid var(--amber);
+}
+.kmg-reward-balance-icon {
+  font-size: 2rem;
+  line-height: 1;
+}
+.kmg-reward-balance-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.kmg-reward-balance-label {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.kmg-reward-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+.kmg-reward-progress-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.kmg-reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.8rem;
+  margin: 0.75rem 0 1rem;
+}
+.kmg-reward-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.3rem;
+  padding: 0.9rem 0.6rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 3px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.kmg-reward-card:hover {
+  transform: translateY(-3px);
+}
+.kmg-reward-card.is-locked {
+  /* Still shown, on purpose: the point of a shop window is seeing what you
+     don't have yet, not just what you already collected. */
+  opacity: 0.55;
+  filter: grayscale(0.6);
+}
+.kmg-reward-card.is-unlocked {
+  border-color: var(--green);
+}
+.kmg-reward-card.is-equipped {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  box-shadow: var(--shadow-lg);
+}
+.kmg-reward-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.kmg-reward-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.kmg-reward-cost {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+.kmg-reward-bar {
+  width: 100%;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+  margin-top: 0.1rem;
+}
+.kmg-reward-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--orange), var(--amber));
+  transition: width 0.4s ease;
+}
+.kmg-reward-btn {
+  margin-top: 0.15rem;
+  padding: 0.4rem 0.8rem;
+  min-height: auto;
+  font-size: 0.82rem;
+}
+.kmg-reward-tag {
+  margin-top: 0.15rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.kmg-reward-card.is-equipped .kmg-reward-tag {
+  background: var(--amber);
+  color: #3e2723;
+}
+
+/* ==========================================================================
    Answer layouts
    ========================================================================== */
 

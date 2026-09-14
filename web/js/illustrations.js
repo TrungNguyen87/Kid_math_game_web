@@ -884,6 +884,69 @@ export function homeIllustration() {
   </svg>`;
 }
 
+/** 🎁 Beloningswinkel: Treasure chest popping with gold coins, beside a gift box */
+export function rewardsIllustration() {
+  const id = uid("rew");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Beloningswinkel">
+    <defs>
+      <linearGradient id="${id}_gold" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#fff59d"/>
+        <stop offset="50%" stop-color="#ffd54f"/>
+        <stop offset="100%" stop-color="#ff8f00"/>
+      </linearGradient>
+      <linearGradient id="${id}_wood" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#8d6e63"/>
+        <stop offset="100%" stop-color="#5d4037"/>
+      </linearGradient>
+    </defs>
+    ${animWrap(id, `
+      @keyframes ${id}_coinPop { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(-30px) rotate(180deg); opacity: 0; } }
+      #${id} .coin1 { animation: ${id}_coinPop 2.4s ease-out infinite; }
+      #${id} .coin2 { animation: ${id}_coinPop 2.8s ease-out 0.7s infinite; }
+      #${id} .coin3 { animation: ${id}_coinPop 2.2s ease-out 1.3s infinite; }
+      @keyframes ${id}_lidOpen { 0%, 100% { transform: rotate(-16deg); } 50% { transform: rotate(-24deg); } }
+      #${id} .lid { animation: ${id}_lidOpen 3s ease-in-out infinite; }
+    `)}
+    <!-- Sparkles -->
+    <circle cx="24" cy="28" r="2.5" fill="#ffe57f" class="anim-sparkle" style="transform-origin:24px 28px;"/>
+    <circle cx="140" cy="40" r="3" fill="#ff8a80" class="anim-sparkle" style="transform-origin:140px 40px; animation-delay:0.6s;"/>
+    <circle cx="132" cy="122" r="2" fill="#80d8ff" class="anim-sparkle" style="transform-origin:132px 122px; animation-delay:1.1s;"/>
+    <!-- Wrapped gift box, floating on the right -->
+    <g class="anim-float-rev" style="transform-origin:122px 108px;">
+      <rect x="98" y="92" width="48" height="36" rx="4" fill="#ef5350" stroke="#b71c1c" stroke-width="2.5"/>
+      <rect x="98" y="104" width="48" height="10" fill="#ffee58"/>
+      <rect x="117" y="92" width="10" height="36" fill="#ffee58"/>
+      <path d="M 122,92 C 108,92 108,78 118,78 C 122,78 122,88 122,92 Z" fill="#ffca28" stroke="#ff8f00" stroke-width="1.5"/>
+      <path d="M 122,92 C 136,92 136,78 126,78 C 122,78 122,88 122,92 Z" fill="#ffca28" stroke="#ff8f00" stroke-width="1.5"/>
+    </g>
+    <!-- Floating star badge -->
+    <g class="anim-float" style="transform-origin:28px 100px;">
+      <circle cx="28" cy="100" r="13" fill="#ab47bc" stroke="#fff" stroke-width="2"/>
+      <text x="28" y="106" font-size="14" text-anchor="middle">⭐</text>
+    </g>
+    <!-- Coins popping up above the chest -->
+    <circle cx="70" cy="70" r="7" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5" class="coin1"/>
+    <circle cx="86" cy="65" r="6" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5" class="coin2"/>
+    <circle cx="58" cy="60" r="5.5" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5" class="coin3"/>
+    <!-- Treasure chest -->
+    <g class="anim-bob" style="transform-origin:75px 110px;">
+      <!-- Chest base -->
+      <rect x="35" y="95" width="80" height="40" rx="6" fill="url(#${id}_wood)" stroke="#3e2723" stroke-width="3"/>
+      <rect x="35" y="95" width="80" height="10" fill="#a1887f"/>
+      <!-- Coins spilling inside -->
+      <circle cx="55" cy="98" r="6" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5"/>
+      <circle cx="70" cy="96" r="6" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5"/>
+      <circle cx="85" cy="98" r="6" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5"/>
+      <circle cx="98" cy="96" r="6" fill="url(#${id}_gold)" stroke="#ff8f00" stroke-width="1.5"/>
+      <!-- Metal clasp -->
+      <rect x="68" y="90" width="14" height="16" rx="3" fill="#ffd54f" stroke="#ff8f00" stroke-width="2"/>
+      <circle cx="75" cy="98" r="2.5" fill="#ff8f00"/>
+      <!-- Chest lid, swinging open -->
+      <path d="M 35,95 Q 35,60 75,60 Q 115,60 115,95 Z" fill="url(#${id}_wood)" stroke="#3e2723" stroke-width="3" class="lid" style="transform-origin:75px 95px;"/>
+    </g>
+  </svg>`;
+}
+
 /** Map of gameKey -> illustration generator function */
 const ILLUSTRATIONS = {
   tafel: tafelIllustration,
@@ -901,6 +964,7 @@ const ILLUSTRATIONS = {
   uitleg: uitlegIllustration,
   dashboard: dashboardIllustration,
   home: homeIllustration,
+  rewards: rewardsIllustration,
 };
 
 /** Get the animated SVG string for a page/game key */
