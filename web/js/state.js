@@ -101,6 +101,12 @@ export const state = {
   totalScore: 0,
   levels: freshLevels(),
   badges: [],
+  // The reward shop's spendable balance - mirrors totalScore as it is earned,
+  // but drops when spent, so totalScore stays a lifetime achievement number
+  // while coins are what the shop actually charges.
+  coins: 0,
+  unlockedRewards: new Set(),
+  equippedAvatar: null,
   gamesTried: new Set(),
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
@@ -127,6 +133,9 @@ export function saveCurrentProfile() {
     totalScore: state.totalScore,
     levels: { ...state.levels },
     badges: [...state.badges],
+    coins: state.coins,
+    unlockedRewards: [...state.unlockedRewards].sort(),
+    equippedAvatar: state.equippedAvatar,
     gamesTried: [...state.gamesTried].sort(),
     updatedAt: new Date().toISOString(),
   };
@@ -146,6 +155,9 @@ export function applyProfile(name) {
     state.totalScore = 0;
     state.levels = freshLevels();
     state.badges = [];
+    state.coins = 0;
+    state.unlockedRewards = new Set();
+    state.equippedAvatar = null;
     state.gamesTried = new Set();
     state.gameStreaks = freshGameStreaks();
     emitChange();
@@ -156,6 +168,9 @@ export function applyProfile(name) {
     GAME_KEYS.map((k) => [k, profile.levels?.[k] ?? MIN_LEVEL]),
   );
   state.badges = profile.badges || [];
+  state.coins = profile.coins || 0;
+  state.unlockedRewards = new Set(profile.unlockedRewards || []);
+  state.equippedAvatar = profile.equippedAvatar || null;
   state.gamesTried = new Set(profile.gamesTried || []);
   state.gameStreaks = freshGameStreaks();
   emitChange();
@@ -195,8 +210,21 @@ export function setSoundEnabled(enabled) {
 
 export function addScore(points = 10) {
   state.totalScore += points;
+  state.coins += points;
   state.streaks += 1;
   emitChange();
+}
+
+/**
+ * Spend coins from the reward-shop balance. Returns false (and spends
+ * nothing) if the balance is short, so a caller can just check the result
+ * instead of comparing state.coins itself.
+ */
+export function spendCoins(amount) {
+  if (!(amount > 0) || state.coins < amount) return false;
+  state.coins -= amount;
+  emitChange();
+  return true;
 }
 
 export function resetStreak() {
@@ -286,6 +314,9 @@ export function clearAllProfiles() {
   state.totalScore = 0;
   state.levels = freshLevels();
   state.badges = [];
+  state.coins = 0;
+  state.unlockedRewards = new Set();
+  state.equippedAvatar = null;
   state.gamesTried = new Set();
   state.gameStreaks = freshGameStreaks();
   state.streaks = 0;

@@ -50,6 +50,7 @@ const ROUTES = [
   "getallenjacht",
   "logica",
   "code",
+  "rewards",
   "uitleg",
   "dashboard",
 ];
@@ -145,6 +146,83 @@ if (!Number.isFinite(a) || !Number.isFinite(b)) {
     if (scoreAfter <= scoreBefore) {
       note("tafel:play", `score did not rise: ${scoreBefore} -> ${scoreAfter}`);
     }
+  }
+}
+
+// --- reward shop: earn coins, then unlock and equip something --------------
+
+currentRoute = "rewards:earn";
+// Force a clean level 0 with a reset streak, whatever tafel:play above left
+// it at: two clicks to different levels always land on the second one, since
+// the level picker only skips a click that targets the already-active level.
+await page.locator('.kmg-levelbtn[data-level="2"]').click();
+await page.locator('.kmg-levelbtn[data-level="0"]').click();
+await page.waitForTimeout(200);
+
+// Six correct answers in a row stays inside levels 0-1, where tafel only
+// ever asks straight multiplication, so "a x b" can be parsed and answered
+// reliably - enough to clear the shop's cheapest item (30 coins: 3 x 5 at
+// level 0, then 2 x 10 at level 1, once the third correct answer levels up).
+for (let i = 0; i < 6; i++) {
+  const text = await page.locator(".kmg-question-text").textContent();
+  const [a, b] = [...text.matchAll(/\d+/g)].map((m) => Number(m[0]));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    note("rewards:earn", `could not parse question ${i + 1}: "${text}"`);
+    break;
+  }
+  await page.locator(".kmg-numinput").fill(String(a * b));
+  await page.locator(".kmg-btn-primary").first().click();
+  const ok = await page
+    .waitForSelector(".kmg-banner-ok", { timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!ok) {
+    // Wrong answers do not auto-advance, and the check button then stays
+    // disabled - stop here rather than hang retrying a frozen question.
+    note("rewards:earn", `answer ${i + 1} to "${text}" was not marked correct`);
+    break;
+  }
+  await page.waitForTimeout(1400); // auto-advance to the next question
+}
+
+const coinsBefore = Number(await page.locator(".kmg-scorebox-coins").first().textContent());
+if (!(coinsBefore >= 30)) note("rewards:earn", `expected at least 30 coins, sidebar shows ${coinsBefore}`);
+
+currentRoute = "rewards:shop";
+await page.goto(`${baseUrl}/#/rewards`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-reward-card");
+
+const balanceShown = Number(await page.locator(".kmg-reward-balance-value").textContent());
+if (balanceShown !== coinsBefore) {
+  note("rewards:shop", `sidebar coins (${coinsBefore}) and shop balance (${balanceShown}) disagree`);
+}
+
+// Unlock the cheapest affordable item - on a fresh profile that is the first
+// locked avatar card, which the shop should auto-equip.
+await page.locator(".kmg-reward-card.is-locked .kmg-reward-btn:not([disabled])").first().click();
+await page.waitForTimeout(300);
+
+if (!(await page.locator(".kmg-reward-card.is-unlocked").count())) {
+  note("rewards:shop", "unlocking an item did not turn any card into is-unlocked");
+}
+if (!(await page.locator(".kmg-reward-card.is-equipped").count())) {
+  note("rewards:shop", "no card is marked equipped after unlocking a character");
+}
+
+const balanceAfter = Number(await page.locator(".kmg-reward-balance-value").textContent());
+if (!(balanceAfter < balanceShown)) {
+  note("rewards:shop", `balance did not drop after unlocking: ${balanceShown} -> ${balanceAfter}`);
+}
+console.log(`  rewards shop: ${balanceShown} coins -> unlocked an item -> ${balanceAfter} left`);
+
+// Switching back to the default character must move the "equipped" tag.
+const switchButton = page.locator(".kmg-reward-card.is-unlocked .kmg-reward-btn").first();
+if (await switchButton.count()) {
+  await switchButton.click();
+  await page.waitForTimeout(200);
+  const stillOneEquipped = await page.locator(".kmg-reward-card.is-equipped").count();
+  if (stillOneEquipped !== 1) {
+    note("rewards:shop", `expected exactly one equipped card after switching, found ${stillOneEquipped}`);
   }
 }
 

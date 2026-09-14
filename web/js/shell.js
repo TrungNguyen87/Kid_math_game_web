@@ -18,6 +18,7 @@ import {
   state,
 } from "./state.js";
 import { currentRoute, onRouteChange } from "./router.js";
+import { equippedAvatarEmoji } from "./rewards.js";
 import * as sound from "./sound.js";
 
 let previousScore = null;
@@ -111,7 +112,7 @@ export function buildShell(root) {
     clear(playerRow);
     if (state.playerName) {
       playerRow.append(
-        el("span.kmg-player-avatar", { text: "🧑" }),
+        el("span.kmg-player-avatar", { text: equippedAvatarEmoji() }),
         el("span.kmg-player-name", { text: state.playerName }),
       );
       playerRow.title = t("sidebar.playing_as", { name: state.playerName });
@@ -132,6 +133,11 @@ export function buildShell(root) {
         el("span.kmg-scorebox-icon", { text: "🌟" }),
         el("span.kmg-scorebox-label", { text: t("sidebar.score") }),
         el("strong.kmg-scorebox-value", { text: String(state.totalScore) }),
+      ]),
+      el("div.kmg-scorebox-row", {}, [
+        el("span.kmg-scorebox-icon", { text: "🪙" }),
+        el("span.kmg-scorebox-label", { text: t("sidebar.coins") }),
+        el("strong.kmg-scorebox-value.kmg-scorebox-coins", { text: String(state.coins) }),
       ]),
       el("div.kmg-scorebox-row", {}, [
         el(`span.kmg-scorebox-icon${state.streaks >= 3 ? ".is-hot" : ""}`, { text: "🔥" }),

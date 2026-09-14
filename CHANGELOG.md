@@ -5,6 +5,23 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 7 - reward shop)
+
+**Coins earned by playing can now be spent.** Every correct answer already
+paid score; it now also pays coins (the same amount), shown in the sidebar
+next to the score and streak. A new **🎁 Beloningswinkel / Reward Shop** page
+(`web/js/pages/rewards.js`, catalog in `web/js/rewards.js`) lets a child spend
+those coins on 11 characters and 10 stickers, tiered from 30 to 1000 coins so
+the first unlock happens fast and the rarest is a multi-session goal.
+Unlocking a character equips it immediately, replacing the 🧑 shown next to
+the player's name everywhere in the app; a child can switch between any
+already-unlocked character at any time. Every item - locked or not - stays
+visible with its price and how close the child is, on purpose: the shop
+doubles as a collection to show a parent, not just a list of what's already
+owned. Coins, unlocks and the equipped character are saved with the rest of
+the player's profile (localStorage, same as score and badges - nothing new
+leaves the device).
+
 ### Added (round 6 - static web app, GitHub Pages, PWA)
 
 **The whole app now runs in the browser.** A new `web/` folder holds a static
