@@ -11,7 +11,7 @@
  */
 import { t, tMd } from "../i18n.js";
 import { el, raw, clear } from "../dom.js";
-import { allAttempts, clearHistory, downloadCsv, toCsv, sessionAttempts } from "../log.js";
+import { MIN_RETENTION_DAYS, allAttempts, clearHistory, downloadCsv, toCsv, sessionAttempts } from "../log.js";
 import { clearAllProfiles, state } from "../state.js";
 import { expander, pageHeader, statRow } from "../ui.js";
 import { getGameIllustration } from "../illustrations.js";
@@ -67,6 +67,96 @@ function questionsPerDay(rows) {
       value: count,
       tip: `${day}: ${count}`,
     }));
+}
+
+/**
+ * One row per calendar day (newest first): sessions, questions, accuracy,
+ * minutes played (summed per-session spans, same method as totalMinutes())
+ * and coins/points earned. This is the "activity log" a parent actually
+ * wants to skim - the raw per-question table below it is for when a day's
+ * summary raises a question the detail can answer.
+ */
+function dailyActivity(rows) {
+  const days = new Map();
+  const sessionSpans = new Map(); // "day|session_id" -> {min, max}
+
+  for (const row of rows) {
+    const day = String(row.timestamp).slice(0, 10);
+    const entry = days.get(day) ?? {
+      day,
+      sessions: new Set(),
+      players: new Set(),
+      questions: 0,
+      correct: 0,
+      points: 0,
+    };
+    entry.sessions.add(row.session_id);
+    if (row.player) entry.players.add(row.player);
+    entry.questions += 1;
+    if (row.result === "correct") entry.correct += 1;
+    entry.points += Number(row.points) || 0;
+    days.set(day, entry);
+
+    const time = Date.parse(row.timestamp);
+    if (!Number.isNaN(time)) {
+      const key = `${day}|${row.session_id}`;
+      const span = sessionSpans.get(key) ?? { day, min: time, max: time };
+      span.min = Math.min(span.min, time);
+      span.max = Math.max(span.max, time);
+      sessionSpans.set(key, span);
+    }
+  }
+
+  const minutesByDay = new Map();
+  for (const { day, min, max } of sessionSpans.values()) {
+    minutesByDay.set(day, (minutesByDay.get(day) ?? 0) + (max - min) / 60000);
+  }
+
+  return [...days.values()]
+    .sort((a, b) => b.day.localeCompare(a.day))
+    .map((entry) => ({
+      date: entry.day,
+      players: [...entry.players].sort((a, b) => a.localeCompare(b)).join(", "),
+      sessions: entry.sessions.size,
+      questions: entry.questions,
+      accuracy: entry.questions ? (100 * entry.correct) / entry.questions : 0,
+      minutes: minutesByDay.get(entry.day) ?? 0,
+      points: entry.points,
+    }));
+}
+
+function activityTable(rows, showPlayers) {
+  const days = dailyActivity(rows);
+  const columns = [
+    ["date", t("dash.activity_col_date")],
+    ...(showPlayers ? [["players", t("dash.activity_col_players")]] : []),
+    ["sessions", t("dash.activity_col_sessions")],
+    ["questions", t("dash.activity_col_questions")],
+    ["accuracy", t("dash.activity_col_accuracy")],
+    ["minutes", t("dash.activity_col_minutes")],
+    ["points", t("dash.col_points")],
+  ];
+
+  const table = el("table.kmg-table.kmg-activity-table");
+  table.append(
+    el("thead", {}, [el("tr", {}, columns.map(([, label]) => el("th", { text: label })))]),
+    el(
+      "tbody",
+      {},
+      days.map((day) =>
+        el(
+          "tr",
+          {},
+          columns.map(([key]) => {
+            const value =
+              key === "accuracy" ? `${Math.round(day.accuracy)}%` : key === "minutes" ? day.minutes.toFixed(0) : day[key];
+            return el("td", { text: String(value) });
+          }),
+        ),
+      ),
+    ),
+  );
+  return el("div.kmg-table-scroll", {}, [table]);
 }
 
 export function render(container) {
@@ -159,6 +249,10 @@ export function render(container) {
           valueHead: t("dash.metric_questions"),
         }),
       ),
+
+      el("h2", { text: t("dash.activity_heading") }),
+      el("p.kmg-caption", { text: t("dash.activity_caption", { days: MIN_RETENTION_DAYS }) }),
+      activityTable(rows, players.length > 1),
 
       el("h2", { text: t("dash.table_heading") }),
       logTable(rows),

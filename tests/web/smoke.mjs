@@ -215,6 +215,28 @@ if (!(balanceAfter < balanceShown)) {
 }
 console.log(`  rewards shop: ${balanceShown} coins -> unlocked an item -> ${balanceAfter} left`);
 
+// The daily coin cap strip must render a real number - it is the thing that
+// stops one long session from clearing the whole shop, so it needs to be
+// visible, not just correct in state.
+const dailyCapText = await page.locator(".kmg-reward-daily-value").textContent();
+if (!/\d+/.test(dailyCapText ?? "")) {
+  note("rewards:shop", `daily coin cap indicator did not render a number: "${dailyCapText}"`);
+}
+
+// A level-gated item still out of reach (mythic tier needs level 5; this
+// profile only just reached level 2) must show a lock reason instead of a
+// price, whatever coins are on hand.
+const lockedMythicCard = page.locator(".kmg-reward-card.is-locked:has(.kmg-tier-mythic)").first();
+if (await lockedMythicCard.count()) {
+  const hasLockMessage = await lockedMythicCard.locator(".kmg-reward-lockmsg").count();
+  const hasBuyButton = await lockedMythicCard.locator(".kmg-reward-btn").count();
+  if (!hasLockMessage || hasBuyButton) {
+    note("rewards:shop", "a locked mythic item should show a lock reason, not a buy button, before its level is reached");
+  }
+} else {
+  note("rewards:shop", "expected at least one locked mythic-tier card in the shop");
+}
+
 // Switching back to the default character must move the "equipped" tag.
 const switchButton = page.locator(".kmg-reward-card.is-unlocked .kmg-reward-btn").first();
 if (await switchButton.count()) {
@@ -235,6 +257,20 @@ const hasChart = await page.locator(".kmg-chart svg").count();
 if (!hasChart) note("dashboard:data", "no chart rendered after a question was answered");
 const hasRows = await page.locator(".kmg-logtable tbody tr").count();
 if (!hasRows) note("dashboard:data", "the answered question is not in the log table");
+const hasActivityRows = await page.locator(".kmg-activity-table tbody tr").count();
+if (!hasActivityRows) note("dashboard:data", "no rows in the daily activity log table");
+
+// A refresh must not lose any of it - the whole point of keeping results and
+// activity in localStorage instead of only in page memory.
+currentRoute = "dashboard:reload";
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(400);
+if (!(await page.locator(".kmg-logtable tbody tr").count())) {
+  note("dashboard:reload", "the log table is empty after refreshing the page");
+}
+if (!(await page.locator(".kmg-activity-table tbody tr").count())) {
+  note("dashboard:reload", "the daily activity log is empty after refreshing the page");
+}
 
 // --- language switch -------------------------------------------------------
 

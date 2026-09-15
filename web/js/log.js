@@ -7,9 +7,13 @@
  *
  * Here the history lives in the browser's localStorage instead, which means:
  *   - it survives redeploys, because deploying no longer touches it;
+ *   - it survives a page refresh, for the same reason;
  *   - it never leaves the child's device;
  *   - it is per device and per browser, which is the honest tradeoff and the
  *     reason the dashboard keeps a prominent CSV export.
+ * At least MIN_RETENTION_DAYS days of it are always kept (see trimToBudget
+ * below), not just "usually" - that is the guarantee the parent dashboard's
+ * activity log is built on.
  *
  * The row shape is byte-for-byte the one gamelog.py writes, so a CSV exported
  * from the Streamlit version and one exported from here open the same way.
@@ -21,7 +25,14 @@ const LOG_KEY = "kmg.attempts";
 // Roughly a school year of daily play at 60 questions a day. Old rows are
 // dropped from the front rather than letting localStorage hit its quota and
 // start throwing mid-lesson.
-const MAX_ROWS = 12000;
+export const MAX_ROWS = 12000;
+// However big MAX_ROWS is, a row from the last MIN_RETENTION_DAYS days is
+// never dropped just for being over that budget - only rows older than the
+// window are. That turns "roughly a school year, usually" into an actual
+// guarantee a parent can rely on: at least this many days of results and
+// activity survive no matter how much a child plays in any single day, and a
+// refresh never loses any of it either, because it is all in localStorage.
+export const MIN_RETENTION_DAYS = 14;
 
 export const FIELDNAMES = [
   "timestamp",
@@ -48,13 +59,41 @@ function load() {
   }
 }
 
+/**
+ * Trim `list` towards `budget` rows, but only by dropping rows older than
+ * MIN_RETENTION_DAYS, oldest first. Rows inside the retention window are
+ * never dropped this way, even if that means staying over budget - the
+ * window is a guarantee, budget is just a soft target above it.
+ */
+// Exported for the retention test in tests/web/test_logic.mjs, which needs
+// to inject rows with specific ages - logAttempt always stamps "now".
+export function trimToBudget(list, budget) {
+  if (list.length <= budget) return list;
+  const cutoff = Date.now() - MIN_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  // Bad/missing timestamps count as "recent" - safer to keep a little too
+  // much than to silently drop something a parent might still want to see.
+  const firstRecentIndex = list.findIndex((row) => {
+    const time = Date.parse(row.timestamp);
+    return Number.isNaN(time) || time >= cutoff;
+  });
+  const recentStart = firstRecentIndex === -1 ? list.length : firstRecentIndex;
+  const recentCount = list.length - recentStart;
+  const oldRowsToKeep = Math.max(0, Math.min(recentStart, budget - recentCount));
+  return list.slice(recentStart - oldRowsToKeep);
+}
+
 function persist() {
   try {
     localStorage.setItem(LOG_KEY, JSON.stringify(rows));
   } catch {
-    // Quota exceeded: drop the oldest quarter and try once more, so play
-    // continues rather than the log silently breaking.
-    rows = rows.slice(Math.floor(rows.length / 4));
+    // Quota exceeded: drop towards three-quarters of the current size,
+    // preferring rows older than the guaranteed retention window, and try
+    // once more so play continues rather than the log silently breaking. If
+    // even the retention window alone is too big for the quota, fall back to
+    // an unconditional drop - storage really is that full, and continuing to
+    // log something is still better than logging nothing.
+    const trimmed = trimToBudget(rows, Math.floor(rows.length * 0.75));
+    rows = trimmed.length < rows.length ? trimmed : rows.slice(Math.floor(rows.length / 4));
     try {
       localStorage.setItem(LOG_KEY, JSON.stringify(rows));
     } catch {
@@ -90,7 +129,7 @@ export function logAttempt({
     game_key: gameKey,
   };
   rows.push(entry);
-  if (rows.length > MAX_ROWS) rows = rows.slice(rows.length - MAX_ROWS);
+  rows = trimToBudget(rows, MAX_ROWS);
   persist();
   return entry;
 }
