@@ -5,6 +5,58 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 8 - harder rewards, more characters, daily activity log)
+
+**A dedicated child could clear the entire reward shop in one sitting - the
+shop is now built so that cannot happen.** Three changes, stacked:
+
+- **A daily coin cap.** `state.js` now caps *spendable* coins at 300 earned
+  per calendar day (`DAILY_COIN_CAP`); score, streaks, levels and badges are
+  never capped, only the shop's currency. The reward shop shows a "coins
+  earned today" strip with its own progress bar, and a plain message once
+  the day's coins are spent ("come back tomorrow for more").
+- **Level gates, not just coin gates.** Rare tier and up now also require
+  the child to have actually reached a certain level in some game
+  (`highestLevelReached()`), so "collect enough points" and "get good
+  enough" both matter, exactly as asked. A locked card explains which of the
+  two is still missing instead of only showing a price.
+- **Steeper, longer tiers.** Existing tiers cost more (common 30 to 40,
+  legendary 1000 to 1500, ...), and two new tiers sit above legendary:
+  **mythic** (original anime-style heroes - "Dragon Blade Hero", "Star
+  Ninja", "Galaxy Guardian" and matching stickers, 3000 coins, needs a maxed
+  game) and **ultra**, a single capstone item gated on `requiresMastery`:
+  every game at its own true max level (Tafel Monster's level 6 included -
+  see `allGamesAtTrueMax()`) *and* every other reward in the shop already
+  unlocked. At the cap and with nothing else to grind, the full catalog now
+  takes weeks of daily play rather than one long session.
+  (Real franchise characters such as Luffy are trademarked, so the "special
+  anime character" tier is a set of original characters in that spirit
+  rather than a copy of one.)
+
+**The catalog itself nearly tripled**: 11 characters and 10 stickers became
+26 and 23, spread across seven tiers (common through ultra) instead of five,
+each card now showing a tier ribbon so the shop reads as "how special is
+this" at a glance.
+
+**The ultra item is a real rotating 3D cube**, not a flat emoji - six CSS
+faces with `transform-style: preserve-3d`, no library and no new dependency,
+consistent with how every other animation in this app is hand-rolled. It
+freezes on `prefers-reduced-motion` exactly like everything else.
+
+### Added (round 8 - parent dashboard activity log)
+
+**A new "Daily activity log" table** on the parent dashboard
+(`web/js/pages/dashboard.js`) summarises every day at a glance - sessions,
+questions, accuracy, minutes played, coins earned, and which child played,
+newest first - next to the existing per-question log and charts.
+
+**History now survives more than "usually".** The attempt log
+(`web/js/log.js`) already lived in localStorage and already survived a
+refresh; what changed is that at least 14 days of it (`MIN_RETENTION_DAYS`)
+can no longer be trimmed away by the row-count budget, only rows older than
+that window can be - a guarantee instead of a coincidence of how much a
+child happens to play. The dashboard caption says so explicitly.
+
 ### Added (round 7 - reward shop)
 
 **Coins earned by playing can now be spent.** Every correct answer already

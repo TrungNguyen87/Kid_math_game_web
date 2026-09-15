@@ -1614,6 +1614,152 @@ table.kmg-table th {
   color: #3e2723;
 }
 
+/* Tier ribbon - shown on every card so the shop reads as "how special is
+   this" at a glance, not just "can I afford it". Common/uncommon stay
+   muted on purpose; rare and up get progressively louder. */
+.kmg-reward-tier {
+  align-self: flex-start;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.kmg-tier-rare {
+  background: var(--blue);
+  border-color: var(--blue-dark);
+  color: #fff;
+}
+.kmg-tier-epic {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #fff;
+}
+.kmg-tier-legendary {
+  background: linear-gradient(90deg, var(--amber), var(--orange));
+  border-color: var(--orange-dark);
+  color: #3e2723;
+}
+.kmg-tier-mythic {
+  background: linear-gradient(90deg, #ab47bc, #ff7043);
+  border-color: var(--purple);
+  color: #fff;
+}
+.kmg-tier-ultra {
+  background: linear-gradient(90deg, #ffd54f, #ff7043, #ab47bc);
+  border-color: var(--amber);
+  color: #fff;
+}
+
+/* Locked for a reason more coins won't fix - shown instead of the price bar. */
+.kmg-reward-lockmsg {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  line-height: 1.3;
+}
+
+/* Daily coin cap strip - the thing that stops one long session from clearing
+   the whole shop. Sits right under the balance card, always visible. */
+.kmg-reward-daily {
+  margin: -0.5rem 0 1.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.kmg-reward-daily-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+.kmg-reward-daily-label {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+.kmg-reward-daily-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kmg-reward-daily .kmg-caption {
+  margin: 0.4rem 0 0;
+}
+
+/* The one ultra reward: a real rotating 3D cube (CSS transforms, no library)
+   instead of a flat emoji, so the rarest item in the shop looks like it. */
+.kmg-reward-card.is-3d {
+  background: linear-gradient(160deg, var(--surface), var(--amber-soft));
+}
+.kmg-reward-card.is-3d.is-unlocked {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(255, 179, 0, 0.28), var(--shadow-lg);
+}
+.kmg-reward-cube {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: 0.2rem auto 0.1rem;
+  perspective: 30rem;
+}
+.kmg-reward-cube-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: kmgCubeSpin 9s linear infinite;
+}
+.kmg-cube-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, var(--amber-soft), var(--amber));
+  border: 2px solid var(--amber);
+  box-shadow: inset 0 0 0.75rem rgba(255, 255, 255, 0.35);
+  backface-visibility: hidden;
+}
+.kmg-cube-front {
+  transform: translateZ(2.25rem);
+}
+.kmg-cube-back {
+  transform: rotateY(180deg) translateZ(2.25rem);
+}
+.kmg-cube-right {
+  transform: rotateY(90deg) translateZ(2.25rem);
+}
+.kmg-cube-left {
+  transform: rotateY(-90deg) translateZ(2.25rem);
+}
+.kmg-cube-top {
+  transform: rotateX(90deg) translateZ(2.25rem);
+}
+.kmg-cube-bottom {
+  transform: rotateX(-90deg) translateZ(2.25rem);
+}
+@keyframes kmgCubeSpin {
+  from {
+    transform: rotateX(-18deg) rotateY(0deg);
+  }
+  to {
+    transform: rotateX(-18deg) rotateY(360deg);
+  }
+}
+.kmg-reward-3d-caption {
+  margin: 0;
+  font-size: 0.74rem;
+  font-style: italic;
+  color: var(--text-soft);
+}
+
 /* ==========================================================================
    Answer layouts
    ========================================================================== */

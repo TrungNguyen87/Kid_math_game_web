@@ -20,6 +20,14 @@ export const LEVEL_UP_STREAK = 3; // correct answers in a row needed to level up
 export const LEVEL_DOWN_STREAK = 2; // wrong answers in a row that drop a level
 export const SESSION_GOAL_MINUTES = 45;
 
+// A child can only earn this many *spendable* coins per calendar day (UTC,
+// matching the log's UTC timestamps). totalScore, streaks, levels and badges
+// are never capped - only the reward-shop currency is, and only the earning
+// of it, never spending it. This is what stops one long session from clearing
+// the whole shop: the catalog's higher tiers are priced assuming this cap, so
+// raising it here is the one knob a parent would need to turn.
+export const DAILY_COIN_CAP = 300;
+
 export const GAME_KEYS = [
   "tafel",
   "breuken",
@@ -73,6 +81,13 @@ function randomId() {
   return Math.random().toString(16).slice(2, 10);
 }
 
+// UTC, deliberately: it is what every log timestamp already uses (see
+// log.js), so "today" means the same thing everywhere in the app rather than
+// drifting between a local-time reward reset and a UTC-time log.
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 const listeners = new Set();
 
 /** Subscribe to any state change; returns an unsubscribe function. */
@@ -105,6 +120,8 @@ export const state = {
   // but drops when spent, so totalScore stays a lifetime achievement number
   // while coins are what the shop actually charges.
   coins: 0,
+  coinsEarnedToday: 0,
+  coinsEarnedDay: todayKey(),
   unlockedRewards: new Set(),
   equippedAvatar: null,
   gamesTried: new Set(),
@@ -134,6 +151,8 @@ export function saveCurrentProfile() {
     levels: { ...state.levels },
     badges: [...state.badges],
     coins: state.coins,
+    coinsEarnedToday: state.coinsEarnedToday,
+    coinsEarnedDay: state.coinsEarnedDay,
     unlockedRewards: [...state.unlockedRewards].sort(),
     equippedAvatar: state.equippedAvatar,
     gamesTried: [...state.gamesTried].sort(),
@@ -156,6 +175,8 @@ export function applyProfile(name) {
     state.levels = freshLevels();
     state.badges = [];
     state.coins = 0;
+    state.coinsEarnedToday = 0;
+    state.coinsEarnedDay = todayKey();
     state.unlockedRewards = new Set();
     state.equippedAvatar = null;
     state.gamesTried = new Set();
@@ -169,6 +190,9 @@ export function applyProfile(name) {
   );
   state.badges = profile.badges || [];
   state.coins = profile.coins || 0;
+  state.coinsEarnedToday = profile.coinsEarnedToday || 0;
+  state.coinsEarnedDay = profile.coinsEarnedDay || todayKey();
+  ensureCoinDayFresh(); // a profile loaded on a later day starts with a clean cap
   state.unlockedRewards = new Set(profile.unlockedRewards || []);
   state.equippedAvatar = profile.equippedAvatar || null;
   state.gamesTried = new Set(profile.gamesTried || []);
@@ -208,10 +232,37 @@ export function setSoundEnabled(enabled) {
 // Scoring and adaptive difficulty (unchanged rules from utils/state.py)
 // ---------------------------------------------------------------------------
 
+// Rolls state.coinsEarnedToday over the moment the UTC date changes, so a
+// profile that was last saved yesterday (or last week) starts today with a
+// full cap instead of whatever was left over.
+function ensureCoinDayFresh() {
+  const today = todayKey();
+  if (state.coinsEarnedDay !== today) {
+    state.coinsEarnedDay = today;
+    state.coinsEarnedToday = 0;
+  }
+}
+
+/** Spendable coins still earnable today before DAILY_COIN_CAP kicks in. */
+export function remainingDailyCoins() {
+  ensureCoinDayFresh();
+  return Math.max(0, DAILY_COIN_CAP - state.coinsEarnedToday);
+}
+
 export function addScore(points = 10) {
   state.totalScore += points;
-  state.coins += points;
   state.streaks += 1;
+  // totalScore is the lifetime achievement number and is never capped; coins
+  // are the reward-shop currency, and only that earning is capped per day -
+  // spending coins is unaffected, and levels/badges/streaks read totalScore
+  // and the streak counter, never coins, so difficulty and badges keep
+  // working exactly as before even on a day the cap is hit.
+  ensureCoinDayFresh();
+  const grant = Math.min(points, Math.max(0, DAILY_COIN_CAP - state.coinsEarnedToday));
+  if (grant > 0) {
+    state.coins += grant;
+    state.coinsEarnedToday += grant;
+  }
   emitChange();
 }
 
@@ -239,6 +290,16 @@ export function getMaxLevel(gameKey = null) {
 
 export function getLevel(gameKey) {
   return state.levels[gameKey] ?? MIN_LEVEL;
+}
+
+/** The highest level the child has reached in any single game so far. */
+export function highestLevelReached() {
+  return Math.max(MIN_LEVEL, ...GAME_KEYS.map((k) => getLevel(k)));
+}
+
+/** True once every game - Tafel Monster's own level 6 included - is maxed. */
+export function allGamesAtTrueMax() {
+  return GAME_KEYS.every((k) => getLevel(k) >= getMaxLevel(k));
 }
 
 export function setLevel(gameKey, level) {
@@ -315,6 +376,8 @@ export function clearAllProfiles() {
   state.levels = freshLevels();
   state.badges = [];
   state.coins = 0;
+  state.coinsEarnedToday = 0;
+  state.coinsEarnedDay = todayKey();
   state.unlockedRewards = new Set();
   state.equippedAvatar = null;
   state.gamesTried = new Set();

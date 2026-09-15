@@ -25,6 +25,8 @@ const { markdown, escapeHtml } = await import("../../web/js/markdown.js");
 const { gcd, randInt, sample, shuffled, unique } = await import("../../web/js/rng.js");
 const state = await import("../../web/js/state.js");
 const { checkNewBadges, BADGE_IDS } = await import("../../web/js/badges.js");
+const rewards = await import("../../web/js/rewards.js");
+const log = await import("../../web/js/log.js");
 const visuals = await import("../../web/js/visuals.js");
 
 const tafel = await import("../../web/js/games/tafel.js");
@@ -221,6 +223,136 @@ test("badges are awarded once, in definition order", () => {
   // Stored in definition order, not the order they happened to be earned.
   const order = state.state.badges.map((id) => BADGE_IDS.indexOf(id));
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
+});
+
+// ---------------------------------------------------------------------------
+// Daily coin cap
+// ---------------------------------------------------------------------------
+
+test("addScore caps spendable coins per day but never totalScore or streaks", () => {
+  state.state.coins = 0;
+  state.state.coinsEarnedToday = 0;
+  state.state.coinsEarnedDay = new Date().toISOString().slice(0, 10);
+  state.state.totalScore = 0;
+  state.state.streaks = 0;
+
+  const cap = state.DAILY_COIN_CAP;
+  state.addScore(cap - 10);
+  assert.equal(state.state.coins, cap - 10);
+
+  state.addScore(50); // would push coins past the cap
+  assert.equal(state.state.coins, cap, "coins must not exceed the daily cap");
+  assert.equal(state.state.totalScore, cap - 10 + 50, "totalScore is a lifetime number and is never capped");
+  assert.equal(state.state.streaks, 2, "the streak counter is never capped either");
+  assert.equal(state.remainingDailyCoins(), 0);
+
+  state.addScore(25); // the day is spent: no more coins, but score still climbs
+  assert.equal(state.state.coins, cap);
+  assert.equal(state.state.totalScore, cap - 10 + 50 + 25);
+});
+
+test("remainingDailyCoins resets once the stored day is not today", () => {
+  state.state.coinsEarnedToday = 250;
+  state.state.coinsEarnedDay = "2000-01-01";
+  assert.equal(state.remainingDailyCoins(), state.DAILY_COIN_CAP);
+});
+
+// ---------------------------------------------------------------------------
+// Reward shop: level and collection gates, not just coins
+// ---------------------------------------------------------------------------
+
+test("highestLevelReached is the highest level across every game", () => {
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+  state.setLevel("breuken", 3);
+  state.setLevel("tafel", 5);
+  assert.equal(state.highestLevelReached(), 5);
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+});
+
+test("allGamesAtTrueMax accounts for tafel's own max of 6, not the shared 5", () => {
+  for (const k of state.GAME_KEYS) state.setLevel(k, state.getMaxLevel(k));
+  assert.equal(state.getLevel("tafel"), 6);
+  assert.equal(state.allGamesAtTrueMax(), true);
+  state.setLevel("tafel", 5);
+  assert.equal(state.allGamesAtTrueMax(), false, "tafel at 5 of 6 is not actually maxed");
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+});
+
+test("unlockReward refuses a level-gated item until that level is reached, even with coins to spare", () => {
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+  state.state.unlockedRewards = new Set();
+  state.state.equippedAvatar = null;
+  state.state.coins = 100000;
+  state.state.coinsEarnedToday = 0;
+
+  assert.equal(rewards.lockReason("avatar_unicorn"), "level");
+  assert.equal(rewards.unlockReward("avatar_unicorn"), false, "level 2 has not been reached anywhere yet");
+  assert.equal(rewards.isUnlocked("avatar_unicorn"), false);
+
+  state.setLevel("tafel", 2);
+  assert.equal(rewards.lockReason("avatar_unicorn"), "coins", "the level is met, only the (already-had) cost is left");
+  assert.equal(rewards.unlockReward("avatar_unicorn"), true);
+  assert.equal(rewards.isUnlocked("avatar_unicorn"), true);
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+});
+
+test("the ultra reward needs every game maxed and every other reward already unlocked", () => {
+  for (const k of state.GAME_KEYS) state.setLevel(k, state.getMaxLevel(k));
+  state.state.coins = 1000000;
+  state.state.coinsEarnedToday = 0;
+
+  // Nothing else unlocked yet: coins and maxed games are not enough on their own.
+  state.state.unlockedRewards = new Set();
+  assert.equal(rewards.lockReason("avatar_3d_champion"), "mastery");
+  assert.equal(rewards.unlockReward("avatar_3d_champion"), false);
+
+  // Unlock everything else first, exactly as a child actually would.
+  state.state.unlockedRewards = new Set(
+    rewards.REWARD_DEFS.map((d) => d.id).filter((id) => id !== "avatar_3d_champion"),
+  );
+  assert.equal(rewards.lockReason("avatar_3d_champion"), "coins");
+  assert.equal(rewards.unlockReward("avatar_3d_champion"), true);
+  assert.equal(rewards.isUnlocked("avatar_3d_champion"), true);
+
+  for (const k of state.GAME_KEYS) state.setLevel(k, 0);
+  state.state.unlockedRewards = new Set();
+});
+
+test("the always-free default avatar is never locked", () => {
+  assert.equal(rewards.isUnlocked("avatar_default"), true);
+  assert.equal(rewards.lockReason("avatar_default"), null);
+});
+
+// ---------------------------------------------------------------------------
+// Attempt log retention (parent dashboard history)
+// ---------------------------------------------------------------------------
+
+test("trimToBudget never drops a row from inside the retention window, even over budget", () => {
+  const now = Date.now();
+  const isoDaysAgo = (n) => new Date(now - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+
+  const rows = [];
+  for (let i = 0; i < 30; i++) rows.push({ timestamp: isoDaysAgo(20), id: `old-${i}` }); // outside the window
+  for (let i = 0; i < 10; i++) rows.push({ timestamp: isoDaysAgo(1), id: `recent-${i}` }); // inside the window
+
+  const trimmed = log.trimToBudget(rows, 5); // budget smaller than the recent rows alone
+  const recentKept = trimmed.filter((r) => r.id.startsWith("recent-"));
+  const oldKept = trimmed.filter((r) => r.id.startsWith("old-"));
+
+  assert.equal(recentKept.length, 10, "every row inside MIN_RETENTION_DAYS must survive");
+  assert.equal(oldKept.length, 0, "no budget is left for anything outside the window");
+  assert.ok(trimmed.length > 5, "the retention guarantee can push the result over budget");
+
+  // With room to spare, old rows fill the rest of the budget, newest first.
+  const roomy = log.trimToBudget(rows, 15);
+  assert.equal(roomy.filter((r) => r.id.startsWith("recent-")).length, 10);
+  assert.equal(roomy.filter((r) => r.id.startsWith("old-")).length, 5);
+  assert.equal(roomy.length, 15);
+});
+
+test("trimToBudget is a no-op when the list already fits", () => {
+  const rows = [{ timestamp: new Date().toISOString() }];
+  assert.equal(log.trimToBudget(rows, 100), rows);
 });
 
 // ---------------------------------------------------------------------------

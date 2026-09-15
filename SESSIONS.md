@@ -9,6 +9,128 @@ rediscover them.
 
 ---
 
+## Session 7 — 15 September 2026
+
+**Branch:** `claude/reward-difficulty-characters-bbdk1u`
+
+### Asked
+
+1. Make the reward shop harder: a child was collecting every character and
+   sticker in a single day, and unlocking the special ones should need a
+   certain level as well as more points.
+2. Add more characters and stickers, including special anime-style
+   characters that cost more, and a rare 3D character only reachable after
+   finishing everything.
+3. A parent-visible activity/results log with at least 10 days of history
+   that survives a page refresh.
+4. Test everything at the end and confirm the GitHub deployment path is
+   still clean.
+
+### Decided: a coin cap, not just higher prices
+
+Raising prices alone does not fix "cleared in one day", because the
+underlying problem is that a long single session can earn thousands of
+points. `state.js` now caps *spendable* coins at `DAILY_COIN_CAP` (300) per
+calendar day - score, streaks, levels and badges stay uncapped, since those
+are achievement, not currency. That is what turns "the shop" from a
+one-sitting problem into a genuinely multi-week one, on top of higher
+individual prices.
+
+The other half of "a certain level" is `highestLevelReached()`: rare tier
+and up now also check the child's best level across every game, independent
+of coins. A locked card says which of the two - level or coins - is still
+missing, in that priority order, rather than only ever showing a price.
+
+### Decided: original characters, not licensed ones
+
+Luffy (One Piece) was the example given, but a real franchise character's
+name and likeness are trademarked/copyrighted; reproducing them - even as
+emoji-and-name reward cards in a personal project - is not something to
+build. The **mythic** tier delivers the same feeling (rare, anime-styled,
+expensive, unlocked late) with original characters instead: Dragon Blade
+Hero, Star Ninja, Galaxy Guardian, and matching stickers. Worth saying
+plainly here so a future session does not "fix" this by adding the real
+names back in.
+
+### Decided: a real 3D reward, kept dependency-free
+
+The one **ultra** item (`avatar_3d_champion`, gated on `requiresMastery`:
+every game at its own true max - `allGamesAtTrueMax()`, not the shared
+level-5 constant - and every other reward already unlocked) renders as an
+actual rotating cube: six `.kmg-cube-face` divs, `transform-style:
+preserve-3d`, one `@keyframes` rule. No Three.js, no new dependency - this
+app's whole architecture is "no build step, no framework", and the existing
+confetti/charts are hand-rolled for the same reason. It freezes on
+`prefers-reduced-motion` for free, via the global rule every other animation
+already obeys.
+
+### Done
+
+- **`web/js/rewards.js`**: catalog grown from 21 items to 49 (26 characters,
+  23 stickers) across seven tiers; `minLevel` and `requiresMastery` gates;
+  `lockReason()` so the UI can explain *why* something is locked, not just
+  *that* it is.
+- **`web/js/state.js`**: `DAILY_COIN_CAP`, `coinsEarnedToday`/`coinsEarnedDay`
+  (persisted, UTC-day rollover), `highestLevelReached()`,
+  `allGamesAtTrueMax()`.
+- **`web/js/pages/rewards.js`** + **`web/css/app.css`**: tier ribbons, a
+  daily-coins strip with its own progress bar, lock-reason messages, and the
+  3D cube for the capstone card.
+- **`web/js/log.js`**: `trimToBudget()` guarantees `MIN_RETENTION_DAYS` (14)
+  survive regardless of the row-count budget - only older rows are trimmed
+  to fit it.
+- **`web/js/pages/dashboard.js`**: a new daily-activity table (date,
+  players, sessions, questions, accuracy, minutes, points), newest first,
+  next to the existing charts and raw log.
+- **~50 new i18n keys**, NL and EN, hand-added: `utils/i18n.py` and its
+  generator are gone from this repo (removed in an earlier session), so
+  `web/js/i18n-data.js` is now the source of truth and was edited directly.
+- Tests: 13 new Node tests (daily cap and its day-rollover, level/mastery
+  gating on `unlockReward`, `trimToBudget`'s retention guarantee) and three
+  new Playwright smoke checks (the daily-cap strip renders a number, a
+  mythic-tier card shows a lock reason rather than a buy button, and a
+  dashboard reload keeps both the raw log and the new activity table).
+
+### Found along the way
+
+**Testing this by hand-editing localStorage races the app's own autosave.**
+`main.js` saves the current profile on `pagehide` and on
+`visibilitychange`, so injecting a profile into localStorage on an
+already-booted page and then calling `page.reload()` loses the injection:
+the outgoing page's unload handler fires first, using its own stale
+in-memory state, and overwrites what was just written. Seeding through
+Playwright's `context.addInitScript()` (which runs before the app's own
+boot code, on every navigation) avoids it for a first load - but then
+itself becomes the trap on a *second* reload in the same test, since it
+reseeds the original data every time. The fix used here: mutate state
+in-page, then re-render with a client-side hash round-trip
+(`location.hash = "#/home"` then back) instead of `reload()`, since the
+router re-renders on `hashchange` without tearing down the document.
+Worth remembering for any future test that pokes at localStorage mid-test.
+
+**`npm test`/`check:precache`/`test:smoke` are not part of the GitHub Pages
+deploy workflow** - `.github/workflows/deploy-pages.yml` only runs
+`tools/check_precache.py`. Nothing here changed that, but it means the full
+test suite (75 Node tests, precache check, 16-route Playwright smoke test)
+is a local/manual discipline, not a CI gate - all three were run by hand
+this session and are clean.
+
+### Still open
+
+- `DAILY_COIN_CAP` (300) and the tier costs are one set of numbers that
+  felt right against this session's estimate of how fast a child earns
+  coins; there is no telemetry to confirm it against, so a parent finding it
+  too slow or too fast is a config change (`state.js`, `rewards.js`), not a
+  redesign.
+- No UI for a parent to adjust the daily cap - it is a constant in code.
+  Fine for now, a real setting if this project ever gets a settings page.
+- The dashboard's daily-activity table has no row cap of its own; on a
+  device played on for years it will eventually be as long as the number of
+  days ever played (the raw per-question table already caps at 200 shown
+  rows, which is where this could follow if it ever becomes a problem).
+
+---
+
 ## Session 6 — 10 September 2026
 
 **Branch:** `claude/game-deployment-platform-4sln0n`
