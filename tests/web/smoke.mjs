@@ -304,7 +304,7 @@ console.log(`  bliksem clock: ${firstTick}s -> ${secondTick}s`);
 await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
 
-// --- Racewedstrijd / Race Challenge: the serverless competition mode -------
+// --- Racewedstrijd / Race Challenge: the race mode ---------------------
 
 // The race's operator can be +, − (U+2212), × (U+00D7) or a ":" division, so
 // parsing "a OP b = ?" needs all four rather than the simple a*b tafel uses.
@@ -319,101 +319,135 @@ function computeRaceAnswer(text) {
   return a / b; // ":" - shown as "dividend : divisor"
 }
 
-// Tap out a (possibly multi-digit) answer on the race's own on-screen pad.
-async function typeOnPad(page, value) {
-  for (const digit of String(value)) {
-    await page.locator(".kmg-padkey", { hasText: new RegExp(`^${digit}$`) }).first().click();
-  }
+// Read the question off one side-by-side player card and tap the matching
+// choice button - the tap *is* the submission, there is no check button.
+async function answerPlayerCard(page, cardIndex) {
+  const card = page.locator(".kmg-race-player-card").nth(cardIndex);
+  const text = await card.locator(".kmg-question-text").textContent();
+  const answer = computeRaceAnswer(text ?? "");
+  if (answer == null) return null;
+  await card.locator(".kmg-choice", { hasText: new RegExp(`^${answer}$`) }).first().click();
+  return answer;
 }
 
-currentRoute = "compete:race";
+// --- Local: several players race side by side on this one device ---------
+
+currentRoute = "compete:local";
 await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-race-mode-tab");
+await page.locator(".kmg-race-mode-tab").nth(1).click(); // "Together on this device"
 await page.waitForSelector(".kmg-levelrow .kmg-levelbtn");
+// Level 0 is addition/subtraction only, so every question is answerable by
+// straightforward parsing - avoids a round hanging on an unlucky draw.
+await page.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
+await page.locator(".kmg-race-segment-btn", { hasText: /^5\b/ }).first().click(); // 5 questions, keeps this fast
+await page.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
+await page.waitForSelector(".kmg-race-arena .kmg-race-player-card", { timeout: 6000 });
 
-// Start a solo race at whatever difficulty is currently selected.
-await page.locator(".kmg-btn-primary").first().click();
-await page.waitForSelector(".kmg-ring", { timeout: 4000 });
-
-// Each question gets its own fresh 15s clock - prove it actually ticks.
-const raceFirstTick = await page.locator(".kmg-ring text").textContent();
-await page.waitForTimeout(1600);
-const raceSecondTick = await page.locator(".kmg-ring text").textContent();
-if (raceFirstTick === raceSecondTick) {
-  note("compete:race", `the per-question clock did not move (${raceFirstTick})`);
-}
-
-// Answer whatever question is on screen, correctly, by reading it off the
-// page and tapping the result out on the pad - exactly as a child would.
-const raceQuestion = await page.locator(".kmg-question-text").textContent();
-const raceAnswer = computeRaceAnswer(raceQuestion ?? "");
-if (raceAnswer == null) {
-  note("compete:race", `could not parse race question: "${raceQuestion}"`);
-} else {
-  await typeOnPad(page, raceAnswer);
-  await page.locator(".kmg-btn-primary").first().click();
-  const answeredOk = await page
-    .waitForSelector(".kmg-banner-ok", { timeout: 4000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!answeredOk) {
-    note("compete:race", `answering "${raceQuestion.trim()}" with ${raceAnswer} was not marked correct`);
+let localRoundsPlayed = 0;
+for (let i = 0; i < 6; i++) {
+  if (await page.locator(".kmg-race-winner-banner").count()) break;
+  const cardCount = await page.locator(".kmg-race-player-card").count();
+  if (cardCount !== 2) {
+    note("compete:local", `expected 2 side-by-side player cards, found ${cardCount}`);
+    break;
   }
-  console.log(`  compete race: answered "${raceQuestion.trim()}" with ${raceAnswer} -> ${answeredOk ? "correct" : "wrong"}`);
+  const a1 = await answerPlayerCard(page, 0);
+  const a2 = await answerPlayerCard(page, 1);
+  if (a1 == null || a2 == null) {
+    note("compete:local", "could not parse a race question on one of the player cards");
+    break;
+  }
+  localRoundsPlayed += 1;
+  await page.waitForTimeout(1300); // feedback banner, then auto-advance to the next round
 }
 
-// Leaving mid-race must stop the timer, same as bliksem above - the exact
-// same class of leak, in a page that reimplements its own countdown loop.
+const localFinished = await page.locator(".kmg-race-winner-banner").count();
+if (!localFinished) {
+  note("compete:local", `local race did not reach the results screen after ${localRoundsPlayed} round(s)`);
+} else {
+  const summaryCards = await page.locator(".kmg-race-summary-card").count();
+  if (summaryCards !== 2) note("compete:local", `expected 2 result summary cards, found ${summaryCards}`);
+  if (!(await page.locator(".kmg-btn-primary", { hasText: /🔁/ }).count())) {
+    note("compete:local", "results screen has no rematch button");
+  }
+}
+console.log(`  compete local: played ${localRoundsPlayed} round(s) side by side -> results ${localFinished ? "shown" : "MISSING"}`);
+
+// Leaving mid-race must stop the shared timer, same as bliksem above - the
+// exact same class of leak, in a page that reimplements its own countdown.
 await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
 
-// A full race (finish every question) must reach the results screen and
-// offer a way to challenge someone - the whole point of the mode.
-currentRoute = "compete:finish";
+// --- Online: a real join code against this same dev server ---------------
+//
+// The dev server this smoke test runs against (node server.js) is exactly
+// the self-hosted setup race-server.js is built for, so this exercises the
+// whole path for real: two browser pages, one WebSocket room, no mocking.
+
+currentRoute = "compete:online";
 await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
-await page.waitForSelector(".kmg-levelrow .kmg-levelbtn");
-// Level 0 is addition/subtraction only, so every question is answerable by
-// straightforward parsing - avoids the round hanging on an unlucky draw.
-await page.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
-await page.locator(".kmg-btn-primary").first().click();
-await page.waitForSelector(".kmg-ring", { timeout: 4000 });
+await page.waitForSelector(".kmg-race-mode-tab"); // online + "create" is the default
+await page.locator(".kmg-race-segment-btn", { hasText: /^5\b/ }).first().click();
+await page.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
 
-let questionsAnswered = 0;
-for (let i = 0; i < 12; i++) {
-  const onResults = await page.locator(".kmg-compete-card, .kmg-compete-results").count();
-  if (onResults) break;
-  const text = await page.locator(".kmg-question-text").textContent().catch(() => null);
-  if (!text) break;
-  const answer = computeRaceAnswer(text);
-  if (answer == null) {
-    note("compete:finish", `could not parse race question: "${text}"`);
-    break;
-  }
-  await typeOnPad(page, answer);
-  await page.locator(".kmg-btn-primary").first().click();
-  questionsAnswered += 1;
-  await page.waitForTimeout(1500); // feedback banner, then auto-advance
-}
+const codeVisible = await page
+  .waitForSelector(".kmg-race-big-code", { timeout: 6000 })
+  .then(() => true)
+  .catch(() => false);
 
-const shareVisible = await page.locator(".kmg-compete-share").count();
-if (!shareVisible) {
-  note("compete:finish", `race did not reach the share screen after ${questionsAnswered} answers`);
+if (!codeVisible) {
+  note("compete:online", "creating a room never showed a join code");
 } else {
-  const linkValue = await page.locator(".kmg-compete-linkbox").first().inputValue();
-  if (!/^https?:\/\/.+#\/compete\?c=.+/.test(linkValue)) {
-    note("compete:finish", `challenge link does not look like a URL: "${linkValue}"`);
-  }
-  const codeValue = await page.locator(".kmg-compete-codebox").first().inputValue();
-  if (!codeValue) note("compete:finish", "challenge code box is empty");
+  const roomCode = (await page.locator(".kmg-race-big-code").textContent())?.trim();
 
-  // Decoding that exact link must reproduce a real race, no server involved.
-  currentRoute = "compete:join";
-  await page.goto(linkValue, { waitUntil: "networkidle" });
-  const heading = await page.locator("#kmg-main h1").first().textContent();
-  if (!heading || !heading.trim()) note("compete:join", "opening a challenge link rendered no heading");
-  const challengeCard = await page.locator(".kmg-compete-challenge").count();
-  if (!challengeCard) note("compete:join", "opening a challenge link did not show the incoming-challenge card");
+  const guest = await context.newPage();
+  guest.on("pageerror", (error) => note("compete:online", `guest page error: ${error.message}`));
+  guest.on("console", (message) => {
+    if (message.type() === "error") note("compete:online", `guest console error: ${message.text()}`);
+  });
+  // A shared join link pre-fills the code, exactly like a pasted invite would.
+  await guest.goto(`${baseUrl}/#/compete?race=${roomCode}`, { waitUntil: "networkidle" });
+  await guest.waitForSelector(".kmg-race-mode-tab");
+  const codeField = guest.locator("input.kmg-textinput").last();
+  if ((await codeField.inputValue()).toUpperCase() !== roomCode) await codeField.fill(roomCode);
+  await guest.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
+
+  const guestJoined = await guest
+    .waitForSelector(".kmg-race-players-status .kmg-race-player-pill.is-me", { timeout: 6000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!guestJoined) note("compete:online", "guest never reached the lobby after joining with the code");
+
+  const hostSeesGuest = await page
+    .waitForFunction(() => document.querySelectorAll(".kmg-race-players-status .kmg-race-player-pill").length >= 2, {
+      timeout: 6000,
+    })
+    .then(() => true)
+    .catch(() => false);
+  if (!hostSeesGuest) note("compete:online", "host lobby never updated to show the guest joining live");
+
+  if (hostSeesGuest) {
+    await page.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click(); // host starts the race
+    const [hostInRound, guestInRound] = await Promise.all([
+      page.waitForSelector(".kmg-choices .kmg-choice", { timeout: 8000 }).then(() => true).catch(() => false),
+      guest.waitForSelector(".kmg-choices .kmg-choice", { timeout: 8000 }).then(() => true).catch(() => false),
+    ]);
+    if (!hostInRound || !guestInRound) {
+      note("compete:online", `the round did not reach both players (host: ${hostInRound}, guest: ${guestInRound})`);
+    } else {
+      await page.locator(".kmg-choices .kmg-choice").first().click();
+      await guest.locator(".kmg-choices .kmg-choice").first().click();
+      const recapReached = await page
+        .waitForSelector(".kmg-race-feedback .kmg-msg-ok, .kmg-race-feedback .kmg-msg-bad", { timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!recapReached) note("compete:online", "the round recap never reached the host after both players answered");
+    }
+  }
+  await guest.close();
 }
-console.log(`  compete race: full run of ${questionsAnswered} question(s) -> share screen ${shareVisible ? "shown" : "MISSING"}`);
+console.log(`  compete online: join code ${codeVisible ? "shown and joined" : "MISSING"}`);
 
 // --- mobile layout ---------------------------------------------------------
 

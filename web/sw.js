@@ -42,7 +42,7 @@ const PRECACHE = [
   "./js/sound.js",
   "./js/fx.js",
   "./js/illustrations.js",
-  "./js/compete.js",
+  "./js/race-logic.js",
   "./js/rng.js",
   "./js/visuals.js",
   "./js/charts.js",

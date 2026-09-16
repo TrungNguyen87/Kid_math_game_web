@@ -27,7 +27,7 @@ const state = await import("../../web/js/state.js");
 const { checkNewBadges, BADGE_IDS } = await import("../../web/js/badges.js");
 const rewards = await import("../../web/js/rewards.js");
 const log = await import("../../web/js/log.js");
-const compete = await import("../../web/js/compete.js");
+const race = await import("../../web/js/race-logic.js");
 const visuals = await import("../../web/js/visuals.js");
 
 const tafel = await import("../../web/js/games/tafel.js");
@@ -834,230 +834,131 @@ test("generators work in English too", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Racewedstrijd / Race Challenge - the serverless competition engine.
+// Racewedstrijd / Race Challenge - the race mode engine.
 //
-// This is the one part of the app where "untrusted input" is a real
-// category: decodeChallenge() has to survive a hand-edited, truncated or
-// flat-out hostile string arriving over a URL, so most of the coverage here
-// is adversarial rather than happy-path.
+// Several players answer the same questions at once (online via a join
+// code, or side by side on one device) - see web/js/race-logic.js. Every
+// question is multiple choice, and a race can now draw from more than one
+// kind of question (`category`), so the coverage here is mostly "every
+// category, every level, produces a valid, answerable, fair question".
 // ---------------------------------------------------------------------------
 
 const RACE_LEVELS = [0, 1, 2, 3, 4, 5];
 
-test("generated race questions are valid at every level", () => {
-  for (const level of RACE_LEVELS) {
-    const questions = compete.generateRaceQuestions(level, 40);
-    assert.equal(questions.length, 40);
-    for (const [a, b, op] of questions) {
-      assert.ok(Number.isInteger(a) && a >= 0, `bad a: ${a}`);
-      assert.ok(Number.isInteger(b) && b >= 0, `bad b: ${b}`);
-      assert.ok(["+", "-", "x", ":"].includes(op), `bad operator: ${op}`);
-      const answer = compete.questionAnswer(a, b, op);
-      assert.ok(Number.isInteger(answer), `non-integer answer for ${a} ${op} ${b}`);
-      if (op === "-") assert.ok(answer >= 0, `subtraction went negative: ${a} - ${b}`);
-      if (op === ":") {
-        assert.ok(b >= 1, "division by zero");
-        assert.ok(a * b <= 5000, `division dividend too large: ${a * b}`);
+function assertValidProblem(problem, category) {
+  assert.equal(typeof problem.text === "string" || typeof problem.textKey === "string", true, "problem needs text or a textKey");
+  if (problem.textKey) {
+    assert.ok(!problem.textKey.includes("undefined"));
+  } else {
+    assert.ok(problem.text.length > 0);
+    assert.ok(!problem.text.includes("NaN") && !problem.text.includes("undefined"));
+  }
+  assert.equal(problem.answerDisplay, String(problem.answer));
+  assert.equal(problem.options.length, 4, `${category}: expected 4 options, got ${problem.options.length}`);
+  assert.ok(new Set(problem.options).size === 4, `${category}: options must be unique: ${problem.options}`);
+  assert.ok(problem.options.includes(problem.answerDisplay), `${category}: the correct answer must be one of the options`);
+  for (const opt of problem.options) assert.equal(typeof opt, "string", `${category}: options must be strings`);
+}
+
+test("every category produces a valid multiple-choice question at every level", () => {
+  for (const category of race.CATEGORIES) {
+    for (const level of RACE_LEVELS) {
+      for (let i = 0; i < REPS / 4; i++) {
+        assertValidProblem(race.generateRaceProblem(category, level), category);
       }
-      const text = compete.questionText(a, b, op);
-      assert.ok(text.length > 0);
-      assert.ok(!text.includes("NaN") && !text.includes("undefined"));
     }
   }
 });
 
-test("questionText/questionAnswer are pure and agree with each other", () => {
-  assert.equal(compete.questionAnswer(4, 3, "+"), 7);
-  assert.equal(compete.questionAnswer(4, 3, "-"), 1);
-  assert.equal(compete.questionAnswer(4, 3, "x"), 12);
-  assert.equal(compete.questionAnswer(5, 3, ":"), 5); // a *is* the quotient
-  assert.equal(compete.questionText(4, 3, "+"), "4 + 3");
-  assert.equal(compete.questionText(4, 3, "-"), "4 − 3");
-  assert.equal(compete.questionText(4, 3, "x"), "4 × 3");
-  assert.equal(compete.questionText(5, 3, ":"), "15 : 3"); // dividend shown is a*b
+test("generateRaceQuestions returns exactly `count` questions", () => {
+  for (const category of race.CATEGORIES) {
+    const questions = race.generateRaceQuestions(category, 3, 12);
+    assert.equal(questions.length, 12);
+    questions.forEach((q) => assertValidProblem(q, category));
+  }
+});
+
+test("questionText/questionAnswer (bliksem) are pure and agree with each other", () => {
+  assert.equal(race.questionAnswer(4, 3, "+"), 7);
+  assert.equal(race.questionAnswer(4, 3, "-"), 1);
+  assert.equal(race.questionAnswer(4, 3, "x"), 12);
+  assert.equal(race.questionAnswer(5, 3, ":"), 5); // a *is* the quotient
+  assert.equal(race.questionText(4, 3, "+"), "4 + 3");
+  assert.equal(race.questionText(4, 3, "-"), "4 − 3");
+  assert.equal(race.questionText(4, 3, "x"), "4 × 3");
+  assert.equal(race.questionText(5, 3, ":"), "15 : 3"); // dividend shown is a*b
+});
+
+test("procenten hands back a textKey + vars instead of a hardcoded connector word", () => {
+  for (let i = 0; i < 50; i++) {
+    const problem = race.generateRaceProblem("procenten", 3);
+    assert.equal(problem.textKey, "race.pct_of");
+    assert.ok(Number.isInteger(problem.textVars.pct));
+    assert.ok(Number.isInteger(problem.textVars.base));
+    assert.equal(Number(problem.answer), (problem.textVars.pct * problem.textVars.base) / 100);
+  }
+});
+
+test("breuken adds two fractions that already share a denominator and never overflows it", () => {
+  for (let i = 0; i < 100; i++) {
+    const problem = race.generateRaceProblem("breuken", 4);
+    const [num1, den1] = problem.text.split(" + ")[0].split("/").map(Number);
+    const [sum, den2] = problem.answerDisplay.split("/").map(Number);
+    assert.equal(den1, den2);
+    assert.ok(sum <= den2, `fraction sum overflowed its denominator: ${problem.answerDisplay}`);
+    assert.ok(num1 >= 1 && num1 < den1);
+  }
+});
+
+test("makeChoices always returns 4 unique choices including the answer", () => {
+  assert.deepEqual(new Set(race.makeChoices(10, [10, 11, 9, 12, 8])).size, 4);
+  // Too few distractors: the numeric fallback must still fill to 4.
+  assert.equal(race.makeChoices(0, []).length, 4);
+  assert.equal(new Set(race.makeChoices(0, [])).size, 4);
+  // Non-numeric answers (fractions) use the string fallback instead.
+  assert.equal(race.makeChoices("1/2", []).length, 4);
 });
 
 test("race points: instant answers score the max, the buzzer scores the min, wrong scores nothing", () => {
-  assert.equal(compete.racePoints(false, 0), 0);
-  assert.equal(compete.racePoints(false, 15000), 0);
-  assert.equal(compete.racePoints(true, 0), compete.RACE_MAX_POINTS);
-  assert.equal(compete.racePoints(true, compete.RACE_SECONDS * 1000), compete.RACE_MIN_POINTS);
+  assert.equal(race.racePoints(false, 0), 0);
+  assert.equal(race.racePoints(false, 15000), 0);
+  assert.equal(race.racePoints(true, 0), race.RACE_MAX_POINTS);
+  assert.equal(race.racePoints(true, race.ROUND_SECONDS * 1000), race.RACE_MIN_POINTS);
   // Never fully zero for a correct answer, however late - only wrong is zero.
-  assert.ok(compete.racePoints(true, compete.RACE_SECONDS * 1000 + 5000) >= compete.RACE_MIN_POINTS);
+  assert.ok(race.racePoints(true, race.ROUND_SECONDS * 1000 + 5000) >= race.RACE_MIN_POINTS);
   // Monotonically non-increasing as elapsed time grows.
-  let previous = compete.RACE_MAX_POINTS + 1;
-  for (let ms = 0; ms <= compete.RACE_SECONDS * 1000; ms += 500) {
-    const points = compete.racePoints(true, ms);
+  let previous = race.RACE_MAX_POINTS + 1;
+  for (let ms = 0; ms <= race.ROUND_SECONDS * 1000; ms += 500) {
+    const points = race.racePoints(true, ms);
     assert.ok(points <= previous, `points rose from ${previous} to ${points} at ${ms}ms`);
     previous = points;
   }
 });
 
-test("newRace builds a fresh, empty race at the requested length and level", () => {
-  const race = compete.newRace(3, 6);
-  assert.equal(race.v, 1);
-  assert.equal(race.lv, 3);
-  assert.equal(race.q.length, 6);
-  assert.deepEqual(race.p, []);
-  // Level is clamped rather than trusted verbatim.
-  assert.equal(compete.newRace(99, 1).lv, compete.MAX_LEVEL);
-  assert.equal(compete.newRace(-5, 1).lv, 0);
-});
-
-test("makeParticipant totals points and caps/normalises the name", () => {
-  const results = [
-    { isCorrect: true, elapsedMs: 1000, points: 90 },
-    { isCorrect: false, elapsedMs: 15000, points: 0 },
-    { isCorrect: true, elapsedMs: 4000, points: 60 },
-  ];
-  const p = compete.makeParticipant("  Alice  ", results);
-  assert.equal(p.n, "Alice");
-  assert.equal(p.t, 150);
-  assert.deepEqual(p.r, [
-    [1, 1000, 90],
-    [0, 15000, 0],
-    [1, 4000, 60],
-  ]);
-
-  const longName = "A".repeat(60);
-  assert.equal(compete.makeParticipant(longName, []).n.length, compete.MAX_NAME_LENGTH);
-  assert.equal(compete.makeParticipant("   ", []).n, "Player");
-});
-
-test("rankParticipants sorts by score, ties broken by who set it first", () => {
-  const participants = [
-    { n: "A", r: [], t: 50 },
-    { n: "B", r: [], t: 90 },
-    { n: "C", r: [], t: 90 },
-    { n: "D", r: [], t: 10 },
-  ];
-  const ranked = compete.rankParticipants(participants);
-  assert.deepEqual(ranked.map((p) => p.n), ["B", "C", "A", "D"]);
-  assert.deepEqual(ranked.map((p) => p.rank), [1, 2, 3, 4]);
-});
-
-test("fastestPerQuestion finds the quickest correct answer, or null if nobody got it", () => {
-  const race = {
-    q: [
-      [1, 1, "+"],
-      [2, 2, "+"],
-    ],
-    p: [
-      { n: "A", r: [[1, 3000, 70], [0, 15000, 0]], t: 70 },
-      { n: "B", r: [[1, 1200, 95], [0, 15000, 0]], t: 95 },
-    ],
-  };
-  const fastest = compete.fastestPerQuestion(race);
-  assert.deepEqual(fastest[0], { participantIndex: 1, ms: 1200 });
-  assert.equal(fastest[1], null);
-});
-
-test("a challenge round-trips through encode/decode with nothing lost", () => {
-  const race = compete.newRace(4, 8);
-  race.p.push(compete.makeParticipant("Alice", race.q.map(([a, b, op], i) => {
-    const isCorrect = i % 2 === 0;
-    const elapsedMs = 800 + i * 900;
-    return { isCorrect, elapsedMs, points: compete.racePoints(isCorrect, elapsedMs) };
-  })));
-
-  const code = compete.encodeChallenge(race);
-  assert.equal(typeof code, "string");
-  // URL-safe: no characters that would need percent-encoding in a hash.
-  assert.doesNotMatch(code, /[+/=]/);
-
-  const decoded = compete.decodeChallenge(code);
-  assert.deepEqual(decoded, race);
-});
-
-test("decodeChallenge rejects garbage, empty and non-string input", () => {
-  assert.equal(compete.decodeChallenge("not a real code"), null);
-  assert.equal(compete.decodeChallenge(""), null);
-  assert.equal(compete.decodeChallenge(null), null);
-  assert.equal(compete.decodeChallenge(undefined), null);
-  assert.equal(compete.decodeChallenge(42), null);
-  assert.equal(compete.decodeChallenge("   "), null);
-});
-
-test("decodeChallenge rejects a payload with the wrong version", () => {
-  const code = compete.encodeChallenge({ v: 2, q: [[1, 1, "+"]], lv: 0, p: [] });
-  assert.equal(compete.decodeChallenge(code), null);
-});
-
-test("decodeChallenge rejects malformed or out-of-range question triples", () => {
-  const bases = [
-    { v: 1, q: [], lv: 0, p: [] }, // empty question list
-    { v: 1, q: [[1, 1]], lv: 0, p: [] }, // triple too short
-    { v: 1, q: [[1, 1, "*"]], lv: 0, p: [] }, // unknown operator
-    { v: 1, q: [[1.5, 1, "+"]], lv: 0, p: [] }, // non-integer operand
-    { v: 1, q: [[-1, 1, "+"]], lv: 0, p: [] }, // negative operand
-    { v: 1, q: [[10000, 1, "+"]], lv: 0, p: [] }, // operand far out of range
-    { v: 1, q: [[5, 0, ":"]], lv: 0, p: [] }, // division by zero
-    { v: 1, q: [[500, 500, "x"]], lv: 0, p: [] }, // product far too large
-    { v: 1, q: Array.from({ length: 25 }, () => [1, 1, "+"]), lv: 0, p: [] }, // too many questions
-  ];
-  for (const race of bases) {
-    const code = compete.encodeChallenge(race);
-    assert.equal(compete.decodeChallenge(code), null, `expected rejection for ${JSON.stringify(race)}`);
+test("generateRoomCode produces a 5-character unambiguous code", () => {
+  for (let i = 0; i < 200; i++) {
+    const code = race.generateRoomCode();
+    assert.equal(code.length, 5);
+    assert.doesNotMatch(code, /[0O1I]/, `code contains an ambiguous character: ${code}`);
   }
 });
 
-test("decodeChallenge rejects participants that don't match the question count, and caps how many there can be", () => {
-  const short = { v: 1, q: [[1, 1, "+"], [2, 2, "+"]], lv: 0, p: [{ n: "A", r: [[1, 100, 100]], t: 100 }] };
-  assert.equal(compete.decodeChallenge(compete.encodeChallenge(short)), null);
-
-  const tooMany = {
-    v: 1,
-    q: [[1, 1, "+"]],
-    lv: 0,
-    p: Array.from({ length: compete.MAX_PARTICIPANTS + 1 }, (_, i) => ({ n: `P${i}`, r: [[1, 100, 100]], t: 100 })),
-  };
-  assert.equal(compete.decodeChallenge(compete.encodeChallenge(tooMany)), null);
+test("cleanPlayerName trims, caps the length, and falls back when empty", () => {
+  assert.equal(race.cleanPlayerName("  Alice  "), "Alice");
+  assert.equal(race.cleanPlayerName("A".repeat(60)).length, race.MAX_NAME_LENGTH);
+  assert.equal(race.cleanPlayerName("   "), "Player");
+  assert.equal(race.cleanPlayerName("", "Speler 2"), "Speler 2");
 });
 
-test("decodeChallenge rejects a participant row with an impossible time or score", () => {
-  const q = [[1, 1, "+"]];
-  const tooSlow = { v: 1, q, lv: 0, p: [{ n: "A", r: [[1, 999999, 100]], t: 100 }] };
-  const tooManyPoints = { v: 1, q, lv: 0, p: [{ n: "A", r: [[1, 100, 999999]], t: 999999 }] };
-  const badFlag = { v: 1, q, lv: 0, p: [{ n: "A", r: [[2, 100, 100]], t: 100 }] };
-  for (const race of [tooSlow, tooManyPoints, badFlag]) {
-    assert.equal(compete.decodeChallenge(compete.encodeChallenge(race)), null);
-  }
-});
-
-test("decodeChallenge truncates an over-long participant name rather than rejecting the whole race", () => {
-  const race = { v: 1, q: [[1, 1, "+"]], lv: 0, p: [{ n: "X".repeat(200), r: [[1, 100, 100]], t: 100 }] };
-  const decoded = compete.decodeChallenge(compete.encodeChallenge(race));
-  assert.ok(decoded);
-  assert.equal(decoded.p[0].n.length, compete.MAX_NAME_LENGTH);
-});
-
-test("decodeChallenge treats a name that looks like markup as plain text, not something to sanitise away", () => {
-  // The page is responsible for rendering names as textContent, never HTML -
-  // the engine's only job is to preserve the string faithfully so that is
-  // possible; it must not choke on or mutate characters like < or >.
-  const hostile = "<img src=x onerror=alert(1)>";
-  const race = { v: 1, q: [[1, 1, "+"]], lv: 0, p: [{ n: hostile, r: [[1, 100, 100]], t: 100 }] };
-  const decoded = compete.decodeChallenge(compete.encodeChallenge(race));
-  assert.equal(decoded.p[0].n, hostile.slice(0, compete.MAX_NAME_LENGTH));
-});
-
-test("extractChallengeCode pulls ?c= out of a raw hash, buildChallengeUrl round-trips it", () => {
-  assert.equal(compete.extractChallengeCode("/compete?c=abc123"), "abc123");
-  assert.equal(compete.extractChallengeCode("/compete?x=1&c=abc123"), "abc123");
-  assert.equal(compete.extractChallengeCode("/compete"), null);
-  assert.equal(compete.extractChallengeCode(""), null);
-
-  const url = compete.buildChallengeUrl("https://example.github.io/kid-math/index.html", "abc123");
-  assert.equal(url, "https://example.github.io/kid-math/index.html#/compete?c=abc123");
-  assert.equal(compete.extractChallengeCode(new URL(url).hash), "abc123");
-});
-
-test("a race generated with unicode-heavy content round-trips (base64url handles non-Latin1 bytes)", () => {
-  // Nothing generated actually contains multi-byte characters today, but the
-  // encoder has to survive a participant name that does - emoji in a typed
-  // name is entirely plausible on a phone keyboard.
-  const race = compete.newRace(0, 1);
-  race.p.push(compete.makeParticipant("Amélie 🚀", [{ isCorrect: true, elapsedMs: 500, points: 95 }]));
-  const decoded = compete.decodeChallenge(compete.encodeChallenge(race));
-  assert.equal(decoded.p[0].n, "Amélie 🚀");
+test("rankPlayers sorts by score, ties broken by whoever joined first, and generalizes past two players", () => {
+  const players = [
+    { name: "A", score: 50 },
+    { name: "B", score: 90 },
+    { name: "C", score: 90 },
+    { name: "D", score: 10 },
+    { name: "E", score: 90 },
+  ];
+  const ranked = race.rankPlayers(players);
+  assert.deepEqual(ranked.map((p) => p.name), ["B", "C", "E", "A", "D"]);
+  assert.deepEqual(ranked.map((p) => p.rank), [1, 2, 3, 4, 5]);
 });

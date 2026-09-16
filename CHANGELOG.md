@@ -5,6 +5,85 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed (round 10 - Race Mode redesign: real multiplayer, side by side, no check button)
+
+**Round 9's race worked, but it was still one person at a time** - a solo
+run, or a finished race forwarded as a link for the next person to try
+afterwards, never simultaneously. Racing someone meant waiting for their
+turn. This round replaces that with an actual race: several players answer
+the *same* question at the *same* time, side by side, either online through
+a short join code or together on one shared device - and every answer is a
+single tap, because a multiple-choice question doesn't need a separate
+"check" step (the rest of the app already made this move once, in
+Bliksemronde).
+
+- **A real join code, not a finished-results code.** The old "challenge
+  code" only existed *after* a race was over - it was someone's completed
+  run, forwarded for the next person to beat asynchronously. The new code is
+  issued the moment a race is *created*: a host opens a room, gets a 5-char
+  code, and anyone who enters it (or opens the matching link) joins a live
+  lobby before a single question is asked.
+- **Side by side, for real.** Locally, up to `MAX_PLAYERS` (6) people share
+  one device, each with their own card and choice grid, answering the same
+  question in parallel - not pass-the-device-after-your-turn. Online, every
+  device shows a live scoreboard strip that updates the instant *any* player
+  answers, not only once the race is over.
+- **No check button.** Every category now generates a multiple-choice
+  question (`options`, four choices including the answer); tapping one *is*
+  the submission. The old typed-number-plus-"Controleer"-button flow is
+  gone, same as Bliksemronde never had one.
+- **More than one kind of game in a single race.** `category` picks what a
+  round draws from - lightning arithmetic (the original mix), times tables,
+  fraction addition, percentage-of, or a shuffled mix of all four - so a
+  10-question race can move between game types round to round instead of
+  being arithmetic-only.
+
+**Why a real server, and why that's still fine for a GitHub Pages app.**
+Side-by-side *online* play needs something authoritative keeping everyone's
+clock and question in sync - that can't be done by mailing a finished
+result back and forth. `race-server.js` is a small room manager (WebSocket
+first, REST polling as a fallback for a network that blocks the socket
+upgrade) mounted into `server.js`. It only runs when the app is
+self-hosted (`npm start`) - `deploy-pages.yml` uploads the `web/` folder
+only, so this never touches the live GitHub Pages deploy and can't break
+it (verified: the workflow's two real steps, stamping `BUILD_ID` into
+`web/sw.js` and `tools/check_precache.py`, both still pass). On GitHub
+Pages itself, online play's `fetch`/`WebSocket` calls simply fail and the
+page says so (`compete.server_unavailable`) rather than hanging - Local
+mode needs no server at all and always works.
+
+- **`web/js/race-logic.js`** replaces `web/js/compete.js` - the engine, no
+  DOM: per-category question generators (`generateRaceProblem`,
+  `makeChoices` for the multiple-choice distractors), `racePoints()`
+  (unchanged scoring curve, 100 down to 10, wrong is always 0),
+  `generateRoomCode`, `cleanPlayerName`, `rankPlayers` (now for any number
+  of players, not just two). The old `encodeChallenge`/`decodeChallenge`
+  base64url machinery is gone with the flow it supported.
+- **`race-server.js`** (new) - the room engine: `waiting → countdown →
+  in_round → round_recap → finished`, generalized to a `players` array of
+  any length (`MIN_PLAYERS_ONLINE` 2 to `MAX_PLAYERS` 6) rather than a fixed
+  pair, broadcasting every round and recap to everyone in the room.
+- **`web/js/pages/compete.js`** rewritten: mode tabs (🌐 online with a code /
+  📱 together on this device), the online create/join lobby, the local
+  roster editor, the synchronized countdown, the side-by-side race arena,
+  and a results screen (summary cards + per-question breakdown table) shared
+  by both modes since they now build the exact same `{stats, roundHistory}`
+  shape.
+- 44 `compete.*` i18n keys rewritten for the new flow (both languages), plus
+  one new `race.pct_of` key so the percentage category's "20% van 40" /
+  "20% of 40" connector word stays translated rather than hardcoded.
+- `package.json` gained the `ws` dependency; `web/sw.js`'s precache list
+  swapped `./js/compete.js` for `./js/race-logic.js`.
+- Tests: `tests/web/test_logic.mjs`'s race-mode suite was rewritten for the
+  new engine (every category valid at every level, `makeChoices` always
+  returns 4 unique options including the answer, `rankPlayers` generalized
+  past two players, the percentage category's `textKey`/`textVars` instead
+  of a hardcoded word). `tests/web/smoke.mjs` now plays a full local
+  side-by-side race to the results screen, and - the part that actually
+  proves the online mode works - opens a second browser page, joins a real
+  room with the code the first page generated, and confirms both players
+  reach the same round and the host's recap reflects the guest's answer too.
+
 ### Added (round 9 - Racewedstrijd / Race Challenge, a competition mode)
 
 **A new way to play that is not solo any more.** `#/compete` adds a speed

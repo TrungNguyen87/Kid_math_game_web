@@ -9,6 +9,138 @@ rediscover them.
 
 ---
 
+## Session 9 — 16 September 2026
+
+**Branch:** `claude/race-mode-multiplayer-wwy40y`
+
+### Asked
+
+Read the memory, changelog and example code in the sibling `Trung-Nguyen`
+project first (a related repo with a further-along version of this same
+app, including a real online "Competitie" mode with join codes and a
+WebSocket server). Then fix Race Mode here: today it only plays one person
+at a time, there's no join code, there's no side-by-side compete mode,
+there's no need for a "check" button, and it should be a race with more
+than one kind of game. Merge that redesign into this repo, verify the
+GitHub Actions workflow still runs cleanly, and save the changelog/memory.
+
+### Decided: reference, not reuse - `Trung-Nguyen`'s server is 2-player only
+
+`Trung-Nguyen/server-multiplayer.js` and its `competitie.js` page are a
+good proof that a join-code room engine works here, but they are hardcoded
+to exactly two players (`room.players[0]`/`[1]`, `p1`/`p2` everywhere) -
+reasonable for a head-to-head "Competitie", wrong for something called a
+*race*, which reads as more than one opponent. `race-server.js` and
+`race-logic.js` here generalize every one of those spots to a `players`
+array of `MIN_PLAYERS_ONLINE`..`MAX_PLAYERS` (2..6): `joinRoom`'s capacity
+check, the round-end-early check (`answeredCount >= connectedCount`), the
+recap and finish broadcasts, and the results screen and breakdown table on
+the client - all loop over the array instead of naming two slots. Porting
+straight would have shipped the same one-opponent ceiling under a new name.
+
+Also fixed, not carried over: `Trung-Nguyen`'s REST fallback route matches
+`req.body.action` against `'start'/'answer'/'rematch'`, but its own client
+posts `req.body.type` as `'start_game'/'submit_answer'/'rematch'` - the
+fallback silently never matches. Here the REST `/action` route and the
+WebSocket handler share one `handleMessage(ws, msg)` keyed on `type`, so
+there's only one shape to keep in sync, not two.
+
+### Decided: a real join code needs a real server, and that's still fine here
+
+Round 8's "challenge code" (`web/js/compete.js`, now deleted) was a
+finished race's results, base64url-encoded into a link for someone else to
+try *afterwards* - not a code anyone could join *before* a race starts,
+and never simultaneous. That's what "no join code" and "no side-by-side"
+actually meant: the old design was asynchronous by construction. A live
+lobby with a real join code needs something authoritative to keep everyone
+synchronized, which a static site cannot do by itself - so this is the one
+feature in the app that genuinely needs a server, same conclusion
+`Trung-Nguyen` reached. The same escape hatch applies: `deploy-pages.yml`
+uploads the `web/` folder only, `race-server.js`/`server.js` live outside
+it, so online play simply doesn't exist on the live GitHub Pages site and
+nothing about the deploy is at risk - verified by re-running the workflow's
+two real steps (`BUILD_ID` stamp, `check_precache.py`) locally against the
+new file set. Local (same-device) mode needs no server at all and is the
+one that actually works for everyone, always - it's listed first in the UI
+for that reason. Online mode fails soft: a `fetch`/`WebSocket` call against
+a GitHub Pages origin just errors, and the page shows
+`compete.server_unavailable` pointing at Local mode instead of hanging.
+
+### Decided: multiple choice removes the check button *and* enables categories
+
+"No need for a check button" and "multiple types of games" turned out to be
+the same fix. The old race used a typed numeric answer (`numberField` +
+"Controleer"), which only works for a category whose answer is a plain
+number - a fraction category's answer ("3/4") can't go through a number
+pad. Switching every category to multiple choice (`makeChoices`, four
+options including the answer, ported from `Trung-Nguyen`'s
+`competition-logic.js`) fixes both at once: a tap *is* the submission
+(exactly how Bliksemronde already works, so this isn't a new pattern for
+the app), and it unblocks `breuken`/`procenten` as real categories
+alongside the original arithmetic mix and a new `tafels` category.
+
+One thing kept different from `Trung-Nguyen` on purpose: their
+`competition-logic.js` hardcodes `"{pct}% van {base}"` - Dutch text with no
+English counterpart, in an app whose i18n discipline (`utils/i18n.py` as
+single source of truth, key-parity tests) is otherwise strict about never
+doing that. The percentage category here returns a `textKey`/`textVars`
+pair instead of pre-built text, resolved through the normal `t()` table
+(`race.pct_of`, both languages) - the one new i18n key this round needed
+beyond rewriting the existing 44 `compete.*` keys for the new flow.
+
+### Decided: local and online results share one shape, on purpose
+
+Local (same-device) and online results used to look like they'd need
+separate rendering code - one is computed client-side from arrays kept in
+the page, the other arrives as a server broadcast. Built the local side to
+assemble the exact same `{stats, roundHistory}` shape the server already
+sends (`id`/`name`/`score`/`correctCount`/`avgSpeed` per player,
+`round`/`question`/`results`/`roundWinners` per question) purely so
+`renderResultsScreen()` and the breakdown table could be one function
+instead of two near-duplicates. Worth remembering as a pattern: when a
+server event and a client computation describe the same real-world thing,
+shaping the client side to match the wire format is usually less code than
+letting them drift into two formats plus a translation step.
+
+### Verification
+
+- `npm test` - 85 Node tests pass, including the rewritten race-mode suite
+  (every category valid at every level, `makeChoices` always unique and
+  includes the answer, `rankPlayers` generalized past two players, the
+  percentage category's `textKey` instead of hardcoded text) and the
+  existing i18n key-parity tests (every rewritten `compete.*` key and the
+  new `race.pct_of` key checked NL/EN placeholder-for-placeholder).
+- `python3 tools/check_precache.py` - 48/48 files, after swapping
+  `./js/compete.js` for `./js/race-logic.js` in `web/sw.js`.
+- `tests/web/smoke.mjs` run against `node server.js` end to end: a full
+  5-question local race played to the results screen with 2 side-by-side
+  player cards, and a genuine online round-trip - one browser page creates
+  a room, a second page joins with the code from a shared link, the host's
+  lobby updates live when the guest joins, the host starts the race, both
+  pages reach the same round, and the host's recap reflects the guest's
+  answer. This is the first time this app's multiplayer path has been
+  exercised as two real browser contexts talking through a real server
+  in a test, rather than asserted from a single page.
+- The GitHub Actions workflow itself was re-run locally, not just read:
+  copied `web/` and `tools/` to a scratch directory, ran the exact `sed`
+  `BUILD_ID` stamp and `check_precache.py` commands `deploy-pages.yml`
+  runs, both passed. `server.js`/`race-server.js`/`package.json` sit
+  outside `web/`, so `upload-pages-artifact` never touches them.
+
+### Still open
+
+- Online mode only works self-hosted (`npm start`), not on the published
+  GitHub Pages site - by design (see above), but worth restating so a
+  future session doesn't "fix" it by trying to add a server to Pages,
+  which doesn't run arbitrary server code.
+- `race-server.js` keeps rooms in memory with no persistence - a server
+  restart mid-race loses it. Fine for a household/classroom's own server,
+  not something to build a tournament feature on top of without revisiting.
+- No rate limiting or room-code collision back-pressure beyond "retry until
+  the code is free" - acceptable at the scale this app runs at.
+
+---
+
 ## Session 8 — 16 September 2026
 
 **Branch:** `claude/multiplayer-competition-mode-ipv44p`
