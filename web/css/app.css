@@ -971,6 +971,11 @@ table.kmg-table th {
   padding: 1rem 2rem;
   min-height: 3.75rem;
 }
+.kmg-btn-sm {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  min-height: 2.2rem;
+}
 
 /* --- Feedback ------------------------------------------------------------ */
 
@@ -2043,79 +2048,290 @@ table.kmg-table th {
 /* ==========================================================================
    Racewedstrijd / Race Challenge
 
-   The one page in the app with no server behind it at all - a "race" is
-   just a {questions, participants} object that round-trips through a
-   copy-pasted link (see web/js/compete.js). The layout below is otherwise
-   ordinary: cards stack the same way the reward shop's do, and the
-   leaderboard/per-question tables reuse table.kmg-table exactly like the
-   dashboard's log does.
+   Several players answer the *same* questions at the same time, side by
+   side - online in a room opened with a short join code (web/race-server.js,
+   self-hosted only - see its own header comment for why), or together on
+   one shared device. The logic lives in web/js/race-logic.js; every answer
+   is a single tap on a .kmg-choice button, same as Bliksemronde's, so there
+   is nothing here for a separate "check" button to do. Cards and tables
+   reuse the same building blocks as the rest of the app (.kmg-card,
+   .kmg-table, .kmg-choices) so this page doesn't need its own version of
+   them.
    ========================================================================== */
 
-.kmg-compete-card {
+.kmg-race-mode-tabs,
+.kmg-race-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+.kmg-race-mode-tab {
+  padding: 0.6rem 1.1rem;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+.kmg-race-mode-tab.is-active {
+  background: linear-gradient(135deg, var(--orange), var(--amber));
+  border-color: var(--orange-dark);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.kmg-race-card {
   margin-bottom: 1rem;
 }
-.kmg-compete-card h2,
-.kmg-compete-card h3 {
+.kmg-race-card h2,
+.kmg-race-card h3 {
   margin-top: 0;
 }
-.kmg-compete-challenge {
+.kmg-race-field {
+  margin: 0.85rem 0;
+}
+.kmg-race-field > label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.kmg-race-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.kmg-race-segment-btn {
+  padding: 0.5rem 0.9rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+.kmg-race-segment-btn.is-active {
+  background: linear-gradient(135deg, var(--orange), var(--amber));
+  border-color: var(--orange-dark);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.kmg-race-players-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.85rem 0;
+}
+.kmg-race-player-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.kmg-race-player-row .kmg-textinput {
+  flex: 1 1 auto;
+}
+.kmg-race-remove-btn {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.7rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--red-dark);
+  font-weight: 700;
+}
+
+.kmg-race-code-display {
+  text-align: center;
+  margin: 0.75rem 0;
+}
+.kmg-race-big-code {
+  display: inline-block;
+  padding: 0.6rem 1.4rem;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 0.25rem;
+  border: 3px dashed var(--orange);
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+  color: var(--orange-dark);
+}
+.kmg-race-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+
+.kmg-race-players-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.kmg-race-player-pill {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  font-weight: 700;
+}
+.kmg-race-player-pill.is-me {
   border-color: var(--orange);
   background: var(--amber-soft);
 }
-.kmg-compete-progress {
+
+.kmg-race-countdown {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+.kmg-race-cd-text {
+  font-weight: 700;
+  color: var(--text-soft);
+  margin-bottom: 0.5rem;
+}
+.kmg-race-cd-num {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--orange-dark);
+}
+
+.kmg-race-round-indicator {
   font-weight: 700;
   color: var(--text-soft);
   margin-bottom: 0.35rem;
 }
-
-.kmg-compete-results {
-  margin: 1rem 0;
-}
-.kmg-compete-leaderboard tr.is-leader td {
-  background: var(--amber-soft);
-  font-weight: 700;
-}
-.kmg-compete-perq td.is-correct {
-  color: var(--green-dark);
-}
-.kmg-compete-perq td.is-wrong {
-  color: var(--red-dark);
-}
-.kmg-compete-fastest {
-  color: var(--orange-dark);
-  font-weight: 700;
-}
-@media (prefers-color-scheme: dark) {
-  .kmg-compete-perq td.is-correct {
-    color: #a5d6a7;
-  }
-  .kmg-compete-perq td.is-wrong {
-    color: #ffab91;
-  }
-  .kmg-compete-fastest {
-    color: var(--amber);
-  }
-}
-
-.kmg-compete-share {
+.kmg-race-timerbar {
+  height: 0.5rem;
+  border-radius: 999px;
   background: var(--surface-2);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
 }
-.kmg-compete-sharerow {
+.kmg-race-timerfill {
+  height: 100%;
+  width: 100%;
+  background: var(--green-dark);
+  transition: width 0.1s linear;
+}
+.kmg-race-timerfill.is-urgent {
+  background: var(--red-dark);
+}
+
+.kmg-race-scorestrip {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.kmg-race-scorepill {
+  display: flex;
   align-items: center;
-  margin: 0.5rem 0;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  font-size: 0.9rem;
+  font-weight: 700;
 }
-.kmg-compete-sharerow .kmg-textinput {
-  flex: 1 1 14rem;
-  min-width: 0;
+.kmg-race-scorepill.is-me {
+  border-color: var(--orange);
+  background: var(--amber-soft);
 }
-.kmg-compete-linkbox,
-.kmg-compete-codebox {
-  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 0.8rem;
-  cursor: text;
+
+.kmg-race-feedback {
+  min-height: 1.6rem;
+  margin-top: 0.5rem;
+  font-weight: 700;
+}
+.kmg-race-feedback .kmg-msg-ok {
+  color: var(--green-dark);
+}
+.kmg-race-feedback .kmg-msg-bad {
+  color: var(--red-dark);
+}
+
+.kmg-race-arena {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.85rem;
+}
+.kmg-race-player-card {
+  padding: 0.85rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.kmg-race-player-card.is-me {
+  border-color: var(--orange);
+}
+.kmg-race-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.kmg-race-scoretag {
+  font-weight: 800;
+  color: var(--orange-dark);
+}
+
+.kmg-race-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.kmg-race-summary-card {
+  text-align: center;
+}
+.kmg-race-summary-card.is-leader {
+  border-color: var(--orange);
+  background: var(--amber-soft);
+}
+.kmg-race-medal {
+  font-size: 1.6rem;
+}
+.kmg-race-summary-score {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--orange-dark);
+}
+.kmg-race-stat-line {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.kmg-race-winner-banner {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+  border: 2px solid var(--orange);
+  margin: 1rem 0;
+}
+.kmg-race-winner-trophy {
+  font-size: 2.5rem;
+}
+.kmg-race-winner-title {
+  margin: 0.35rem 0;
+}
+
+.kmg-race-table td.is-correct {
+  color: var(--green-dark);
+}
+.kmg-race-table td.is-wrong {
+  color: var(--red-dark);
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-race-table td.is-correct {
+    color: #a5d6a7;
+  }
+  .kmg-race-table td.is-wrong {
+    color: #ffab91;
+  }
 }
 
 /* ==========================================================================
