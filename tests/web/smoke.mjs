@@ -50,6 +50,7 @@ const ROUTES = [
   "getallenjacht",
   "logica",
   "code",
+  "compete",
   "rewards",
   "uitleg",
   "dashboard",
@@ -302,6 +303,117 @@ console.log(`  bliksem clock: ${firstTick}s -> ${secondTick}s`);
 // node - that used to be the classic leak in this kind of app.
 await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
+
+// --- Racewedstrijd / Race Challenge: the serverless competition mode -------
+
+// The race's operator can be +, − (U+2212), × (U+00D7) or a ":" division, so
+// parsing "a OP b = ?" needs all four rather than the simple a*b tafel uses.
+function computeRaceAnswer(text) {
+  const m = text.match(/^(\d+)\s*([+−×:])\s*(\d+)\s*=/);
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = Number(m[3]);
+  if (m[2] === "+") return a + b;
+  if (m[2] === "−") return a - b;
+  if (m[2] === "×") return a * b;
+  return a / b; // ":" - shown as "dividend : divisor"
+}
+
+// Tap out a (possibly multi-digit) answer on the race's own on-screen pad.
+async function typeOnPad(page, value) {
+  for (const digit of String(value)) {
+    await page.locator(".kmg-padkey", { hasText: new RegExp(`^${digit}$`) }).first().click();
+  }
+}
+
+currentRoute = "compete:race";
+await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-levelrow .kmg-levelbtn");
+
+// Start a solo race at whatever difficulty is currently selected.
+await page.locator(".kmg-btn-primary").first().click();
+await page.waitForSelector(".kmg-ring", { timeout: 4000 });
+
+// Each question gets its own fresh 15s clock - prove it actually ticks.
+const raceFirstTick = await page.locator(".kmg-ring text").textContent();
+await page.waitForTimeout(1600);
+const raceSecondTick = await page.locator(".kmg-ring text").textContent();
+if (raceFirstTick === raceSecondTick) {
+  note("compete:race", `the per-question clock did not move (${raceFirstTick})`);
+}
+
+// Answer whatever question is on screen, correctly, by reading it off the
+// page and tapping the result out on the pad - exactly as a child would.
+const raceQuestion = await page.locator(".kmg-question-text").textContent();
+const raceAnswer = computeRaceAnswer(raceQuestion ?? "");
+if (raceAnswer == null) {
+  note("compete:race", `could not parse race question: "${raceQuestion}"`);
+} else {
+  await typeOnPad(page, raceAnswer);
+  await page.locator(".kmg-btn-primary").first().click();
+  const answeredOk = await page
+    .waitForSelector(".kmg-banner-ok", { timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!answeredOk) {
+    note("compete:race", `answering "${raceQuestion.trim()}" with ${raceAnswer} was not marked correct`);
+  }
+  console.log(`  compete race: answered "${raceQuestion.trim()}" with ${raceAnswer} -> ${answeredOk ? "correct" : "wrong"}`);
+}
+
+// Leaving mid-race must stop the timer, same as bliksem above - the exact
+// same class of leak, in a page that reimplements its own countdown loop.
+await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+
+// A full race (finish every question) must reach the results screen and
+// offer a way to challenge someone - the whole point of the mode.
+currentRoute = "compete:finish";
+await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-levelrow .kmg-levelbtn");
+// Level 0 is addition/subtraction only, so every question is answerable by
+// straightforward parsing - avoids the round hanging on an unlucky draw.
+await page.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
+await page.locator(".kmg-btn-primary").first().click();
+await page.waitForSelector(".kmg-ring", { timeout: 4000 });
+
+let questionsAnswered = 0;
+for (let i = 0; i < 12; i++) {
+  const onResults = await page.locator(".kmg-compete-card, .kmg-compete-results").count();
+  if (onResults) break;
+  const text = await page.locator(".kmg-question-text").textContent().catch(() => null);
+  if (!text) break;
+  const answer = computeRaceAnswer(text);
+  if (answer == null) {
+    note("compete:finish", `could not parse race question: "${text}"`);
+    break;
+  }
+  await typeOnPad(page, answer);
+  await page.locator(".kmg-btn-primary").first().click();
+  questionsAnswered += 1;
+  await page.waitForTimeout(1500); // feedback banner, then auto-advance
+}
+
+const shareVisible = await page.locator(".kmg-compete-share").count();
+if (!shareVisible) {
+  note("compete:finish", `race did not reach the share screen after ${questionsAnswered} answers`);
+} else {
+  const linkValue = await page.locator(".kmg-compete-linkbox").first().inputValue();
+  if (!/^https?:\/\/.+#\/compete\?c=.+/.test(linkValue)) {
+    note("compete:finish", `challenge link does not look like a URL: "${linkValue}"`);
+  }
+  const codeValue = await page.locator(".kmg-compete-codebox").first().inputValue();
+  if (!codeValue) note("compete:finish", "challenge code box is empty");
+
+  // Decoding that exact link must reproduce a real race, no server involved.
+  currentRoute = "compete:join";
+  await page.goto(linkValue, { waitUntil: "networkidle" });
+  const heading = await page.locator("#kmg-main h1").first().textContent();
+  if (!heading || !heading.trim()) note("compete:join", "opening a challenge link rendered no heading");
+  const challengeCard = await page.locator(".kmg-compete-challenge").count();
+  if (!challengeCard) note("compete:join", "opening a challenge link did not show the incoming-challenge card");
+}
+console.log(`  compete race: full run of ${questionsAnswered} question(s) -> share screen ${shareVisible ? "shown" : "MISSING"}`);
 
 // --- mobile layout ---------------------------------------------------------
 

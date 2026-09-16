@@ -173,6 +173,7 @@ export function render(container) {
 
     // Extra links that were separate sidebar pages in the Streamlit app.
     el("div.kmg-homelinks", {}, [
+      el("a.kmg-btn.kmg-btn-ghost", { href: "#/compete", text: `🏁 ${t("nav.compete")}` }),
       el("a.kmg-btn.kmg-btn-ghost", {
         href: "#/rewards",
         text: `🎁 ${t("nav.rewards")} (${state.coins} 🪙)`,

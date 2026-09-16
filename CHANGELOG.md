@@ -5,6 +5,91 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 9 - Racewedstrijd / Race Challenge, a competition mode)
+
+**A new way to play that is not solo any more.** `#/compete` adds a speed
+race - a fixed set of questions, 15 seconds each, faster correct answers
+worth more points (100 down to 10 as the clock runs out) and a wrong or
+timed-out answer worth nothing - built to be played three ways, all from the
+same page:
+
+- **Solo**, against the clock, same as any timed game here.
+- **Locally, on one device.** After finishing, "add a local player" hands the
+  same question set to whoever is sitting next to you (a name, no profile
+  switch), and the results screen becomes a live leaderboard as each person
+  takes a turn.
+- **With anyone, anywhere.** "Challenge someone" turns the finished race into
+  a short link and a plain-text code. Opening that link - on the same wifi,
+  texted across the world, it makes no difference - decodes the identical
+  question set and shows a head-to-head result once the second person
+  finishes, with a running leaderboard if a third, fourth, ... person plays
+  it too.
+
+**Why this could be built at all without a backend:** this app has nowhere
+to run one (see round 6 below and SESSIONS.md session 6 - GitHub Pages,
+static files, "no server, no third party" was the point of moving here). A
+live cross-device match needs a relay server or at least a signalling
+step for WebRTC, neither of which fits that. The way around it: a race is
+just data - `{questions, level, participants}` - so *sending the invite* can
+just be sending that data, base64url-encoded into the link itself
+(`web/js/compete.js`: `encodeChallenge` / `decodeChallenge`). No account, no
+server ever sees a challenge, nothing is stored anywhere but the devices
+actually playing. `decodeChallenge` treats every field as hostile - a link
+can be hand-edited or arrive truncated - and range-checks the whole payload
+(question count, operand size, timing, score, participant count and name
+length) before any of it reaches the page, rather than trusting what a URL
+says.
+
+Questions are transmitted as `[a, b, op]` triples, not as rendered text or
+multiple-choice options: the display string and the answer are both pure
+functions of the triple (`questionText` / `questionAnswer`), so there is
+nothing to keep in sync and nothing that needs escaping. A typed numeric
+answer (the same `numberField` every other game uses) replaces
+Bliksemronde's multiple choice for the same reason - four distractors would
+have to travel in every link for no benefit.
+
+Only the player actually using this device and profile has their answers go
+through `settleAnswer()` - real score, coins, the log, badges, same as any
+other game. Everyone else in a race (a locally-added guest, or a name that
+arrived inside a decoded challenge) is comparison data only, never written
+into this device's saved profile - deliberately: a quick race with a friend
+should not need them to have an account on your tablet.
+
+- **`web/js/compete.js`** - the engine, no DOM: question generation per
+  level (0-5, typed answers rather than Bliksemronde's multiple choice),
+  `racePoints()`, `newRace`/`makeParticipant`/`rankParticipants`/
+  `fastestPerQuestion`, and the encode/decode/validate pair above.
+- **`web/js/pages/compete.js`** - the page: start a race, an incoming
+  challenge preview (with a "paste a code" fallback for whenever a link
+  does not survive whatever it was sent through), the per-question
+  15-second clock (its own `requestAnimationFrame` loop, stopped on the way
+  out exactly like Bliksemronde's), the finished/leaderboard screen, and the
+  share panel (clipboard, `navigator.share` where available, and the local
+  pass-and-play flow).
+- New illustration (`competeIllustration` in `illustrations.js`), 46 new
+  i18n keys (`nav.compete`, `game.compete.name`, 44 `compete.*` keys, both
+  languages), a home-page link next to rewards/uitleg/dashboard, and a new
+  CSS section reusing `.kmg-card`/`.kmg-table`/`.kmg-levelpicker` rather than
+  inventing new chrome.
+- Deliberately **not** part of `GAME_KEYS`: it does not affect badges or the
+  home page's overall-level bar, and its difficulty is remembered as its own
+  `localStorage` preference (`kmg.compete.level`) rather than through the
+  profile's `state.levels`, because `applyProfile()` rebuilds `state.levels`
+  from exactly the fixed `GAME_KEYS` list on every profile switch - the same
+  reason Bliksemronde keeps its own best-score key instead of using the
+  profile system for it.
+- Tests: 17 new Node tests in `tests/web/test_logic.mjs` (question validity
+  across all six levels, the scoring curve's edges, encode/decode
+  round-tripping, and a battery of adversarial `decodeChallenge` cases - bad
+  version, malformed/out-of-range triples, too many questions, mismatched or
+  impossible participant data, an over-long name, a name containing markup,
+  non-Latin1 characters); a full Playwright scenario in `tests/web/smoke.mjs`
+  that starts a race, proves the per-question clock ticks and resets, plays
+  an entire race to the results screen, and - the part that actually proves
+  the serverless design works - navigates to the exact challenge link the
+  app generated and confirms it decodes back into a live "you've been
+  challenged" screen.
+
 ### Added (round 8 - harder rewards, more characters, daily activity log)
 
 **A dedicated child could clear the entire reward shop in one sitting - the

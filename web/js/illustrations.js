@@ -744,6 +744,58 @@ export function jachtIllustration() {
   </svg>`;
 }
 
+/** 🏁 Racewedstrijd: two rockets racing toward a waving checkered flag */
+export function competeIllustration() {
+  const id = uid("race");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Racewedstrijd">
+    ${animWrap(id, `
+      @keyframes ${id}_dash1 { 0% { transform: translateX(0px); } 100% { transform: translateX(6px); } }
+      @keyframes ${id}_dash2 { 0% { transform: translateX(0px); } 100% { transform: translateX(-6px); } }
+      #${id} .racer-a { animation: ${id}_dash1 0.7s ease-in-out infinite alternate; }
+      #${id} .racer-b { animation: ${id}_dash2 0.7s ease-in-out infinite alternate; animation-delay: 0.15s; }
+      @keyframes ${id}_flagwave { 0% { transform: skewY(-4deg); } 100% { transform: skewY(6deg); } }
+      #${id} .flag { animation: ${id}_flagwave 1.4s ease-in-out infinite alternate; transform-origin: 128px 30px; }
+    `)}
+    <!-- Sparkles -->
+    <circle cx="20" cy="30" r="3" fill="#ffd600" class="anim-sparkle" style="transform-origin:20px 30px;"/>
+    <circle cx="30" cy="130" r="2.5" fill="#00e5ff" class="anim-sparkle" style="transform-origin:30px 130px; animation-delay:0.6s;"/>
+    <!-- Finish line -->
+    <g>
+      <rect x="10" y="118" width="140" height="10" fill="#ffffff" stroke="#3e2723" stroke-width="2"/>
+      ${[0, 1, 2, 3, 4, 5, 6].map((i) => `<rect x="${10 + i * 20}" y="118" width="10" height="10" fill="${i % 2 === 0 ? "#3e2723" : "#ffffff"}"/>`).join("")}
+    </g>
+    <!-- Flag pole and waving checkered pennant -->
+    <line x1="128" y1="18" x2="128" y2="118" stroke="#8d6e63" stroke-width="4" stroke-linecap="round"/>
+    <g class="flag">
+      <path d="M 128,18 L 156,26 L 128,38 Z" fill="#ffffff" stroke="#3e2723" stroke-width="1.5"/>
+      <path d="M 128,20 L 134,23 L 128,26 Z M 138,25 L 144,28 L 138,31 Z M 128,30 L 134,33 L 128,36 Z" fill="#3e2723"/>
+    </g>
+    <!-- Stopwatch, ticking -->
+    <g class="anim-bob" style="transform-origin:34px 78px;">
+      <rect x="31" y="56" width="6" height="5" fill="#f57f17"/>
+      <circle cx="34" cy="80" r="17" fill="#ffd54f" stroke="#f57f17" stroke-width="2.5"/>
+      <circle cx="34" cy="80" r="13" fill="#ffffff"/>
+      <line x1="34" y1="80" x2="34" y2="70" stroke="#d50000" stroke-width="2" stroke-linecap="round" class="anim-spin-slow" style="transform-origin:34px 80px;"/>
+      <circle cx="34" cy="80" r="2" fill="#f57f17"/>
+    </g>
+    <!-- Two racers speeding toward the flag, each leaving a motion trail -->
+    <g class="racer-a" style="transform-origin:80px 70px;">
+      <line x1="42" y1="70" x2="64" y2="70" stroke="#ef5350" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+      <line x1="48" y1="76" x2="66" y2="76" stroke="#ef5350" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+      <path d="M 68,60 L 96,68 L 68,80 L 76,68 Z" fill="#ef5350" stroke="#b71c1c" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="80" cy="68" r="5" fill="#ffffff"/>
+      <text x="80" y="71" font-size="6" font-weight="900" fill="#b71c1c" text-anchor="middle" font-family="sans-serif">1</text>
+    </g>
+    <g class="racer-b" style="transform-origin:78px 98px;">
+      <line x1="40" y1="98" x2="60" y2="98" stroke="#42a5f5" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+      <line x1="46" y1="104" x2="62" y2="104" stroke="#42a5f5" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+      <path d="M 64,88 L 92,96 L 64,108 L 72,96 Z" fill="#42a5f5" stroke="#1565c0" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="76" cy="96" r="5" fill="#ffffff"/>
+      <text x="76" y="99" font-size="6" font-weight="900" fill="#1565c0" text-anchor="middle" font-family="sans-serif">2</text>
+    </g>
+  </svg>`;
+}
+
 /** 📖 Uitleg Concepten: Enchanted math grimoire / encyclopedia with floating runes */
 export function uitlegIllustration() {
   const id = uid("uitl");
@@ -961,6 +1013,7 @@ const ILLUSTRATIONS = {
   logica: logicaIllustration,
   code: codeIllustration,
   jacht: jachtIllustration,
+  compete: competeIllustration,
   uitleg: uitlegIllustration,
   dashboard: dashboardIllustration,
   home: homeIllustration,
