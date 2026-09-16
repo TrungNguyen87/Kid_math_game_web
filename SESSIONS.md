@@ -9,158 +9,53 @@ rediscover them.
 
 ---
 
-## Session 10 — 16 September 2026
+## Session 11 — 16 September 2026
 
-**Branch:** `claude/webrtc-manual-signaling-8xon1v`
+**Branch:** `claude/webrtc-rollback-c3tjyq`
 
 ### Asked
 
-Implement "Method 1: WebRTC via Manual Signaling" for Race Mode - a host
-generates an SDP offer (shown as a QR code or copyable string), a guest
-reads it and produces an answer the same way, and the two browsers connect
-directly over a data channel, with no signaling server and no cloud service
-involved anywhere. Then save the changelog/memory, and test all of it
-against a GitHub-Pages-shaped deployment to make sure it actually runs
-smoothly there.
+Session 10's WebRTC "Direct connection" race mode was judged too complex.
+Roll back to the previous commit version, safely, without breaking the
+GitHub Pages deployment.
 
-### Decided: this is the answer to session 9's "still open", not a new feature bolted on
+### Decided: revert the merge, don't rewrite history
 
-Session 9 built a real join-code race and then wrote, in its own "still
-open" section, that online play "only works self-hosted... by design",
-worth restating "so a future session doesn't 'fix' it by trying to add a
-server to Pages, which doesn't run arbitrary server code." That framing was
-correct as far as it went, but it assumed the only way to have a live,
-synchronized room was a server relaying messages - true for a room with up
-to six players (round 10's actual design point), but not true for exactly
-two players who can reach each other on the same network, which is what
-this task asked for. WebRTC's own ICE layer does the "find each other"
-part; only the handshake needs a third party, and a third party is
-avoidable if the two players carry the handshake themselves.
+`main` already had session 10's PR (#6, merge commit `8b449e9`) merged in,
+so simply resetting this branch to before it would have thrown away shared,
+published history and forced a rewrite of `main` to match - risky for a
+change whose only goal is "make the code simpler again," and unnecessary:
+`git revert -m 1 8b449e9` produces the same resulting tree (the merge's own
+diff was exactly PR #6's diff, nothing else landed on `main` afterward) as
+an ordinary, additive commit. It's itself trivially revertible if the
+decision changes again, and it doesn't touch anyone else's clone or force a
+`git pull --rebase` on collaborators.
 
-### Decided: run `RaceRoomManager` in the browser instead of writing a second room engine
+### Verified nothing depended on what was removed
 
-The temptation was to write a lighter, 2-player-only state machine for
-Direct mode, since it never needs more than a host and one guest. Didn't:
-`race-server.js`'s `RaceRoomManager` already only touched `ws.send()` and
-`ws.readyState`, never anything WebSocket-specific, except in the one
-method that opens the socket server. Split that method out
-(`web/js/race-room-engine.js` keeps the class, `race-server.js` re-adds the
-method via a subclass) and the *exact same authoritative room logic* now
-runs inside the host's own tab for Direct mode - a loopback "socket" for
-the host's own player, the real `RTCDataChannel` for the guest. This is
-also why `web/js/pages/compete.js` needed no changes at all to its lobby,
-countdown, round, recap or results rendering: those functions only ever
-depended on a `{send(msg), stop()}` client and `type`-tagged events, which
-a `WebRtcHostClient`/`WebRtcGuestClient` produces identically to the
-existing `RaceClient`. Two connection methods, one set of screens.
-
-### Found: a chicken-and-egg ordering bug the manual-signaling flow made unavoidable to hit
-
-First working version of `WebRtcGuestClient.readOffer()` waited for the
-`ondatachannel` event *before* returning the answer blob to show the guest
-- reasoning that "the answer isn't useful until the channel exists." That
-is backwards: the channel cannot exist until the *host* has the answer and
-applies it, and the host cannot have the answer until the guest produces
-it. The guest hung forever on "Connecting..." with no error, because
-nothing had actually failed - it was correctly waiting for an event that
-could only fire after a step that was itself waiting on this one. Fixed by
-having `readOffer()` return as soon as its own local description (the
-answer) is ready, and moving the wait for the data channel into
-`joinRoom()`, which only runs after the answer has had a chance to reach
-the host. Found by testing two real pages end to end rather than by
-reading the code - the pause line ("await ICE gathering, then return") read
-correct in isolation on both ends; it was the combination that deadlocked.
-
-### Found: a QR round-trip test catches an alignment-pattern bug that "does it look like a QR code" would not
-
-The QR encoder is adapted from Kazuhiko Arase's `qrcode-generator` (fetched
-and trimmed, not retyped from memory - see the CHANGELOG entry for why that
-distinction mattered here). Structural checks (finder patterns present,
-timing pattern alternates, size matches the version formula) all passed on
-the first working version, including for a plain visual eyeball check of
-the rendered SVG. The independent round-trip decode test written alongside
-it - unmask, walk the data region, Reed-Solomon syndrome check - failed
-immediately, but only for versions with an alignment pattern (version 1,
-which has none, round-tripped fine). The bug: the *test's* reserved-module
-predicate marked a whole 5x5 zone around every alignment-pattern candidate
-position, including ones the real encoder skips because they overlap a
-finder pattern - so the test was reserving modules the encoder had actually
-used for data, and reading garbage there. Worth remembering past this one
-bug: "renders something that looks right" and "is byte-correct" are
-different claims for anything spec-shaped (a codec, a checksum, a binary
-format), and only the second one is checkable without a second, real-world
-decoder (a phone camera, in this case, which this session had no way to
-drive). The round-trip test is the substitute for that phone.
-
-### Decided: no STUN/TURN server, and QR is additive, not required
-
-`iceServers: []` on purpose - the brief was two devices on the same
-subnet, which only needs "host" candidates (the device's own LAN address),
-and skipping STUN keeps the offer/answer blob small enough to comfortably
-fit a QR code without ever needing to think about chunking it. The QR code
-itself is additive: `blobShareCard` always shows the raw text too, and if
-`qrSvg()` throws (a payload larger than a version-40 QR can hold at error
-level L, which a `iceServers: []` LAN offer should never actually reach but
-the code doesn't assume) the page falls back to text-only rather than
-failing the whole flow. Camera *scanning* (as opposed to display) is
-narrower still: it only shows a "Scan QR code" button where the browser's
-own `BarcodeDetector` exists, which ruled out writing a QR decoder as part
-of this session - `encodeQr`/`qrSvg` this session wrote and tested; the
-browser (where it can) does the reading.
-
-### Verification
-
-- `npm test` - 99 Node tests, including new coverage for `qrcode.js` (the
-  round-trip decode across several versions, one deliberately large enough
-  to force a version above 6 so version-info bits get exercised too),
-  `race-room-engine.js` (a full room lifecycle driven with fake sockets, no
-  transport at all) and `webrtc-signal.js` (blob encode/decode round-trip
-  plus adversarial decode cases: wrong blob type, truncated, garbage,
-  tampered SDP).
-- `python3 tools/check_precache.py` - 52/52 files, after adding the four
-  new `web/js/` modules to `web/sw.js`.
-- `tests/web/smoke.mjs` run twice, by hand, against two different servers:
-  once against `node server.js` (the existing self-hosted setup), and once
-  against a bare `python3 -m http.server 8090 --directory web` serving only
-  the `web/` folder with **no Node process running at all** - the same
-  shape as what `deploy-pages.yml` actually publishes to GitHub Pages. Both
-  runs passed clean, including the new Direct-mode test (two real browser
-  pages, a real `RTCDataChannel`, a full round played to the recap screen).
-  The static-hosting run is the part that actually proves the "zero
-  backend" claim rather than trusting it from reading the code - and it is
-  also why the *existing* `compete:online` (server-backed) test needed a
-  one-line change first, to explicitly pick "Via a server" now that
-  Direct is the default connection method.
-- Screenshots taken by hand (desktop and 390px mobile) of every step of
-  both the create and join flows, against the static server. Caught one
-  real bug this way that no logic test would: a bare "null" printed on the
-  page between the two steps of the create flow - `directErrorBanner()`
-  returns `null` when there is nothing to show, and one of the five spots
-  it is used still called the native `Element.append()` instead of this
-  app's own null-filtering `append()` helper (`web/js/dom.js`) - the exact
-  bug CHANGELOG round 6 already fixed three instances of, in a fourth
-  location it hadn't reached yet.
+Before trusting the revert, checked whether anything committed after
+`8b449e9` referenced the WebRTC files - nothing had (this branch was cut
+directly from `main`'s tip), so the revert applied with zero conflicts.
+After it: `npm test` (85 tests, back to round 10's count exactly), `npm run
+lint`, and `python3 tools/check_precache.py` (48/48 files, also back to
+round 10's count) all pass unchanged. `web/js/pages/compete.js`'s online
+mode is back to a single WebSocket `RaceClient` flow with no "connection
+method" choice - grepped the whole page afterward for any leftover
+`Direct`/`webrtc`/`qrcode` reference and found none. `deploy-pages.yml`
+itself was never touched by session 10 or this revert, so the two things
+that actually gate a live deploy (the `BUILD_ID` stamp and the precache
+check) were re-run locally exactly as the workflow runs them, unchanged in
+behavior from round 10.
 
 ### Still open
 
-- Camera scanning depends on `BarcodeDetector`, which is Chrome/Edge/
-  Android-only today (confirmed empirically: not present in the headless
-  Chromium this session's own tests run under, which is why smoke.mjs
-  drives the Direct handshake by reading the blob text out of the DOM
-  rather than exercising the scanner). Firefox and Safari users always have
-  the text box and copy/paste, which is by design, not a gap to close -
-  but if either ships `BarcodeDetector` later, nothing here needs to change
-  to pick it up.
-- Direct mode is capped at exactly two players (host + one guest) - the
-  manual QR/paste handshake does not scale to round 10's up-to-six-player
-  rooms without asking every pair of players to exchange a code, which
-  would be a worse experience than it's worth. The "Via a server" method
-  still exists specifically for a self-hosted household/classroom that
-  wants more than two.
-- No STUN fallback means Direct mode is genuinely LAN-only (same wifi/
-  subnet) by design, per the brief - it will not connect two devices on
-  different networks. That is the "Via a server" method's job, not this
-  one's.
+- Race Mode's online play is, once again, self-hosted-only
+  (`npm start`) - the same limitation session 9 and session 10 both
+  documented. If a future session wants online play back on the published
+  GitHub Pages site, session 10's approach (this file, above the line) and
+  its CHANGELOG entry are still there in full via `git show 8b449e9` even
+  though the code itself is reverted - worth reading before re-attempting
+  the same design rather than re-deriving it from scratch.
 
 ---
 

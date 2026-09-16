@@ -47,8 +47,6 @@ import { settleAnswer } from "../gameflow.js";
 import { bigCelebration, confetti, toast } from "../fx.js";
 import { getGameIllustration } from "../illustrations.js";
 import * as sound from "../sound.js";
-import { qrSvg } from "../qrcode.js";
-import { WebRtcHostClient, WebRtcGuestClient } from "../webrtc-race-client.js";
 
 const GAME_KEY = "compete";
 const DEFAULT_LEVEL = 2;
@@ -198,25 +196,11 @@ export function render(container) {
   // --- shared setup state --------------------------------------------------
 
   let mode = "online"; // "online" | "local"
-  // "direct" needs no server at all (WebRTC, manual signaling - works on
-  // GitHub Pages); "server" is the older join-code room server, which only
-  // runs when this app is self-hosted (see docs/DEPLOYMENT.md). Direct is
-  // the default because it is the one that actually works wherever this
-  // page is deployed.
-  let connectionMethod = "direct"; // "direct" | "server"
   let onlineTab = "create"; // "create" | "join"
   let onlineScreen = "form"; // "form" | "lobby"
   let selectedCategory = readCategoryPref();
   let selectedRounds = DEFAULT_ROUNDS;
   let selectedLevel = readLevelPref();
-
-  // Direct (WebRTC) connection state - the manual offer/answer handshake
-  // that replaces a signaling server (see webrtc-signal.js).
-  let directStep = "form"; // "form" | "await-answer" | "show-answer" | "connecting" | "error"
-  let directError = "";
-  let directOfferBlob = "";
-  let directAnswerBlob = "";
-  let activeScanStream = null; // the camera stream a QR scan attempt opened, if any (see startQrScan)
 
   let initialJoinCode = "";
   try {
@@ -228,10 +212,7 @@ export function render(container) {
   } catch {
     /* ignore a malformed hash */
   }
-  if (initialJoinCode) {
-    onlineTab = "join";
-    connectionMethod = "server"; // a bare code only means anything against the room server
-  }
+  if (initialJoinCode) onlineTab = "join";
 
   // --- local (same device) match state --------------------------------------
 
@@ -376,37 +357,8 @@ export function render(container) {
   // Online: create / join
   // ---------------------------------------------------------------------
 
-  function connectionMethodChooser() {
-    return el("div.kmg-race-connection-tabs", {}, [
-      el(`button.kmg-race-connection-tab${connectionMethod === "direct" ? ".is-active" : ""}`, {
-        type: "button",
-        text: t("compete.connection_direct"),
-        onClick: () => {
-          if (connectionMethod === "direct") return;
-          connectionMethod = "direct";
-          directStep = "form";
-          directError = "";
-          sound.playTap();
-          renderSetup();
-        },
-      }),
-      el(`button.kmg-race-connection-tab${connectionMethod === "server" ? ".is-active" : ""}`, {
-        type: "button",
-        text: t("compete.connection_server"),
-        onClick: () => {
-          if (connectionMethod === "server") return;
-          connectionMethod = "server";
-          sound.playTap();
-          renderSetup();
-        },
-      }),
-    ]);
-  }
-
   function renderOnlineForm() {
     const card = el("div.kmg-card.kmg-race-card");
-    card.append(connectionMethodChooser());
-
     const subtabs = el("div.kmg-race-subtabs", {}, [
       el(`button.kmg-btn.kmg-btn-sm${onlineTab === "create" ? ".kmg-btn-primary" : ".kmg-btn-ghost"}`, {
         type: "button",
@@ -427,10 +379,7 @@ export function render(container) {
     ]);
     card.append(subtabs);
 
-    if (connectionMethod === "direct") {
-      if (onlineTab === "create") renderDirectCreatePanel(card);
-      else renderDirectJoinPanel(card);
-    } else if (onlineTab === "create") {
+    if (onlineTab === "create") {
       const nameInput = el("input.kmg-textinput", {
         type: "text",
         value: state.playerName || "",
@@ -497,338 +446,6 @@ export function render(container) {
     }
 
     viewSetup.append(card);
-  }
-
-  // ---------------------------------------------------------------------
-  // Online, direct (WebRTC, manual signaling) - the connection method that
-  // needs no server, so it is the one that actually works on GitHub Pages.
-  // See webrtc-signal.js for the offer/answer handshake and qrcode.js for
-  // how it is drawn.
-  // ---------------------------------------------------------------------
-
-  /** A copyable blob shown as both a QR code and selectable text, with a
-   *  copy button - one player reads this off their screen and gets it to
-   *  the other however is convenient (camera, a message, reading it aloud
-   *  is even possible in a pinch, since it's already base64url). */
-  function blobShareCard(blob) {
-    const qrHost = el("div.kmg-qr-box");
-    try {
-      qrHost.append(raw("div", qrSvg(blob, { cellSize: 4, margin: 12 })));
-    } catch {
-      // Payload too large for a QR code at any version (shouldn't happen for
-      // a LAN-only, host-candidate-only SDP, but never block on it) - the
-      // text box below still works on its own.
-      qrHost.append(el("p.kmg-sub", { text: t("compete.qr_or_text_hint") }));
-    }
-    const textArea = el("textarea.kmg-qr-textarea", {
-      readonly: true,
-      rows: "4",
-      value: blob,
-      onClick: (e) => e.target.select(),
-    });
-    const copyBtn = el("button.kmg-btn.kmg-btn-ghost.kmg-btn-sm", {
-      type: "button",
-      text: t("compete.copy_code_btn"),
-      onClick: async () => {
-        if (await copyToClipboard(blob)) toast(t("compete.copied_toast"), "📋", 1800);
-      },
-    });
-    return el("div.kmg-qr-card", {}, [
-      qrHost,
-      el("p.kmg-sub", { text: t("compete.qr_or_text_hint") }),
-      textArea,
-      copyBtn,
-    ]);
-  }
-
-  function directErrorBanner() {
-    if (!directError) return null;
-    return el("div.kmg-banner.kmg-banner-bad", {}, [
-      el("span.kmg-banner-icon", { text: "⚠️" }),
-      el("span.kmg-banner-body", { text: directError }),
-    ]);
-  }
-
-  /** Stops whatever camera stream a QR scan attempt opened - called when a
-   *  scan finds a code, is cancelled, or the page is left mid-scan. */
-  function stopActiveScan() {
-    activeScanStream?.getTracks().forEach((track) => track.stop());
-    activeScanStream = null;
-  }
-
-  /** Opens an inline camera preview and detects a QR code with the
-   *  browser's own `BarcodeDetector` (Chrome/Edge/Android today; nowhere
-   *  else, which is exactly why this is a button next to the paste box
-   *  rather than the only way in - the text is always there too). Replaces
-   *  `hostNode`'s contents with the preview while scanning; calls
-   *  `onResult(text)` the moment a code is found and closes the camera -
-   *  a scan result is as definitive as a paste, so, like every tap
-   *  elsewhere in this app, it doesn't wait for a second confirming click. */
-  function startQrScan(hostNode, onResult) {
-    stopActiveScan();
-    const video = el("video.kmg-qr-scan-video", { autoplay: true, playsinline: true, muted: true });
-    const cancelBtn = el("button.kmg-btn.kmg-btn-ghost.kmg-btn-sm", {
-      type: "button",
-      text: t("compete.scan_cancel_btn"),
-      onClick: () => {
-        stopActiveScan();
-        clear(hostNode);
-      },
-    });
-    clear(hostNode);
-    hostNode.append(el("div.kmg-qr-scan-box", {}, [video]), cancelBtn);
-
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "environment" } })
-      .then((stream) => {
-        activeScanStream = stream;
-        video.srcObject = stream;
-        const detector = new BarcodeDetector({ formats: ["qr_code"] });
-        let stopped = false;
-        const tick = async () => {
-          if (stopped || activeScanStream !== stream) return;
-          try {
-            const codes = await detector.detect(video);
-            if (codes.length) {
-              stopped = true;
-              stopActiveScan();
-              clear(hostNode);
-              onResult(codes[0].rawValue);
-              return;
-            }
-          } catch {
-            /* a frame that fails to decode just gets retried on the next tick */
-          }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      })
-      .catch(() => {
-        // Covers both a denied/unsupported getUserMedia call and
-        // BarcodeDetector construction failing after the camera already
-        // opened (some browsers only learn a format is unsupported once
-        // asked) - either way, nothing should keep the camera running.
-        stopActiveScan();
-        clear(hostNode);
-        hostNode.append(el("p.kmg-sub", { text: t("compete.scan_unavailable") }));
-      });
-  }
-
-  function pasteBox({ placeholder, buttonText, onSubmit }) {
-    const textArea = el("textarea.kmg-qr-textarea", { placeholder, rows: "4" });
-    const pasteBtn = el("button.kmg-btn.kmg-btn-ghost.kmg-btn-sm", {
-      type: "button",
-      text: t("compete.paste_from_clipboard_btn"),
-      onClick: async () => {
-        try {
-          textArea.value = (await navigator.clipboard.readText()) || textArea.value;
-        } catch {
-          /* clipboard read denied/unsupported - the child just types or long-presses paste instead */
-        }
-      },
-    });
-    const submitBtn = el("button.kmg-btn.kmg-btn-primary.kmg-btn-big", {
-      type: "button",
-      text: buttonText,
-      onClick: () => onSubmit(textArea.value),
-    });
-    const scanHost = el("div.kmg-qr-scan-host");
-    const buttonsRow = el("div.kmg-race-code-actions", {}, [pasteBtn, submitBtn]);
-    if (typeof BarcodeDetector !== "undefined" && navigator.mediaDevices?.getUserMedia) {
-      buttonsRow.prepend(
-        el("button.kmg-btn.kmg-btn-ghost.kmg-btn-sm", {
-          type: "button",
-          text: t("compete.scan_qr_btn"),
-          onClick: () => startQrScan(scanHost, (text) => onSubmit(text)),
-        }),
-      );
-    }
-    return el("div.kmg-race-field", {}, [textArea, buttonsRow, scanHost]);
-  }
-
-  function renderDirectCreatePanel(card) {
-    if (directStep === "form") {
-      const nameInput = el("input.kmg-textinput", {
-        type: "text",
-        value: state.playerName || "",
-        placeholder: t("compete.your_name"),
-        maxlength: "24",
-      });
-      const createBtn = el("button.kmg-btn.kmg-btn-primary.kmg-btn-big", {
-        type: "button",
-        text: t("compete.direct_create_btn"),
-        onClick: () => startDirectCreate(nameInput.value),
-      });
-      append(
-        card,
-        el("div.kmg-race-field", {}, [el("label", { text: t("compete.your_name") }), nameInput]),
-        categoryChooser(renderSetup),
-        roundsChooser(renderSetup),
-        levelChooser(renderSetup),
-        scoringNote(),
-        directErrorBanner(),
-        createBtn,
-      );
-    } else if (directStep === "connecting") {
-      card.append(el("div.kmg-race-countdown", {}, [el("div.kmg-race-cd-text", { text: t("compete.direct_connecting") })]));
-    } else if (directStep === "error") {
-      append(
-        card,
-        directErrorBanner(),
-        el("button.kmg-btn.kmg-btn-ghost", {
-          type: "button",
-          text: t("compete.direct_try_again_btn"),
-          onClick: () => {
-            directStep = "form";
-            directError = "";
-            renderSetup();
-          },
-        }),
-      );
-    } else if (directStep === "await-answer") {
-      append(
-        card,
-        el("h3", { text: t("compete.direct_step1_heading") }),
-        el("p.kmg-sub", { text: t("compete.direct_step1_body") }),
-        blobShareCard(directOfferBlob),
-        el("h3", { text: t("compete.direct_step2_heading") }),
-        el("p.kmg-sub", { text: t("compete.direct_step2_body") }),
-        directErrorBanner(),
-        pasteBox({
-          placeholder: t("compete.direct_paste_placeholder"),
-          buttonText: t("compete.direct_connect_btn"),
-          onSubmit: (text) => submitDirectAnswer(text),
-        }),
-      );
-    }
-  }
-
-  function renderDirectJoinPanel(card) {
-    if (directStep === "form") {
-      const nameInput = el("input.kmg-textinput", {
-        type: "text",
-        value: state.playerName || "",
-        placeholder: t("compete.your_name"),
-        maxlength: "24",
-      });
-      append(
-        card,
-        el("h3", { text: t("compete.direct_join_heading") }),
-        el("p.kmg-sub", { text: t("compete.direct_join_body") }),
-        el("div.kmg-race-field", {}, [el("label", { text: t("compete.your_name") }), nameInput]),
-        directErrorBanner(),
-        pasteBox({
-          placeholder: t("compete.direct_paste_placeholder"),
-          buttonText: t("compete.direct_read_btn"),
-          onSubmit: (text) => startDirectJoin(nameInput.value, text),
-        }),
-      );
-    } else if (directStep === "connecting") {
-      card.append(el("div.kmg-race-countdown", {}, [el("div.kmg-race-cd-text", { text: t("compete.direct_connecting") })]));
-    } else if (directStep === "error") {
-      append(
-        card,
-        directErrorBanner(),
-        el("button.kmg-btn.kmg-btn-ghost", {
-          type: "button",
-          text: t("compete.direct_try_again_btn"),
-          onClick: () => {
-            directStep = "form";
-            directError = "";
-            renderSetup();
-          },
-        }),
-      );
-    } else if (directStep === "show-answer") {
-      card.append(
-        el("h3", { text: t("compete.direct_join_step2_heading") }),
-        el("p.kmg-sub", { text: t("compete.direct_join_step2_body") }),
-        blobShareCard(directAnswerBlob),
-        el("div.kmg-banner.kmg-banner-info", {}, [
-          el("span.kmg-banner-icon", { text: "⏳" }),
-          el("span.kmg-banner-body", { text: t("compete.direct_waiting_for_guest") }),
-        ]),
-      );
-    }
-  }
-
-  async function startDirectCreate(hostName) {
-    directError = "";
-    directStep = "connecting";
-    renderSetup();
-    client?.stop(); // an abandoned attempt (e.g. switched tabs mid-handshake) leaves a dangling peer connection
-    try {
-      const hostClient = new WebRtcHostClient((event) => handleOnlineEvent(event));
-      const settings = { category: selectedCategory, rounds: selectedRounds, level: selectedLevel };
-      const created = await hostClient.createOffer(hostName || state.playerName, settings);
-      client = hostClient;
-      myPlayerId = created.playerId;
-      roomCode = created.roomCode;
-      isHost = true;
-      players = hostClient.manager.sanitizePlayers(hostClient.room);
-      directOfferBlob = created.blob;
-      directStep = "await-answer";
-      sound.playTap();
-      renderSetup();
-    } catch (e) {
-      directError = e?.message === "webrtc_unsupported" ? t("compete.direct_error_unsupported") : t("compete.direct_error_connection");
-      directStep = "error";
-      renderSetup();
-    }
-  }
-
-  async function submitDirectAnswer(answerText) {
-    directError = "";
-    directStep = "connecting";
-    renderSetup();
-    const result = await client
-      .applyAnswerBlob(answerText)
-      .catch((e) => ({ ok: false, error: e?.message || "connection_timeout" }));
-    if (!result.ok) {
-      directError =
-        result.error === "connection_timeout" ? t("compete.direct_error_connection") : t("compete.direct_error_malformed");
-      directStep = "await-answer";
-      renderSetup();
-      return;
-    }
-    onlineScreen = "lobby";
-    sound.playTap();
-    renderSetup();
-  }
-
-  async function startDirectJoin(guestName, offerText) {
-    directError = "";
-    directStep = "connecting";
-    renderSetup();
-    client?.stop(); // an abandoned attempt (e.g. switched tabs mid-handshake) leaves a dangling peer connection
-    try {
-      const guestClient = new WebRtcGuestClient((event) => handleOnlineEvent(event));
-      const result = await guestClient.readOffer(offerText);
-      if (!result.ok) {
-        directError = t("compete.direct_error_malformed");
-        directStep = "form";
-        renderSetup();
-        return;
-      }
-      client = guestClient;
-      isHost = false;
-      selectedCategory = result.settings.category;
-      selectedRounds = result.settings.rounds;
-      selectedLevel = result.settings.level;
-      directAnswerBlob = result.answerBlob;
-      directStep = "show-answer";
-      sound.playTap();
-      renderSetup();
-
-      const name = cleanPlayerName(guestName || state.playerName, t("compete.you_label"));
-      await guestClient.joinRoom(result.code, name);
-      // room_joined arrives back over the channel and moves to the lobby
-      // (see the "room_joined" case in handleOnlineEvent below).
-    } catch {
-      directError = t("compete.direct_error_connection");
-      directStep = "error";
-      renderSetup();
-    }
   }
 
   function setupClient() {
@@ -940,39 +557,21 @@ export function render(container) {
       );
     }
 
-    // Direct mode's handshake already happened (that is how the guest got
-    // here at all) and is 1:1, so there is nothing left to share by the time
-    // this lobby renders - only the server-backed room stays joinable by
-    // code after the host reaches this screen.
-    if (connectionMethod !== "direct") {
-      card.append(
-        el("h3", { text: t("compete.share_code_title") }),
-        el("p.kmg-sub", { text: t("compete.share_code_desc") }),
-        el("div.kmg-race-code-display", {}, [el("div.kmg-race-big-code", { text: roomCode })]),
-        el("div.kmg-race-code-actions", {}, [copyCodeBtn, copyLinkBtn]),
-      );
-    }
-    card.append(el("h4", { text: t("compete.players_heading") }), playersList, actionArea);
+    card.append(
+      el("h3", { text: t("compete.share_code_title") }),
+      el("p.kmg-sub", { text: t("compete.share_code_desc") }),
+      el("div.kmg-race-code-display", {}, [el("div.kmg-race-big-code", { text: roomCode })]),
+      el("div.kmg-race-code-actions", {}, [copyCodeBtn, copyLinkBtn]),
+      el("h4", { text: t("compete.players_heading") }),
+      playersList,
+      actionArea,
+    );
     viewSetup.append(card);
   }
 
   function handleOnlineEvent(msg) {
     if (!msg || !msg.type) return;
     switch (msg.type) {
-      // Only ever arrives on the guest side of a Direct (WebRTC) connection,
-      // right after it sends "join_room" over the freshly-opened data
-      // channel - the server-based flow gets the same information back
-      // synchronously from its REST call instead (see joinOnlineRoom).
-      case "room_joined": {
-        myPlayerId = msg.playerId;
-        roomCode = msg.roomCode;
-        players = msg.players || players;
-        isHost = false;
-        onlineScreen = "lobby";
-        sound.playTap();
-        renderSetup();
-        break;
-      }
       case "player_joined":
       case "player_left": {
         players = msg.players || players;
@@ -1153,10 +752,6 @@ export function render(container) {
         roomCode = "";
         players = [];
         onlineScreen = "form";
-        directStep = "form";
-        directError = "";
-        directOfferBlob = "";
-        directAnswerBlob = "";
         viewResults.hidden = true;
         viewSetup.hidden = false;
         renderSetup();
@@ -1546,6 +1141,5 @@ export function render(container) {
     stopLocalTimers();
     if (onlineTimerInterval) clearInterval(onlineTimerInterval);
     if (client) client.stop();
-    stopActiveScan();
   };
 }
