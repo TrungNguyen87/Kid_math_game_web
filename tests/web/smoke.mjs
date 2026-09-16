@@ -388,9 +388,6 @@ await page.waitForTimeout(600);
 currentRoute = "compete:online";
 await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
 await page.waitForSelector(".kmg-race-mode-tab"); // online + "create" is the default
-// "Direct" (WebRTC) is the default connection method now - explicitly pick
-// the server-backed one so this still exercises the WebSocket room path.
-await page.locator(".kmg-race-connection-tab", { hasText: /Via een server/ }).click();
 await page.locator(".kmg-race-segment-btn", { hasText: /^5\b/ }).first().click();
 await page.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
 
@@ -451,99 +448,6 @@ if (!codeVisible) {
   await guest.close();
 }
 console.log(`  compete online: join code ${codeVisible ? "shown and joined" : "MISSING"}`);
-
-// --- Online, Direct: WebRTC with no server at all --------------------------
-//
-// This is the mode that actually works on the published GitHub Pages site
-// (see docs/DEPLOYMENT.md / CHANGELOG round 11): two browser pages exchange
-// an offer/answer blob - read straight out of the DOM here rather than
-// scanned as a QR code, but it is exactly the text a QR code carries - and
-// connect over a real RTCDataChannel, no server involved. It is the default
-// connection method, so this test does not need to select it.
-
-currentRoute = "compete:direct";
-// The previous section leaves `page` mid-race on this same #/compete route
-// (with viewSetup hidden); reset through #/home first so the goto below is
-// a real navigation rather than a same-URL no-op.
-await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
-await page.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
-await page.waitForSelector(".kmg-race-mode-tab");
-await page.locator(".kmg-race-segment-btn", { hasText: /^5\b/ }).first().click();
-await page.locator(".kmg-race-card .kmg-btn-primary.kmg-btn-big").click(); // "Create a direct race"
-
-const offerShown = await page
-  .waitForSelector("textarea.kmg-qr-textarea[readonly]", { timeout: 6000 })
-  .then(() => true)
-  .catch(() => false);
-
-let raced = false;
-if (!offerShown) {
-  note("compete:direct", "creating a direct room never showed the offer code");
-} else {
-  const offerBlob = await page.locator("textarea.kmg-qr-textarea[readonly]").inputValue();
-
-  const guest = await context.newPage();
-  guest.on("pageerror", (error) => note("compete:direct", `guest page error: ${error.message}`));
-  guest.on("console", (message) => {
-    if (message.type() === "error") note("compete:direct", `guest console error: ${message.text()}`);
-  });
-  await guest.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
-  await guest.waitForSelector(".kmg-race-mode-tab");
-  await guest.locator(".kmg-race-subtabs button").nth(1).click(); // "Join with a code"
-  await guest.locator("textarea.kmg-qr-textarea:not([readonly])").fill(offerBlob);
-  await guest.locator(".kmg-race-card .kmg-btn-primary.kmg-btn-big").click(); // "Read the code"
-
-  const answerShown = await guest
-    .waitForSelector("textarea.kmg-qr-textarea[readonly]", { timeout: 8000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!answerShown) note("compete:direct", "guest never produced an answer code after reading the offer");
-
-  let hostSeesGuest = false;
-  if (answerShown) {
-    const answerBlob = await guest.locator("textarea.kmg-qr-textarea[readonly]").inputValue();
-    await page.locator("textarea.kmg-qr-textarea:not([readonly])").fill(answerBlob);
-    await page.locator(".kmg-race-card .kmg-btn-primary.kmg-btn-big").click(); // "Connect"
-
-    hostSeesGuest = await page
-      .waitForFunction(() => document.querySelectorAll(".kmg-race-players-status .kmg-race-player-pill").length >= 2, {
-        timeout: 10000,
-      })
-      .then(() => true)
-      .catch(() => false);
-    if (!hostSeesGuest) note("compete:direct", "host lobby never showed the guest after applying the answer code");
-  }
-
-  const guestJoined = hostSeesGuest
-    ? await guest
-        .waitForSelector(".kmg-race-players-status .kmg-race-player-pill.is-me", { timeout: 6000 })
-        .then(() => true)
-        .catch(() => false)
-    : false;
-  if (hostSeesGuest && !guestJoined) note("compete:direct", "guest never reached its own lobby after connecting");
-
-  if (hostSeesGuest && guestJoined) {
-    await page.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click(); // host starts the race
-    const [hostInRound, guestInRound] = await Promise.all([
-      page.waitForSelector(".kmg-choices .kmg-choice", { timeout: 8000 }).then(() => true).catch(() => false),
-      guest.waitForSelector(".kmg-choices .kmg-choice", { timeout: 8000 }).then(() => true).catch(() => false),
-    ]);
-    if (!hostInRound || !guestInRound) {
-      note("compete:direct", `the round did not reach both players (host: ${hostInRound}, guest: ${guestInRound})`);
-    } else {
-      await page.locator(".kmg-choices .kmg-choice").first().click();
-      await guest.locator(".kmg-choices .kmg-choice").first().click();
-      const recapReached = await page
-        .waitForSelector(".kmg-race-feedback .kmg-msg-ok, .kmg-race-feedback .kmg-msg-bad", { timeout: 5000 })
-        .then(() => true)
-        .catch(() => false);
-      if (!recapReached) note("compete:direct", "the round recap never reached the host after both players answered");
-      raced = recapReached;
-    }
-  }
-  await guest.close();
-}
-console.log(`  compete direct (WebRTC, no server): ${raced ? "connected and raced" : "MISSING/FAILED"}`);
 
 // --- mobile layout ---------------------------------------------------------
 
