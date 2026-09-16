@@ -29,6 +29,9 @@ const rewards = await import("../../web/js/rewards.js");
 const log = await import("../../web/js/log.js");
 const race = await import("../../web/js/race-logic.js");
 const visuals = await import("../../web/js/visuals.js");
+const qrcode = await import("../../web/js/qrcode.js");
+const { RaceRoomManager } = await import("../../web/js/race-room-engine.js");
+const webrtcSignal = await import("../../web/js/webrtc-signal.js");
 
 const tafel = await import("../../web/js/games/tafel.js");
 const breuken = await import("../../web/js/games/breuken.js");
@@ -961,4 +964,417 @@ test("rankPlayers sorts by score, ties broken by whoever joined first, and gener
   const ranked = race.rankPlayers(players);
   assert.deepEqual(ranked.map((p) => p.name), ["B", "C", "E", "A", "D"]);
   assert.deepEqual(ranked.map((p) => p.rank), [1, 2, 3, 4, 5]);
+});
+
+// ---------------------------------------------------------------------------
+// QR code encoder - independent round-trip decode
+//
+// The tables (Reed-Solomon block sizes, alignment-pattern positions) are
+// copied verbatim from a well-known reference (see the comment at the top of
+// qrcode.js), so what is actually worth testing here is this file's own
+// wiring between them - not something a passing "it drew a grid of squares"
+// check would catch. This decodes the matrix the same way a scanner (or a
+// second implementation) would: read the format-info bits, unmask using the
+// mask pattern they name, walk the data region in the same zig-zag order as
+// the encoder (written fresh here, not imported from it), split the result
+// back into Reed-Solomon blocks, and check the error-correction codewords
+// against a from-scratch syndrome calculation - a different computation
+// (polynomial evaluation) than the encoder's own (polynomial division), so a
+// wrong generator polynomial or a wrong interleave order shows up as a
+// non-zero syndrome instead of silently agreeing with itself.
+// ---------------------------------------------------------------------------
+
+function qrInFinderZone(row, col, moduleCount) {
+  const near = (r0, c0) => row >= r0 - 1 && row <= r0 + 7 && col >= c0 - 1 && col <= c0 + 7;
+  return near(0, 0) || near(moduleCount - 7, 0) || near(0, moduleCount - 7);
+}
+
+function qrReservedModule(row, col, moduleCount, typeNumber, alignmentPositions) {
+  if (qrInFinderZone(row, col, moduleCount)) return true;
+
+  if (row === 6 && col >= 8 && col <= moduleCount - 9) return true;
+  if (col === 6 && row >= 8 && row <= moduleCount - 9) return true;
+
+  // An alignment pattern is only actually drawn where its *center* does not
+  // already fall inside a finder pattern's zone (that is what the encoder's
+  // own "skip if this cell is already set" check amounts to, since at this
+  // point in the build only the three finder patterns have been drawn) - a
+  // center whose neighbourhood merely *overlaps* a finder zone without the
+  // center itself being inside one still gets a real alignment pattern.
+  for (const r0 of alignmentPositions) {
+    for (const c0 of alignmentPositions) {
+      if (qrInFinderZone(r0, c0, moduleCount)) continue;
+      if (row >= r0 - 2 && row <= r0 + 2 && col >= c0 - 2 && col <= c0 + 2) return true;
+    }
+  }
+
+  if (col === 8 && ((row <= 8 && row !== 6) || row >= moduleCount - 7)) return true;
+  if (row === 8 && ((col <= 8 && col !== 6) || col >= moduleCount - 8)) return true;
+  if (row === moduleCount - 8 && col === 8) return true; // the fixed dark module
+
+  if (typeNumber >= 7) {
+    if (row <= 5 && col >= moduleCount - 11 && col <= moduleCount - 9) return true;
+    if (row >= moduleCount - 11 && row <= moduleCount - 9 && col <= 5) return true;
+  }
+
+  return false;
+}
+
+/** Walks the data region in the same column-pair, direction-flipping order
+ *  ISO/IEC 18004 specifies (and qrcode.js's own placement loop uses) and
+ *  returns the raw, unmasked codeword bytes. */
+function qrExtractCodewords(encoded) {
+  const { size, typeNumber, maskPattern, isDark } = encoded;
+  const alignmentPositions = qrcode._internal.patternPosition(typeNumber);
+  const maskFn = qrcode._internal.MASK_FUNCTIONS[maskPattern];
+
+  const bytes = [];
+  let byte = 0;
+  let bitCount = 0;
+  let inc = -1;
+  let row = size - 1;
+  for (let col = size - 1; col > 0; col -= 2) {
+    if (col === 6) col -= 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      for (let c = 0; c < 2; c += 1) {
+        const cc = col - c;
+        if (!qrReservedModule(row, cc, size, typeNumber, alignmentPositions)) {
+          let dark = isDark(row, cc);
+          if (maskFn(row, cc)) dark = !dark;
+          byte = (byte << 1) | (dark ? 1 : 0);
+          bitCount += 1;
+          if (bitCount === 8) {
+            bytes.push(byte);
+            byte = 0;
+            bitCount = 0;
+          }
+        }
+      }
+      row += inc;
+      if (row < 0 || size <= row) {
+        row -= inc;
+        inc = -inc;
+        break;
+      }
+    }
+  }
+  return bytes;
+}
+
+/** Reed-Solomon syndrome check: for a valid codeword, evaluating it at
+ *  alpha^0..alpha^(ecCount-1) over GF(256) must give zero every time. This
+ *  is a different calculation from how the encoder produced the EC bytes
+ *  (polynomial multiply + mod), so it only passes if the generator
+ *  polynomial, the GF(256) tables and the block interleaving all agree. */
+function assertRSBlockValid(blockBytes, ecCount, message) {
+  const n = blockBytes.length;
+  for (let j = 0; j < ecCount; j += 1) {
+    let syndrome = 0;
+    for (let k = 0; k < n; k += 1) {
+      if (blockBytes[k] === 0) continue;
+      syndrome ^= qrcode._internal.QRMath.gexp(
+        qrcode._internal.QRMath.glog(blockBytes[k]) + j * (n - 1 - k),
+      );
+    }
+    assert.equal(syndrome, 0, `${message}: non-zero syndrome at j=${j}`);
+  }
+}
+
+/** Full round-trip: matrix -> codewords -> de-interleaved RS blocks
+ *  (syndrome-checked) -> original data bit buffer -> mode/length/payload ->
+ *  UTF-8 text. Throws/asserts on any mismatch. */
+function qrDecodeText(encoded) {
+  const { typeNumber, ecLevel } = encoded;
+  const rsBlocks = qrcode._internal.getRSBlocks(typeNumber, ecLevel);
+  const flat = qrExtractCodewords(encoded);
+
+  const maxDcCount = Math.max(...rsBlocks.map((b) => b.dataCount));
+  const maxEcCount = Math.max(...rsBlocks.map((b) => b.totalCount - b.dataCount));
+  const dc = rsBlocks.map((b) => new Array(b.dataCount));
+  const ec = rsBlocks.map((b) => new Array(b.totalCount - b.dataCount));
+
+  let index = 0;
+  for (let i = 0; i < maxDcCount; i += 1) {
+    for (let r = 0; r < rsBlocks.length; r += 1) {
+      if (i < dc[r].length) dc[r][i] = flat[index++];
+    }
+  }
+  for (let i = 0; i < maxEcCount; i += 1) {
+    for (let r = 0; r < rsBlocks.length; r += 1) {
+      if (i < ec[r].length) ec[r][i] = flat[index++];
+    }
+  }
+
+  rsBlocks.forEach((block, r) => {
+    assertRSBlockValid([...dc[r], ...ec[r]], block.totalCount - block.dataCount, `block ${r}`);
+  });
+
+  // Original bit buffer = each block's data codewords, concatenated in
+  // block order (not interleaved - the interleaving above undoes that).
+  const dataBytes = dc.flat();
+  const readBits = (bitOffset, numBits) => {
+    let value = 0;
+    for (let i = 0; i < numBits; i += 1) {
+      const idx = bitOffset + i;
+      const bit = (dataBytes[idx >> 3] >> (7 - (idx & 7))) & 1;
+      value = (value << 1) | bit;
+    }
+    return value;
+  };
+
+  const mode = readBits(0, 4);
+  assert.equal(mode, qrcode._internal.MODE_8BIT_BYTE, "mode indicator is not byte mode");
+  const lengthBits = qrcode._internal.lengthInBits(typeNumber);
+  const byteLength = readBits(4, lengthBits);
+  const payloadStart = 4 + lengthBits;
+  const payload = [];
+  for (let i = 0; i < byteLength; i += 1) payload.push(readBits(payloadStart + i * 8, 8));
+
+  return Buffer.from(payload).toString("utf8");
+}
+
+test("qrSvg / encodeQr: round-trips short, medium and long payloads (independent decode)", () => {
+  const samples = [
+    "A",
+    "HELLO WORLD 123",
+    "v=0\r\no=- 1234567890 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n", // SDP-shaped
+    "x".repeat(200),
+    "y".repeat(900), // forces a version well above 6, exercising version-info bits
+    "🎉 groep 6/7 — база64url-ish_-payload ".repeat(20), // multibyte UTF-8
+  ];
+  for (const text of samples) {
+    const encoded = qrcode.encodeQr(text);
+    assert.ok(encoded.typeNumber >= 1 && encoded.typeNumber <= 40);
+    assert.equal(encoded.size, encoded.typeNumber * 4 + 17);
+    const decoded = qrDecodeText(encoded);
+    assert.equal(decoded, text, `round-trip mismatch for a ${text.length}-char payload`);
+  }
+});
+
+test("encodeQr picks the smallest version that fits (version 1 L byte-mode capacity is 17 bytes)", () => {
+  assert.equal(qrcode.encodeQr("a".repeat(17)).typeNumber, 1);
+  assert.equal(qrcode.encodeQr("a".repeat(18)).typeNumber, 2);
+});
+
+test("encodeQr throws rather than silently truncating oversized payloads", () => {
+  assert.throws(() => qrcode.encodeQr("x".repeat(3000)), RangeError);
+});
+
+test("encodeQr rejects an unknown error-correction level", () => {
+  assert.throws(() => qrcode.encodeQr("hi", { ecLevel: "Z" }), RangeError);
+});
+
+test("every QR matrix has the three finder patterns and a fully alternating timing pattern", () => {
+  for (const text of ["short", "a".repeat(300)]) {
+    const { size, isDark } = qrcode.encodeQr(text);
+    // Finder pattern: solid 7x7 ring with a light separator ring and a dark
+    // 3x3 core, at all three corners.
+    const checkFinder = (r0, c0) => {
+      for (let r = 0; r < 7; r += 1) {
+        for (let c = 0; c < 7; c += 1) {
+          const isRing = r === 0 || r === 6 || c === 0 || c === 6;
+          const isCore = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+          const expected = isRing || isCore;
+          assert.equal(isDark(r0 + r, c0 + c), expected, `finder(${r0},${c0}) mismatch at ${r},${c}`);
+        }
+      }
+    };
+    checkFinder(0, 0);
+    checkFinder(0, size - 7);
+    checkFinder(size - 7, 0);
+
+    for (let i = 8; i <= size - 9; i += 1) {
+      assert.equal(isDark(6, i), i % 2 === 0, `horizontal timing pattern breaks at column ${i}`);
+      assert.equal(isDark(i, 6), i % 2 === 0, `vertical timing pattern breaks at row ${i}`);
+    }
+  }
+});
+
+test("qrSvg embeds the module count's pixel size and only the two documented colours", () => {
+  const svg = qrcode.qrSvg("https://example.invalid/join?x=1", { cellSize: 3, margin: 12 });
+  const { size } = qrcode.encodeQr("https://example.invalid/join?x=1");
+  const pixels = size * 3 + 12 * 2;
+  assert.ok(svg.includes(`viewBox="0 0 ${pixels} ${pixels}"`));
+  assert.ok(svg.startsWith("<svg"));
+  assert.ok(svg.trim().endsWith("</svg>"));
+  assert.ok(svg.includes('fill="#ffffff"'));
+  assert.ok(svg.includes('fill="#000000"'));
+});
+
+// ---------------------------------------------------------------------------
+// Race room engine - the transport-agnostic authoritative room state machine
+// extracted out of race-server.js so the WebRTC "direct" connection mode can
+// run it locally in the browser. A fake `ws` here is anything with `.send()`
+// and `.readyState` - exactly what a real WebSocket and an RTCDataChannel
+// wrapper both look like from this class's point of view.
+// ---------------------------------------------------------------------------
+
+function fakeSocket() {
+  const received = [];
+  return {
+    received,
+    readyState: 1,
+    send(payload) {
+      received.push(JSON.parse(payload));
+    },
+  };
+}
+
+test("RaceRoomManager: create, join, start, answer and finish a 2-player room", () => {
+  const manager = new RaceRoomManager();
+  const hostWs = fakeSocket();
+  const guestWs = fakeSocket();
+
+  manager.handleMessage(hostWs, {
+    type: "create_room",
+    playerName: "Host",
+    settings: { category: "tafels", rounds: 5, level: 0 },
+  });
+  const created = hostWs.received.find((m) => m.type === "room_created");
+  assert.ok(created, "no room_created ack");
+  const { roomCode, playerId: hostId } = created;
+
+  manager.handleMessage(guestWs, { type: "join_room", roomCode, playerName: "Guest" });
+  const joined = guestWs.received.find((m) => m.type === "room_joined");
+  assert.ok(joined, "no room_joined ack");
+  const guestId = joined.playerId;
+  assert.equal(joined.players.length, 2);
+
+  const hostJoinBroadcast = hostWs.received.find((m) => m.type === "player_joined");
+  assert.ok(hostJoinBroadcast, "host was never told a guest joined");
+
+  manager.handleMessage(hostWs, { type: "start_game", roomCode, playerId: hostId });
+  assert.ok(hostWs.received.some((m) => m.type === "countdown_started"));
+
+  const room = manager.rooms.get(roomCode);
+  // Skip past the 3-2-1 countdown timers directly to the first round rather
+  // than waiting on real setTimeout delays in a unit test.
+  clearTimeout(room.timer);
+  manager.startNextRound(room);
+  const roundStarted = hostWs.received.find((m) => m.type === "round_started");
+  assert.ok(roundStarted, "round never started");
+  assert.equal(roundStarted.question.options.length, 4);
+
+  const correctAnswer = room.questions[0].answerDisplay;
+  manager.handleMessage(hostWs, { type: "submit_answer", roomCode, playerId: hostId, answer: correctAnswer });
+  manager.handleMessage(guestWs, { type: "submit_answer", roomCode, playerId: guestId, answer: "not-the-answer" });
+
+  // Both players answered - endRound was scheduled for 700ms out; run it now.
+  clearTimeout(room.timer);
+  manager.endRound(room);
+  const recap = hostWs.received.find((m) => m.type === "round_recap");
+  assert.ok(recap, "no round recap broadcast");
+  const hostResult = recap.results.find((r) => r.id === hostId);
+  const guestResult = recap.results.find((r) => r.id === guestId);
+  assert.equal(hostResult.isCorrect, true);
+  assert.equal(guestResult.isCorrect, false);
+  assert.ok(hostResult.points > 0);
+
+  // Fast-forward through the remaining 4 rounds the same way.
+  for (let i = 1; i < 5; i += 1) {
+    clearTimeout(room.timer);
+    manager.startNextRound(room);
+    const answer = room.questions[i].answerDisplay;
+    manager.handleMessage(hostWs, { type: "submit_answer", roomCode, playerId: hostId, answer });
+    manager.handleMessage(guestWs, { type: "submit_answer", roomCode, playerId: guestId, answer });
+    clearTimeout(room.timer);
+    manager.endRound(room);
+  }
+  clearTimeout(room.timer);
+  manager.startNextRound(room); // currentRoundIndex is now 5 == questions.length -> finishGame
+
+  const finished = hostWs.received.find((m) => m.type === "game_finished");
+  assert.ok(finished, "game never finished");
+  assert.equal(finished.stats.length, 2);
+  const hostStat = finished.stats.find((s) => s.id === hostId);
+  assert.ok(hostStat.correctCount >= 1);
+});
+
+test("RaceRoomManager: joinRoom rejects a full room, a bad code, and a race already in progress", () => {
+  const manager = new RaceRoomManager();
+  const room = manager.createRoom("Host", { rounds: 5 });
+
+  assert.equal(manager.joinRoom("does-not-exist", "X").error, "Racecode niet gevonden. Controleer de code.");
+
+  for (let i = 0; i < race.MAX_PLAYERS - 1; i += 1) {
+    const result = manager.joinRoom(room.code, `Guest ${i}`);
+    assert.ok(!result.error, `guest ${i} should have been able to join`);
+  }
+  assert.ok(manager.joinRoom(room.code, "One too many").error);
+
+  room.status = "in_round";
+  assert.ok(manager.joinRoom(room.code, "Late joiner").error);
+});
+
+// ---------------------------------------------------------------------------
+// WebRTC signal blobs - the offer/answer round trip that replaces the
+// join-code server for Direct mode. Treated as hostile input on decode,
+// exactly like the old challenge-link decoder (CHANGELOG round 9): a player
+// can hand-edit, truncate, or paste the wrong kind of blob entirely.
+// ---------------------------------------------------------------------------
+
+function fakeDescription(type, extra = "") {
+  return { type, sdp: `v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n${extra}` };
+}
+
+test("encodeSignalBlob / decodeSignalBlob: offer round-trips its code, settings and SDP", () => {
+  const description = fakeDescription("offer", "a=candidate:1 1 UDP 1 192.168.1.5 50000 typ host\r\n");
+  const settings = { category: "tafels", rounds: 8, level: 3 };
+  const blob = webrtcSignal.encodeSignalBlob({ type: "offer", code: "AB2CD", settings, description });
+
+  const decoded = webrtcSignal.decodeSignalBlob(blob, "offer");
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.code, "AB2CD");
+  assert.deepEqual(decoded.settings, settings);
+  assert.deepEqual(decoded.description, description);
+});
+
+test("encodeSignalBlob / decodeSignalBlob: answer round-trips its code and SDP, with no settings", () => {
+  const description = fakeDescription("answer");
+  const blob = webrtcSignal.encodeSignalBlob({ type: "answer", code: "ZZZZZ", description });
+  const decoded = webrtcSignal.decodeSignalBlob(blob, "answer");
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.code, "ZZZZZ");
+  assert.equal(decoded.settings, null);
+  assert.deepEqual(decoded.description, description);
+});
+
+test("decodeSignalBlob rejects an answer blob when an offer was expected, and vice versa", () => {
+  const offerBlob = webrtcSignal.encodeSignalBlob({ type: "offer", code: "ABCDE", settings: {}, description: fakeDescription("offer") });
+  const answerBlob = webrtcSignal.encodeSignalBlob({ type: "answer", code: "ABCDE", description: fakeDescription("answer") });
+  assert.equal(webrtcSignal.decodeSignalBlob(offerBlob, "answer").ok, false);
+  assert.equal(webrtcSignal.decodeSignalBlob(answerBlob, "offer").ok, false);
+});
+
+test("decodeSignalBlob rejects garbage, empty, truncated and oversized input without throwing", () => {
+  const cases = [
+    "",
+    "   ",
+    "not-base64url-json!!!",
+    btoa("this is not json"),
+    webrtcSignal.encodeSignalBlob({ type: "offer", code: "ABCDE", settings: {}, description: fakeDescription("offer") }).slice(0, 20),
+    "A".repeat(webrtcSignal._internal.MAX_BLOB_LENGTH + 10),
+  ];
+  for (const input of cases) {
+    const decoded = webrtcSignal.decodeSignalBlob(input, "offer");
+    assert.equal(decoded.ok, false, `expected ${JSON.stringify(input.slice(0, 30))} to be rejected`);
+  }
+});
+
+test("decodeSignalBlob rejects a well-formed blob whose SDP was tampered with", () => {
+  const blob = webrtcSignal.encodeSignalBlob({ type: "offer", code: "ABCDE", settings: {}, description: fakeDescription("offer") });
+  const raw = JSON.parse(webrtcSignal._internal.fromBase64Url(blob));
+  raw.sdp.sdp = "not an sdp body";
+  const tampered = webrtcSignal._internal.toBase64Url(JSON.stringify(raw));
+  assert.equal(webrtcSignal.decodeSignalBlob(tampered, "offer").ok, false);
+});
+
+test("decodeSignalBlob fills in default settings when an offer omits them", () => {
+  const blob = webrtcSignal.encodeSignalBlob({ type: "offer", code: "ABCDE", settings: null, description: fakeDescription("offer") });
+  const decoded = webrtcSignal.decodeSignalBlob(blob, "offer");
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.settings.category, "bliksem");
+  assert.equal(decoded.settings.rounds, 10);
+  assert.equal(decoded.settings.level, 2);
 });
