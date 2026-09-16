@@ -5,6 +5,34 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Reverted (round 12 - roll back the WebRTC Direct connection mode)
+
+**Round 11's Direct connection mode (manual SDP offer/answer, QR codes, a
+`RaceRoomManager` running inside the host's own tab) is reverted in full,**
+by reverting merge commit `8b449e9` (`git revert -m 1`, a clean revert with
+no conflicts, not a history rewrite). It worked and was verified against a
+GitHub-Pages-shaped static server, but the handshake - offer text or QR,
+paste an answer back, wait for ICE - was judged too complex a flow to keep
+in an app aimed at a child's parent setting up a race, versus the round 10
+alternative of just running a self-hosted server. See SESSIONS.md session
+11 for the full reasoning.
+
+- Removed: `web/js/webrtc-signal.js`, `web/js/webrtc-race-client.js`,
+  `web/js/qrcode.js`, `web/js/race-room-engine.js`, the "📶 Direct" /
+  "🖧 Via a server" connection-method choice in `web/js/pages/compete.js`,
+  the 26 `compete.*` i18n keys it added, its `web/css/app.css` rules, and
+  its four entries in `web/sw.js`'s precache list.
+- Restored: `race-server.js`'s `RaceRoomManager` (previously split out into
+  `race-room-engine.js`), and `web/js/pages/compete.js`'s online mode as a
+  single WebSocket `RaceClient` flow, same as round 10 - self-hosted
+  (`npm start`) only, same as before round 11 existed.
+- Verified after the revert: `npm test` (85 Node tests, the round 10
+  baseline count), `npm run lint`, `python3 tools/check_precache.py`
+  (48/48 files, matching round 10), and the deploy workflow's two real
+  steps (`BUILD_ID` stamp, `check_precache.py`) run locally - all pass with
+  no changes needed, since nothing landed on top of round 11 to depend on
+  it. `deploy-pages.yml` itself is untouched.
+
 ### Changed (round 10 - Race Mode redesign: real multiplayer, side by side, no check button)
 
 **Round 9's race worked, but it was still one person at a time** - a solo

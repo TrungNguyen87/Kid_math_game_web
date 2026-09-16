@@ -9,6 +9,56 @@ rediscover them.
 
 ---
 
+## Session 11 — 16 September 2026
+
+**Branch:** `claude/webrtc-rollback-c3tjyq`
+
+### Asked
+
+Session 10's WebRTC "Direct connection" race mode was judged too complex.
+Roll back to the previous commit version, safely, without breaking the
+GitHub Pages deployment.
+
+### Decided: revert the merge, don't rewrite history
+
+`main` already had session 10's PR (#6, merge commit `8b449e9`) merged in,
+so simply resetting this branch to before it would have thrown away shared,
+published history and forced a rewrite of `main` to match - risky for a
+change whose only goal is "make the code simpler again," and unnecessary:
+`git revert -m 1 8b449e9` produces the same resulting tree (the merge's own
+diff was exactly PR #6's diff, nothing else landed on `main` afterward) as
+an ordinary, additive commit. It's itself trivially revertible if the
+decision changes again, and it doesn't touch anyone else's clone or force a
+`git pull --rebase` on collaborators.
+
+### Verified nothing depended on what was removed
+
+Before trusting the revert, checked whether anything committed after
+`8b449e9` referenced the WebRTC files - nothing had (this branch was cut
+directly from `main`'s tip), so the revert applied with zero conflicts.
+After it: `npm test` (85 tests, back to round 10's count exactly), `npm run
+lint`, and `python3 tools/check_precache.py` (48/48 files, also back to
+round 10's count) all pass unchanged. `web/js/pages/compete.js`'s online
+mode is back to a single WebSocket `RaceClient` flow with no "connection
+method" choice - grepped the whole page afterward for any leftover
+`Direct`/`webrtc`/`qrcode` reference and found none. `deploy-pages.yml`
+itself was never touched by session 10 or this revert, so the two things
+that actually gate a live deploy (the `BUILD_ID` stamp and the precache
+check) were re-run locally exactly as the workflow runs them, unchanged in
+behavior from round 10.
+
+### Still open
+
+- Race Mode's online play is, once again, self-hosted-only
+  (`npm start`) - the same limitation session 9 and session 10 both
+  documented. If a future session wants online play back on the published
+  GitHub Pages site, session 10's approach (this file, above the line) and
+  its CHANGELOG entry are still there in full via `git show 8b449e9` even
+  though the code itself is reverted - worth reading before re-attempting
+  the same design rather than re-deriving it from scratch.
+
+---
+
 ## Session 9 — 16 September 2026
 
 **Branch:** `claude/race-mode-multiplayer-wwy40y`
