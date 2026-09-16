@@ -32,6 +32,12 @@ export const NAV = [
   { path: "logica", key: "nav.logica", icon: "🧠", game: "logica", load: () => import("./games/logica.js") },
   { path: "code", key: "nav.code", icon: "🔐", game: "code", load: () => import("./games/code.js") },
 
+  // No `game` key on purpose: it is not part of the curriculum (GAME_KEYS),
+  // so it does not affect badges or the home page's overall-level bar, and a
+  // home tile would show a level/progress bar this page has no use for. It
+  // still gets a home-page link, next to rewards/uitleg/dashboard below.
+  { path: "compete", key: "nav.compete", icon: "🏁", load: () => import("./pages/compete.js") },
+
   { path: "rewards", key: "nav.rewards", icon: "🎁", load: () => import("./pages/rewards.js") },
   { path: "uitleg", key: "nav.uitleg", icon: "📖", load: () => import("./pages/uitleg.js") },
   // Kept last on purpose - the parent-facing page.

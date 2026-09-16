@@ -9,6 +9,192 @@ rediscover them.
 
 ---
 
+## Session 8 — 16 September 2026
+
+**Branch:** `claude/multiplayer-competition-mode-ipv44p`
+
+### Asked
+
+Add a competition mode: multiplayer children can compete with others,
+locally on the same network or with people anywhere in the world. Points go
+to whoever answers faster; a wrong answer is worth nothing. Each question
+gets 15 seconds. Be creative if there's a better way. Save the changelog and
+memory, and test everything against the GitHub deploy path.
+
+### Decided: no live cross-device match, and why that's not a cop-out
+
+"Same network or anywhere in the world" reads like a request for a realtime
+multiplayer backend - a websocket relay, a matchmaking step, maybe accounts.
+This app has nowhere to run one: round 6 (below) moved it to GitHub Pages
+specifically to get *rid* of a server, and that reasoning does not stop
+being true because a new feature would be more convenient with one. Standing
+up even a small relay would mean a second free-tier account, a second
+dashboard, and a second thing that can go down - exactly the operational
+weight the whole platform move was designed to avoid, for a feature a child
+uses a few times a week.
+
+WebRTC without a relay was the other option actually considered: two
+browsers *can* talk directly once connected, but getting to "connected" still
+needs a signalling exchange (SDP offer/answer, ICE candidates) that has to
+travel somewhere before the peer connection exists - which is the same
+problem restated, not solved, unless it is done by hand (read a code off one
+screen, type it into the other). That is a real design, but it is a
+same-room, same-sitting feature wearing a "works anywhere in the world"
+label, and it would have been the most fragile part of the app by far,
+un-debuggable in this sandbox (no two real devices, and UDP for STUN is not
+guaranteed through the proxy here anyway).
+
+The reframe: a race does not need to be *live* to be a real competition -
+it needs the same questions and a fair, comparable score. So a race became
+data (`{questions, level, participants}`), sending a challenge became
+base64url-encoding that data into a link, and "anywhere in the world" turned
+into "wherever you'd already send a text". Playing it back-to-back in the
+same room (pass the device, `web/js/pages/compete.js`'s "add a local
+player") and playing it days apart with an ocean between you are the *same
+code path* - only whether the round-trip happens through memory or through
+a copy-pasted link differs. That symmetry is the part worth being pleased
+with; it was not the first idea (the first idea was the WebRTC one above).
+
+### Decided: typed triples over rendered questions, and why `decodeChallenge` is adversarial
+
+Two encoding choices made the resulting link short and the decoder simple to
+get right:
+
+- Questions travel as `[a, b, op]`, not as `{text, answer, options}`. The
+  display string and the correct answer are both pure functions of the
+  triple (`questionText` / `questionAnswer` in `compete.js`), so nothing
+  needs to agree with anything else, and there is no rendered HTML in the
+  payload to worry about.
+- The race uses typed numeric answers (`numberField`, same as eight of the
+  other games) instead of Bliksemronde's four-option multiple choice, purely
+  so there are no distractors to generate and ship - one less thing in the
+  link, one less thing that could be inconsistent between the person who
+  made the challenge and the person opening it.
+
+A challenge code is untrusted input the moment it can be hand-edited or
+pasted from anywhere, so `decodeChallenge` never trusts a field: version,
+question count, every operand and operator, every participant's name
+length, elapsed time and score are all range-checked, and anything outside
+range returns `null` for the whole race rather than a partially-trusted
+object. This is not paranoia for its own sake - `web/js/compete.js`'s
+comment on `sanitizeRace` says so, but the concrete failure mode is a
+crafted link handing the page a 999999ms answer time or a "483 x 917"
+question that breaks the layout. The Node tests spend more lines on this
+(seven `decodeChallenge` tests, several looping over a dozen-plus malformed
+variants each) than on the happy path, on purpose.
+
+One thing this is *not*: participant names are never rendered as HTML
+anywhere in the page (`el(..., {text: ...})` only, never `raw()`/`{html:}`),
+because a challenge's `p[].n` field is exactly the kind of untrusted string
+that would otherwise be an XSS vector in a link a child might open. A test
+(`decodeChallenge treats a name that looks like markup as plain text...`)
+pins this down at the engine boundary; the page's job is just to keep
+honouring it as text.
+
+### Decided: difficulty is a `localStorage` preference, not a `state.levels` entry
+
+The race's difficulty picker looks like `levelPicker()`/`getLevel`/
+`setLevel` from `ui.js`/`state.js`, and the first draft used them directly -
+until `applyProfile()` turned out to rebuild `state.levels` from exactly the
+fixed `GAME_KEYS` array on every profile switch (`state.js`), silently
+dropping anything stored under a `"compete"` key that isn't in that list.
+Adding `"compete"` to `GAME_KEYS` was the other way out, but that array also
+drives the badge conditions (`playedAllGames`, `allLevelsMaxed`) and the home
+page's overall-progress bar - a race's difficulty is not curriculum mastery,
+and folding it in would have made both of those measure something they
+shouldn't. Ended up doing what Bliksemronde already does for its own
+best-score record: a small dedicated `localStorage` key
+(`kmg.compete.level`), read/written directly, same trick, same file
+(`compete.js`'s comment says so explicitly for the next person who reaches
+for `setLevel` here).
+
+The NAV entry correspondingly has no `game` key, so it does not get a home
+tile with a level bar it would give stale numbers for - just a normal nav
+link plus a manual button on the home page next to rewards/uitleg/dashboard.
+
+### Decided: only the local player's own run touches real score/coins/log
+
+A finished race can have several participants (a local pass-and-play guest,
+or names that arrived inside a decoded challenge). Only the one actually
+playing on this device and profile goes through `settleAnswer()` - real
+score, coins, the log, badges, exactly like every other game. Everyone else
+is display-only data for the results screen, never written into this
+device's saved profile. This was a deliberate boundary, not an oversight:
+a guest playing pass-and-play has typed a name, not logged in, and should
+not need to - and a name arriving inside someone else's challenge link is
+not a profile on this device at all.
+
+### Done
+
+- **`web/js/compete.js`** (new) - the engine: level-scaled question
+  generation, `racePoints()` (100 instant, 10 at the 15s buzzer, 0 for
+  wrong/timeout), `newRace`/`makeParticipant`/`rankParticipants`/
+  `fastestPerQuestion`, and `encodeChallenge`/`decodeChallenge`/
+  `extractChallengeCode`/`buildChallengeUrl`. No DOM - imports only
+  `rng.js`.
+- **`web/js/pages/compete.js`** (new) - the page, phases intro → racing →
+  done: start-a-race / incoming-challenge-preview / paste-a-code, the
+  per-question clock (own `requestAnimationFrame` loop, stopped in the
+  cleanup the router calls, same shape as `bliksem.js`'s), the
+  leaderboard/head-to-head/per-question-breakdown tables, and the share
+  panel (clipboard with an `execCommand` fallback, `navigator.share` where
+  available, "add a local player").
+- **`web/js/nav.js`**, **`web/js/pages/home.js`** - a `#/compete` route (no
+  `game` key - see above) and a home-page link.
+- **`web/js/illustrations.js`** - `competeIllustration()`, two rockets
+  racing a waving checkered flag past a stopwatch, registered in
+  `ILLUSTRATIONS`.
+- **`web/js/i18n-data.js`** - `nav.compete`, `game.compete.name`, 44
+  `compete.*` keys, both languages, key-parity and placeholder-parity tests
+  both pass (609 keys total, up from 563).
+- **`web/css/app.css`** - one new section, deliberately built from existing
+  classes (`.kmg-card`, `.kmg-table`, `.kmg-levelpicker`, `.kmg-timedhead`)
+  rather than new chrome.
+- **`web/sw.js`** - both new files added to `PRECACHE`; `tools/check_precache.py`
+  passes (48 files).
+- Tests: 17 new Node tests in `tests/web/test_logic.mjs` (92 total, up from
+  75), and a new Playwright scenario in `tests/web/smoke.mjs` covering the
+  `compete` route in the full route sweep, the per-question clock actually
+  ticking and stopping on navigate-away, a full 8-question race reaching the
+  results/share screen, and - the one that actually exercises the
+  serverless design end to end - opening the exact challenge link the app
+  generated in a fresh navigation and confirming it decodes back into a live
+  "you've been challenged" screen.
+
+### Found along the way
+
+`npm run lint` (`node --check server.js web/js/main.js`) does not reach a
+dynamically-imported page module at all, so it would have stayed green even
+with a syntax error in `pages/compete.js`. Ran `node --check` across every
+file under `web/js` by hand as a result; worth remembering that `npm run
+lint` alone is not sufficient evidence a new page module parses.
+
+`server.js` needs `npm install` before it will boot (`express` is a real
+dependency, not vendored) - unsurprising, but worth noting since this
+session's sandbox started without `node_modules/` and the first attempt to
+run the dev server for the smoke test failed on that rather than on
+anything about this feature.
+
+### Still open
+
+- The `localStorage`-only route means a challenge code's length grows with
+  both question count (fixed at 8) and participant count (capped at 12 in
+  `decodeChallenge`) - fine for a text message or a chat link, but a long
+  forwarded chain could hit length limits on some older SMS gateways or
+  QR-code readers if either were ever used to carry it instead of a plain
+  URL. Not a problem observed, just a ceiling this design has that a server
+  would not.
+- No UI for a parent to see race history on the dashboard - a finished race
+  currently only exists in the page's own memory and, if shared, inside the
+  link itself. The *local* player's own answers do land in the normal
+  per-question log (same as any other game), just not as a race summary.
+- Levels 3-5 introduce division; the smoke test's full-race run stays at
+  level 0 (addition/subtraction only) specifically so a straightforward text
+  parse of the question can't be thrown off by an edge case - the Node tests
+  are what actually cover every operator at every level.
+
+---
+
 ## Session 7 — 15 September 2026
 
 **Branch:** `claude/reward-difficulty-characters-bbdk1u`

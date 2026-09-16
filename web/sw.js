@@ -42,6 +42,7 @@ const PRECACHE = [
   "./js/sound.js",
   "./js/fx.js",
   "./js/illustrations.js",
+  "./js/compete.js",
   "./js/rng.js",
   "./js/visuals.js",
   "./js/charts.js",
@@ -67,6 +68,7 @@ const PRECACHE = [
   "./js/pages/uitleg.js",
   "./js/pages/dashboard.js",
   "./js/pages/rewards.js",
+  "./js/pages/compete.js",
 
   "./icons/icon.svg",
   "./icons/icon-maskable.svg",

@@ -2041,6 +2041,84 @@ table.kmg-table th {
 }
 
 /* ==========================================================================
+   Racewedstrijd / Race Challenge
+
+   The one page in the app with no server behind it at all - a "race" is
+   just a {questions, participants} object that round-trips through a
+   copy-pasted link (see web/js/compete.js). The layout below is otherwise
+   ordinary: cards stack the same way the reward shop's do, and the
+   leaderboard/per-question tables reuse table.kmg-table exactly like the
+   dashboard's log does.
+   ========================================================================== */
+
+.kmg-compete-card {
+  margin-bottom: 1rem;
+}
+.kmg-compete-card h2,
+.kmg-compete-card h3 {
+  margin-top: 0;
+}
+.kmg-compete-challenge {
+  border-color: var(--orange);
+  background: var(--amber-soft);
+}
+.kmg-compete-progress {
+  font-weight: 700;
+  color: var(--text-soft);
+  margin-bottom: 0.35rem;
+}
+
+.kmg-compete-results {
+  margin: 1rem 0;
+}
+.kmg-compete-leaderboard tr.is-leader td {
+  background: var(--amber-soft);
+  font-weight: 700;
+}
+.kmg-compete-perq td.is-correct {
+  color: var(--green-dark);
+}
+.kmg-compete-perq td.is-wrong {
+  color: var(--red-dark);
+}
+.kmg-compete-fastest {
+  color: var(--orange-dark);
+  font-weight: 700;
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-compete-perq td.is-correct {
+    color: #a5d6a7;
+  }
+  .kmg-compete-perq td.is-wrong {
+    color: #ffab91;
+  }
+  .kmg-compete-fastest {
+    color: var(--amber);
+  }
+}
+
+.kmg-compete-share {
+  background: var(--surface-2);
+}
+.kmg-compete-sharerow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+.kmg-compete-sharerow .kmg-textinput {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.kmg-compete-linkbox,
+.kmg-compete-codebox {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  cursor: text;
+}
+
+/* ==========================================================================
    Dashboard
    ========================================================================== */
 
