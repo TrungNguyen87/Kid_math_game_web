@@ -174,24 +174,43 @@ class RaceClient {
 
 export function render(container) {
   const root = el("section.kmg-compete");
+  const headNode = pageHeader("compete.title", {
+    subtitleKey: "compete.subtitle",
+    emoji: "🏁",
+    illustration: getGameIllustration("compete"),
+  });
+  const introNode = raw("div.kmg-intro", tMd("compete.intro"));
   const viewSetup = el("div.kmg-race-setup");
   const viewPlay = el("div.kmg-race-play");
   const viewResults = el("div.kmg-race-results");
   viewPlay.hidden = true;
   viewResults.hidden = true;
 
-  root.append(
-    pageHeader("compete.title", {
-      subtitleKey: "compete.subtitle",
-      emoji: "🏁",
-      illustration: getGameIllustration("compete"),
-    }),
-    raw("div.kmg-intro", tMd("compete.intro")),
-    viewSetup,
-    viewPlay,
-    viewResults,
-  );
+  root.append(headNode, introNode, viewSetup, viewPlay, viewResults);
   container.append(root);
+
+  /**
+   * Show or hide the play view, and with it the page's own chrome.
+   *
+   * The heading and the "how this works" intro are together about 430px
+   * tall on a phone, and nobody reads either of them mid-race. Leaving them
+   * on screen is what pushed the second player's card entirely below the
+   * fold in local mode (see SESSIONS.md session 13) - the literal reason only
+   * one child could reach the screen at a time.
+   */
+  function setRacePlaying(playing) {
+    viewPlay.hidden = !playing;
+    // Only the shared-screen mode has to fit several cards on one screen, so
+    // only it gets the fill-the-viewport treatment; online play is one
+    // player per device and stays an ordinary scrolling page.
+    viewPlay.classList.toggle("is-local", playing && mode === "local");
+    headNode.hidden = playing;
+    introNode.hidden = playing;
+    // The stylesheet uses this to claw back the page's own bottom padding
+    // for the arena - `.kmg-main` is an ancestor, so the arena cannot ask
+    // for that space from its own selector.
+    document.body.classList.toggle("kmg-racing", playing);
+  }
 
   // --- shared setup state --------------------------------------------------
 
@@ -226,6 +245,38 @@ export function render(container) {
   let localTimerInterval = null;
   let localAdvanceTimeout = null;
   let localCountdownInterval = null;
+  /** Live answer buttons of the current local round: button element -> submit fn. */
+  const localAnswerHandlers = new Map();
+
+  /**
+   * The multi-touch path for local play, and the reason it is one listener
+   * on `document` rather than one per button.
+   *
+   * When several fingers land inside the same input frame - which is exactly
+   * what "both kids tap at once" is - a browser is allowed to deliver a
+   * SINGLE `touchstart` carrying every new point in `changedTouches`,
+   * dispatched at the first touch's target. A listener bound to the other
+   * player's button never fires at all in that case, and neither does one
+   * bound to a shared ancestor if one of the fingers landed outside it. The
+   * only way to see every finger is to walk `changedTouches` from a listener
+   * that is guaranteed to be on the propagation path, and Touch Events are
+   * the one multi-touch API every mobile browser has had for a decade.
+   *
+   * `handleLocalAnswer()` guards on "this player already answered this
+   * round", so a tap that also arrives as `pointerdown` and then as a
+   * synthesized `click` is counted exactly once.
+   */
+  function onDocumentTouchStart(event) {
+    if (!localAnswerHandlers.size) return;
+    for (const touch of event.changedTouches) {
+      const node = touch.target;
+      const element = node && node.nodeType === 1 ? node : node?.parentElement;
+      const btn = element?.closest?.(".kmg-choice");
+      const submit = btn ? localAnswerHandlers.get(btn) : null;
+      if (submit) submit();
+    }
+  }
+  document.addEventListener("touchstart", onDocumentTouchStart, { passive: true });
 
   // --- online match state ---------------------------------------------------
 
@@ -582,7 +633,7 @@ export function render(container) {
       case "countdown_started": {
         viewSetup.hidden = true;
         viewResults.hidden = true;
-        viewPlay.hidden = false;
+        setRacePlaying(true);
         renderCountdown(3);
         break;
       }
@@ -617,7 +668,7 @@ export function render(container) {
       case "rematch_ready": {
         players = msg.players || players;
         onlineScreen = "lobby";
-        viewPlay.hidden = true;
+        setRacePlaying(false);
         viewResults.hidden = true;
         viewSetup.hidden = false;
         renderSetup();
@@ -741,7 +792,7 @@ export function render(container) {
 
   function renderOnlineFinished(msg) {
     clearInterval(onlineTimerInterval);
-    viewPlay.hidden = true;
+    setRacePlaying(false);
     viewResults.hidden = false;
     clear(viewResults);
     renderResultsScreen(msg.stats, msg.roundHistory, msg.totalRounds, {
@@ -847,7 +898,7 @@ export function render(container) {
 
     viewSetup.hidden = true;
     viewResults.hidden = true;
-    viewPlay.hidden = false;
+    setRacePlaying(true);
 
     let count = 3;
     clear(viewPlay);
@@ -883,6 +934,9 @@ export function render(container) {
     localAnsweredThisRound = new Set();
     localRoundEnded = false;
     localRoundStartTime = performance.now();
+    // Last round's buttons are about to be thrown away; drop their handlers
+    // with them so a stray touch can never reach a detached node.
+    localAnswerHandlers.clear();
     clear(viewPlay);
 
     const indicator = el("div.kmg-race-round-indicator", {
@@ -898,25 +952,25 @@ export function render(container) {
       const choiceGrid = el("div.kmg-choices", { style: { "--kmg-cols": "2" } });
       const buttons = [];
       problem.options.forEach((opt) => {
+        const submit = () => handleLocalAnswer(pi, opt, problem, btn, feedbackNode, buttons);
         const btn = el("button.kmg-choice", {
           type: "button",
           text: opt,
-          onClick: () => handleLocalAnswer(pi, opt, problem, btn, feedbackNode, buttons),
-          // Two (or more) players tap two different cards on this one shared
-          // screen at the same instant. A touch browser only synthesizes a
-          // "click" from the first finger it sees in a multi-touch gesture,
-          // so without this the second (and any later) player's tap would
-          // silently do nothing. pointerdown fires once per touch point,
-          // independently of any other finger already down elsewhere on the
-          // screen, so every player's own card registers its own tap.
-          // handleLocalAnswer() already guards on "this player already
-          // answered", so also getting the click that follows (for whichever
-          // finger the browser treats as primary) is harmless.
+          // Three ways in, on purpose, because no single one covers every
+          // browser and input device (see onDocumentTouchStart above for the
+          // touch story). `click` is what a mouse and a keyboard or switch
+          // user activates the button with; `pointerdown` fires once per
+          // touch point on browsers with sound multi-touch pointer support;
+          // the document-level `touchstart` catches the coalesced case the
+          // other two miss. Answering is idempotent per player per round, so
+          // receiving all three for one tap costs nothing.
+          onClick: submit,
           onPointerdown: (event) => {
             if (event.pointerType === "mouse" && event.button !== 0) return;
-            handleLocalAnswer(pi, opt, problem, btn, feedbackNode, buttons);
+            submit();
           },
         });
+        localAnswerHandlers.set(btn, submit);
         buttons.push(btn);
         choiceGrid.append(btn);
       });
@@ -931,7 +985,11 @@ export function render(container) {
       ]);
     });
 
-    append(viewPlay, el("div.kmg-race-play-header", {}, [indicator, timerBar]), el("div.kmg-race-arena", {}, cards));
+    // `is-local` is what tells the stylesheet this arena has to fit every
+    // player's card on one screen at once - two children cannot both reach a
+    // card that is below the fold, however well its buttons handle touch.
+    const arena = el("div.kmg-race-arena.is-local", { style: { "--kmg-race-players": String(localNames.length) } }, cards);
+    append(viewPlay, el("div.kmg-race-play-header", {}, [indicator, timerBar]), arena);
 
     localTimerInterval = setInterval(() => {
       if (localRoundEnded) {
@@ -1021,7 +1079,8 @@ export function render(container) {
 
   function finishLocalRace() {
     stopLocalTimers();
-    viewPlay.hidden = true;
+    localAnswerHandlers.clear();
+    setRacePlaying(false);
     viewResults.hidden = false;
     clear(viewResults);
 
@@ -1153,6 +1212,9 @@ export function render(container) {
 
   return () => {
     stopLocalTimers();
+    document.body.classList.remove("kmg-racing");
+    document.removeEventListener("touchstart", onDocumentTouchStart);
+    localAnswerHandlers.clear();
     if (onlineTimerInterval) clearInterval(onlineTimerInterval);
     if (client) client.stop();
   };
