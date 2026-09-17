@@ -3,17 +3,18 @@
  *
  * Two collections, "characters" (equip one to show next to your name in the
  * sidebar) and "stickers" (pure collectibles), both unlocked with the coins
- * every correct answer already pays out (see addScore() in state.js - which
- * also caps how many coins can be *earned* per day, shown here as a small
- * progress strip under the balance). The whole page doubles as the
- * "collection to show a parent": the intro line says so, and every locked
- * card stays visible - dimmed, with either its price or the real reason it
- * is still locked - rather than being hidden, so the *size* of the
- * collection is always in view, not just what's already been unlocked.
+ * every correct answer already pays out (see addScore() in state.js - coins
+ * never expire, get capped, or reset, so the balance shown here is always
+ * everything a child has ever saved up, minus whatever they've spent). The
+ * whole page doubles as the "collection to show a parent": the intro line
+ * says so, and every locked card stays visible - dimmed, with either its
+ * price or the real reason it is still locked - rather than being hidden,
+ * so the *size* of the collection is always in view, not just what's
+ * already been unlocked.
  */
 import { t, tMd } from "../i18n.js";
 import { el, raw, clear } from "../dom.js";
-import { DAILY_COIN_CAP, remainingDailyCoins, state } from "../state.js";
+import { state } from "../state.js";
 import {
   REWARD_DEFS,
   canAfford,
@@ -36,7 +37,6 @@ const CATEGORIES = [
 export function render(container) {
   const root = el("section.kmg-rewards");
   const balance = el("div.kmg-reward-balance");
-  const dailyCap = el("div.kmg-reward-daily");
   const sections = new Map(CATEGORIES.map(({ key }) => [key, el("div")]));
 
   function paintBalance() {
@@ -50,28 +50,8 @@ export function render(container) {
     );
   }
 
-  function paintDailyCap() {
-    clear(dailyCap);
-    const remaining = remainingDailyCoins();
-    const earned = DAILY_COIN_CAP - remaining;
-    const pct = Math.max(0, Math.min(100, Math.round((earned / DAILY_COIN_CAP) * 100)));
-    dailyCap.append(
-      el("div.kmg-reward-daily-row", {}, [
-        el("span.kmg-reward-daily-label", { text: t("rewards.daily_cap_heading") }),
-        el("span.kmg-reward-daily-value", {
-          text: t("rewards.daily_cap_status", { earned, cap: DAILY_COIN_CAP }),
-        }),
-      ]),
-      el("div.kmg-reward-bar", {}, [el("span.kmg-reward-bar-fill", { style: { width: `${pct}%` } })]),
-      el("p.kmg-caption", {
-        text: remaining === 0 ? t("rewards.daily_cap_full") : t("rewards.daily_cap_note", { cap: DAILY_COIN_CAP }),
-      }),
-    );
-  }
-
   function refreshAll() {
     paintBalance();
-    paintDailyCap();
     for (const { key, headingKey } of CATEGORIES) {
       const host = sections.get(key);
       clear(host);
@@ -189,7 +169,6 @@ export function render(container) {
     }),
     raw("div.kmg-intro", tMd("rewards.intro")),
     balance,
-    dailyCap,
     ...sections.values(),
   );
 

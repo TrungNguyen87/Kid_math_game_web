@@ -5,6 +5,77 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed (round 13 - local Race Mode multi-touch, reward coins no longer capped per day)
+
+**Two players tapping two different cards on one shared tablet at the same
+instant could lose a tap.** Local ("together on this device") Race Mode
+answered each `.kmg-choice` button on a `click` event. A touch browser only
+ever synthesizes a mouse-compatibility `click` for the *first* finger it
+sees in a multi-touch gesture - a real platform limitation, not a bug in
+this app's event wiring alone - so a genuinely simultaneous second tap on a
+different player's card could silently do nothing, which is what "no multi
+touch support" actually meant. `web/js/pages/compete.js`'s local-race answer
+buttons now also listen on `pointerdown`, which the Pointer Events spec
+fires once per active touch point independently of any other finger already
+down elsewhere on the screen - exactly the mechanism built to solve this
+class of problem. `handleLocalAnswer()` already guarded on "this player
+already answered", so also receiving the `click` that follows for whichever
+finger the browser treats as primary is harmless; the `onClick` handler is
+left in place for mouse and keyboard/assistive-tech activation.
+
+Proving this needed more than Playwright's default `.click()`, which
+dispatches ordinary mouse events - sequential taps already worked before
+this fix, so a test built on them would not have caught the bug. A
+JS-dispatched `PointerEvent("pointerdown", {pointerType: "touch"})` turned
+out not to prove it either: Chromium synthesizes a compatibility `click`
+from a script-dispatched touch pointerdown regardless of whether a second
+finger is already down, so that approach passed even with the fix reverted
+- a false-pass that would have made the test worse than none. The real
+regression check (`tests/web/smoke.mjs`, `compete:local:multitouch`) uses a
+dedicated `hasTouch: true` browser context and the low-level CDP
+`Input.dispatchTouchEvent`, sending both touch points down in one call
+through Chromium's actual touch input pipeline - confirmed, by temporarily
+reverting the fix and re-running, to fail exactly as expected when the bug
+is present and pass once it is fixed.
+
+**Reward coins no longer reset or get discarded day to day.** `state.js`
+capped *spendable* coins at 300 earned per calendar day since round 8, to
+stop one long session from clearing the whole shop. In practice that cap
+silently discarded every point earned past it for the rest of that day -
+score kept climbing, but the reward balance simply stopped moving until the
+next day - which is what read as "the reward resets every day" and left a
+child unable to save up enough for the pricier tiers. `DAILY_COIN_CAP`,
+`coinsEarnedToday`/`coinsEarnedDay` and `remainingDailyCoins()` are removed;
+`addScore()` now grants coins 1:1 with points, same as `totalScore`, with no
+cap and nothing ever rolled back. The reward shop's "coins earned today"
+progress strip is removed along with it (`web/js/pages/rewards.js`, the
+`rewards.daily_cap_*` i18n keys, the `.kmg-reward-daily*` CSS) since there is
+no longer a daily limit for it to show. The unlocked collection
+(`unlockedRewards`) and the coin balance itself were already persisted
+correctly across days before this change - saved with the rest of the
+player's profile in `localStorage`, restored on every reload - so nothing
+needed fixing there; verified with a new Node test that round-trips a
+profile with coins and an unlocked item through `saveCurrentProfile()` /
+`applyProfile()` via an in-memory `localStorage` shim (Node itself has none,
+which is also why no existing test in this suite exercised that path
+before). Tiered pricing (40 to 8000 coins) is unchanged - only the earning
+side, not the goal itself.
+
+- Tests: `tests/web/test_logic.mjs`'s daily-cap tests are replaced with one
+  that grants a single 10,000-point haul and confirms it is banked in full,
+  and one that round-trips coins and the collection through a save/reload
+  with no day-based reset (85 tests total, unchanged count - two removed,
+  two added). `tests/web/smoke.mjs` drops the now-gone daily-cap strip
+  assertion and adds the `compete:local:multitouch` scenario described above.
+- Verified: `npm test` (85/85), `npm run lint`, `npm run check:precache`
+  (48/48 files), `npm run test:smoke` against `node server.js` (all 17
+  routes plus every scripted scenario, including the new multi-touch check),
+  and the deploy workflow's two real steps (`BUILD_ID` stamp,
+  `check_precache.py`) re-run locally against a scratch copy of `web/` -
+  all clean. `deploy-pages.yml` itself is untouched, and nothing outside
+  `web/` (server.js, race-server.js, the test suite) reaches the live
+  GitHub Pages deploy at all.
+
 ### Reverted (round 12 - roll back the WebRTC Direct connection mode)
 
 **Round 11's Direct connection mode (manual SDP offer/answer, QR codes, a

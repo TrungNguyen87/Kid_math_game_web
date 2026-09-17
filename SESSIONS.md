@@ -9,6 +9,147 @@ rediscover them.
 
 ---
 
+## Session 12 — 17 September 2026
+
+**Branch:** `claude/upbeat-bardeen-em98oa`
+
+### Asked
+
+1. Local ("together on this device") Race Mode does not support multi-touch,
+   so two people cannot actually play at the same time on one screen. Fix it.
+2. Reward points reset every day; kids cannot collect enough to buy what they
+   want. Keep track of their reward points so they can buy favourite items
+   later, and keep track of their collection too.
+3. Test everything, confirm the GitHub Pages deploy path is clean, save the
+   changelog and memory before committing.
+
+### Decided: the actual bug is "only the first finger gets a click", not the app's event wiring being absent
+
+Read the code before assuming anything was missing: local Race Mode's answer
+buttons (`runLocalRound()` in `web/js/pages/compete.js`) already handle two
+players independently in the *logic* - separate `buttons` arrays, separate
+`localAnsweredThisRound` entries per `playerIndex`, nothing global gets
+locked by one player's answer. The gap was one level lower: both buttons
+only listened for `click`, and a touch browser's mouse-compatibility layer
+only ever synthesizes `click` for the *first* touch point active in a
+multi-touch gesture - a real, documented platform behaviour (this is why
+Pointer Events exist at all: each active pointer gets its own independent
+`pointerdown`/`pointerup`, not filtered down to "whichever finger was
+first"). Two children tapping two different cards at the same instant would
+silently drop one of the two taps, which is exactly "does not support multi
+touch". Fix: also listen on `pointerdown`, filtering out a non-primary mouse
+button (so a stray right-click cannot submit an answer) but deliberately
+*not* filtering on `isPrimary` - filtering to the primary pointer is the
+mistake that would have reintroduced the same bug, since only one concurrent
+touch is ever primary. `onClick` stays, for mouse and keyboard/assistive-tech
+activation; `handleLocalAnswer()`'s existing "already answered" guard makes
+receiving both events for the same tap harmless.
+
+### Found along the way: a synthetic PointerEvent cannot prove this fix, and almost shipped a false-pass test
+
+First attempt at a regression test dispatched
+`new PointerEvent("pointerdown", {pointerType: "touch"})` via
+`element.dispatchEvent()` from inside `page.evaluate()`, on two buttons in
+one call. It passed - including with the fix *reverted* (verified by
+temporarily deleting the `onPointerdown` handler and re-running). Chromium
+turns out to still synthesize a compatibility `click` from a script-dispatched
+touch `pointerdown`, regardless of whether another finger is already "down"
+elsewhere - because a JS-dispatched event never enters the browser's actual
+touch/gesture pipeline that real hardware input goes through, so none of the
+real multi-touch bookkeeping (or its "first finger only" limitation) applies
+to it either way. A test that passes whether or not the bug is present is
+worse than no test, so it was not shipped as-is.
+
+The fix: `context.newCDPSession(page)` and the low-level CDP
+`Input.dispatchTouchEvent`, sending both touch points down in the *same*
+call - this goes through Chromium's real touch input pipeline, the same one
+real hardware drives. Re-ran the revert-and-confirm check against this
+version: with the fix removed, neither card registers an answer (real
+simultaneous touch input does not even get a compatibility click for the
+first point, let alone the second - consistent with "not supported" being
+worse than "only one player's tap works"); with the fix present, both
+register immediately, since `pointerdown` needs no click synthesis at all.
+Confirmed stable over several repeated runs before trusting it. Landed as
+`tests/web/smoke.mjs`'s `compete:local:multitouch` scenario, in its own
+`hasTouch: true` browser context so the rest of the smoke test's shared
+`context`/`page` (used by all seventeen routes) is not affected by turning
+touch emulation on.
+
+### Decided: the reward "reset" was the daily coin cap discarding earnings, not a persistence bug
+
+Read `state.js`/`rewards.js`/`pages/rewards.js` fully before touching
+anything: `coins` and `unlockedRewards` were already saved with the rest of
+the profile in `localStorage` and restored on every reload, never reset by
+any automatic (non-parent-initiated) code path - round 7/8's design already
+intended exactly what was asked for here. The actual mechanism behind "resets
+every day": `DAILY_COIN_CAP` (300) capped how many coins could be *earned*
+per calendar day, and once hit, every further correct answer for the rest of
+that day paid score but zero coins - the balance simply stopped moving until
+the next day, invisibly, with no message explaining why. To a child (or a
+parent watching) that reads exactly like "the reward resets every day", and
+at 300/day even perfect daily play needs 27 days for the 8000-coin ultra
+item - "cannot collect enough points" is a predictable outcome of that
+design, not a bug report about something crashing.
+
+Round 7's own reasoning for the cap (stop one long session from clearing the
+whole shop) is still in the CHANGELOG/this file for the next session to read
+before re-adding something like it - but the request this time was explicit
+and direct: keep track of reward points so they can be spent later, full
+stop. Removed the cap rather than raising the number, since round 7 already
+flagged "there is no telemetry to confirm this number" and any new fixed
+cap would just relocate the identical complaint to a different threshold.
+`addScore()` now grants coins 1:1 with points, same as `totalScore`, forever
+- the same lifetime-number treatment `totalScore` already gets, extended to
+the currency that is actually meant to be saved up. Tiered pricing is
+untouched; only the earning side changed.
+
+### Found along the way: Node has no `localStorage`, so this suite could not previously prove a profile round-trips
+
+Wanted a regression test that a saved profile's coins and collection survive
+a reload, to pin down the actual claim in the request. `state.js` wraps
+every `localStorage` call in try/catch specifically so it degrades
+gracefully when there is none (its own module comment says Safari private
+mode) - which also means `saveCurrentProfile()`/`applyProfile()` are
+silent no-ops in this Node test environment (`typeof localStorage ===
+"undefined"` here), and nothing in the existing suite had ever exercised
+that pair together. A tiny in-memory `localStorage` shim, installed on
+`globalThis` for the duration of one test and restored afterward, was
+enough to exercise the real save-then-reload path for the first time in
+this suite. Worth remembering as a pattern if a future session needs to test
+anything else that goes through `saveCurrentProfile()`/`applyProfile()`.
+
+### Verification
+
+- `npm test` - 85 Node tests (same count: two daily-cap tests removed, two
+  coin-persistence tests added). `npm run lint`. `npm run check:precache`
+  (48/48 files, unchanged - only JS/CSS/i18n content changed, not the file
+  list).
+- `npm run test:smoke` against `node server.js`, twice at the end (once
+  right after landing the fix, once as a final pass before committing): all
+  17 routes, the reward shop earning-and-unlocking flow (now with no
+  daily-cap strip to check), the existing sequential local-race play-through
+  to a results screen, the new `compete:local:multitouch` scenario, and the
+  online two-browser race - all clean.
+- The deploy workflow's two real steps (`BUILD_ID` stamp via `sed`,
+  `tools/check_precache.py`) re-run locally against a scratch copy of `web/`
+  and `tools/`, exactly as sessions 7, 9 and 11 did - both pass unchanged.
+  `deploy-pages.yml` itself was not touched, and everything edited this
+  session that lives outside `web/` (the two test files) cannot affect the
+  live Pages deploy at all, which only uploads `web/`.
+
+### Still open
+
+- `DAILY_COIN_CAP` no longer exists, so a future session should not
+  reintroduce a *different* one to solve some other pacing complaint without
+  first checking whether the actual problem is a cap discarding earnings
+  (as it was here) versus something else - re-read this entry first.
+- The multi-touch fix is scoped to local Race Mode's answer buttons only,
+  since that is the one place on this shared-screen app where two people
+  are ever expected to touch the screen at once. No other page needed the
+  same treatment.
+
+---
+
 ## Session 11 — 16 September 2026
 
 **Branch:** `claude/webrtc-rollback-c3tjyq`

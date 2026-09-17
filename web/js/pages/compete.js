@@ -902,6 +902,20 @@ export function render(container) {
           type: "button",
           text: opt,
           onClick: () => handleLocalAnswer(pi, opt, problem, btn, feedbackNode, buttons),
+          // Two (or more) players tap two different cards on this one shared
+          // screen at the same instant. A touch browser only synthesizes a
+          // "click" from the first finger it sees in a multi-touch gesture,
+          // so without this the second (and any later) player's tap would
+          // silently do nothing. pointerdown fires once per touch point,
+          // independently of any other finger already down elsewhere on the
+          // screen, so every player's own card registers its own tap.
+          // handleLocalAnswer() already guards on "this player already
+          // answered", so also getting the click that follows (for whichever
+          // finger the browser treats as primary) is harmless.
+          onPointerdown: (event) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            handleLocalAnswer(pi, opt, problem, btn, feedbackNode, buttons);
+          },
         });
         buttons.push(btn);
         choiceGrid.append(btn);
