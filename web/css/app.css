@@ -1668,35 +1668,6 @@ table.kmg-table th {
   line-height: 1.3;
 }
 
-/* Daily coin cap strip - the thing that stops one long session from clearing
-   the whole shop. Sits right under the balance card, always visible. */
-.kmg-reward-daily {
-  margin: -0.5rem 0 1.5rem;
-  padding: 0.7rem 1rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-}
-.kmg-reward-daily-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-  margin-bottom: 0.35rem;
-}
-.kmg-reward-daily-label {
-  color: var(--text-soft);
-  font-weight: 600;
-}
-.kmg-reward-daily-value {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.kmg-reward-daily .kmg-caption {
-  margin: 0.4rem 0 0;
-}
-
 /* The one ultra reward: a real rotating 3D cube (CSS transforms, no library)
    instead of a flat emoji, so the rarest item in the shop looks like it. */
 .kmg-reward-card.is-3d {

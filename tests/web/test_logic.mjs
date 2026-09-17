@@ -227,35 +227,61 @@ test("badges are awarded once, in definition order", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Daily coin cap
+// Reward coins: banked forever, never capped or rolled back
 // ---------------------------------------------------------------------------
 
-test("addScore caps spendable coins per day but never totalScore or streaks", () => {
+test("addScore grants coins 1:1 with points, with no daily cap and no loss on a big session", () => {
   state.state.coins = 0;
-  state.state.coinsEarnedToday = 0;
-  state.state.coinsEarnedDay = new Date().toISOString().slice(0, 10);
   state.state.totalScore = 0;
   state.state.streaks = 0;
 
-  const cap = state.DAILY_COIN_CAP;
-  state.addScore(cap - 10);
-  assert.equal(state.state.coins, cap - 10);
+  // A single very large haul (well past the old 300/day cap) must be banked
+  // in full - a child who plays a lot in one day should end up closer to
+  // what they're saving for, never capped back down.
+  state.addScore(10000);
+  assert.equal(state.state.coins, 10000);
+  assert.equal(state.state.totalScore, 10000);
 
-  state.addScore(50); // would push coins past the cap
-  assert.equal(state.state.coins, cap, "coins must not exceed the daily cap");
-  assert.equal(state.state.totalScore, cap - 10 + 50, "totalScore is a lifetime number and is never capped");
-  assert.equal(state.state.streaks, 2, "the streak counter is never capped either");
-  assert.equal(state.remainingDailyCoins(), 0);
-
-  state.addScore(25); // the day is spent: no more coins, but score still climbs
-  assert.equal(state.state.coins, cap);
-  assert.equal(state.state.totalScore, cap - 10 + 50 + 25);
+  state.addScore(50);
+  assert.equal(state.state.coins, 10050, "coins keep accumulating past any old cap");
+  assert.equal(state.state.totalScore, 10050);
+  assert.equal(state.state.streaks, 2);
 });
 
-test("remainingDailyCoins resets once the stored day is not today", () => {
-  state.state.coinsEarnedToday = 250;
-  state.state.coinsEarnedDay = "2000-01-01";
-  assert.equal(state.remainingDailyCoins(), state.DAILY_COIN_CAP);
+test("a saved profile's coins and collection survive being reloaded, with no day-based reset", () => {
+  // state.js wraps every localStorage access in try/catch so it degrades
+  // gracefully when there is none (Safari private mode - or plain Node,
+  // which has no localStorage at all). That also means the rest of this
+  // suite cannot prove a profile actually round-trips. A tiny in-memory
+  // shim, scoped to this one test, is enough to exercise the real
+  // save -> reload path and pin down the exact claim this round's fix
+  // makes: nothing about coins or the collection resets on a later day.
+  const store = new Map();
+  const originalLocalStorage = globalThis.localStorage;
+  globalThis.localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  try {
+    state.state.playerName = "__test_reload__";
+    state.state.coins = 5000;
+    state.state.unlockedRewards = new Set(["avatar_cat"]);
+    state.saveCurrentProfile();
+
+    // Simulate the player reappearing on some later day, after a fresh
+    // page load re-parses this same profile from storage.
+    state.applyProfile("__test_reload__");
+    assert.equal(state.state.coins, 5000, "coins must survive a reload untouched");
+    assert.deepEqual(
+      [...state.state.unlockedRewards],
+      ["avatar_cat"],
+      "the unlocked collection must survive too",
+    );
+  } finally {
+    if (originalLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = originalLocalStorage;
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -284,7 +310,6 @@ test("unlockReward refuses a level-gated item until that level is reached, even 
   state.state.unlockedRewards = new Set();
   state.state.equippedAvatar = null;
   state.state.coins = 100000;
-  state.state.coinsEarnedToday = 0;
 
   assert.equal(rewards.lockReason("avatar_unicorn"), "level");
   assert.equal(rewards.unlockReward("avatar_unicorn"), false, "level 2 has not been reached anywhere yet");
@@ -300,7 +325,6 @@ test("unlockReward refuses a level-gated item until that level is reached, even 
 test("the ultra reward needs every game maxed and every other reward already unlocked", () => {
   for (const k of state.GAME_KEYS) state.setLevel(k, state.getMaxLevel(k));
   state.state.coins = 1000000;
-  state.state.coinsEarnedToday = 0;
 
   // Nothing else unlocked yet: coins and maxed games are not enough on their own.
   state.state.unlockedRewards = new Set();

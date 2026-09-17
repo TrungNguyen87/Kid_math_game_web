@@ -2,11 +2,12 @@
  * The reward shop: what a child can do with the coins they earn.
  *
  * Every correct answer already pays coins alongside the score (see
- * addScore() in state.js, which also caps how many coins can be *earned* per
- * day) - this module is only about spending them: a static catalog of
- * characters and stickers, and the actions that unlock and equip them.
- * Unlocks are permanent and persisted with the rest of the player's profile,
- * exactly like badges and levels.
+ * addScore() in state.js - coins are never capped or rolled back, so a big
+ * day of play always leaves a child closer to what they're saving for) -
+ * this module is only about spending them: a static catalog of characters
+ * and stickers, and the actions that unlock and equip them. Unlocks are
+ * permanent and persisted with the rest of the player's profile, exactly
+ * like badges and levels.
  *
  * Two things gate the priciest items, on top of the coin cost:
  *   - minLevel: the child must have pushed at least one game to that level,
@@ -29,10 +30,10 @@ import {
 const DEFAULT_AVATAR_ID = "avatar_default";
 
 // Costs are tiered so the first couple of items fall in one sitting and the
-// rarest ones take weeks of steady daily play - a plausible "ask a parent to
-// be proud of you" milestone rather than something one long session can
-// sweep. These numbers are priced against DAILY_COIN_CAP in state.js, not
-// against how fast a child can tap "check".
+// rarest ones are a multi-session goal to save up for - a plausible "ask a
+// parent to be proud of you" milestone. Coins accumulate without limit (see
+// addScore() in state.js), so however long it takes, saved-up coins are
+// never lost or discarded on the way to a goal.
 const COMMON = 40;
 const UNCOMMON = 120;
 const RARE = 320;

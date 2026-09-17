@@ -216,14 +216,6 @@ if (!(balanceAfter < balanceShown)) {
 }
 console.log(`  rewards shop: ${balanceShown} coins -> unlocked an item -> ${balanceAfter} left`);
 
-// The daily coin cap strip must render a real number - it is the thing that
-// stops one long session from clearing the whole shop, so it needs to be
-// visible, not just correct in state.
-const dailyCapText = await page.locator(".kmg-reward-daily-value").textContent();
-if (!/\d+/.test(dailyCapText ?? "")) {
-  note("rewards:shop", `daily coin cap indicator did not render a number: "${dailyCapText}"`);
-}
-
 // A level-gated item still out of reach (mythic tier needs level 5; this
 // profile only just reached level 2) must show a lock reason instead of a
 // price, whatever coins are on hand.
@@ -373,6 +365,81 @@ if (!localFinished) {
   }
 }
 console.log(`  compete local: played ${localRoundsPlayed} round(s) side by side -> results ${localFinished ? "shown" : "MISSING"}`);
+
+// Two players tapping two different cards at the exact same instant must
+// BOTH register - not just whichever finger a touch browser treats as
+// "first" in a multi-touch gesture (a plain click event used to only be
+// synthesized for that first touch point, silently dropping the second
+// player's simultaneous tap - see the onPointerdown handler in
+// web/js/pages/compete.js). This needs a real touch-capable browser context
+// (hasTouch: true) and the low-level CDP Input.dispatchTouchEvent, which
+// sends both touch points down together through Chromium's actual touch
+// input pipeline - a JS-dispatched PointerEvent does not reliably reproduce
+// this, since Chromium's mouse-compatibility click synthesis kicks in for a
+// script-dispatched touch pointerdown regardless of whether a second finger
+// is already down, masking exactly the bug this is meant to catch. A
+// dedicated context keeps hasTouch scoped to just this check.
+currentRoute = "compete:local:multitouch";
+{
+  const touchContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, hasTouch: true });
+  const touchPage = await touchContext.newPage();
+  touchPage.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  touchPage.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+
+  await touchPage.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
+  await touchPage.waitForSelector(".kmg-race-mode-tab");
+  await touchPage.locator(".kmg-race-mode-tab").nth(1).click();
+  await touchPage.waitForSelector(".kmg-levelrow .kmg-levelbtn");
+  await touchPage.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
+  await touchPage.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
+  await touchPage.waitForSelector(".kmg-race-arena .kmg-race-player-card", { timeout: 6000 });
+
+  const cards = touchPage.locator(".kmg-race-player-card");
+  const texts = await cards.locator(".kmg-question-text").allTextContents();
+  const answers = texts.map((t) => computeRaceAnswer(t ?? ""));
+
+  if (answers.length !== 2 || answers.some((a) => a == null)) {
+    note(currentRoute, `could not parse both player cards' questions: ${JSON.stringify(texts)}`);
+  } else {
+    // Locate each card's correct-answer button center, in-page.
+    const points = await touchPage.evaluate((answerStrings) => {
+      return [...document.querySelectorAll(".kmg-race-player-card")].map((card, i) => {
+        const btn = [...card.querySelectorAll(".kmg-choice")].find((b) => b.textContent.trim() === answerStrings[i]);
+        const r = btn.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      });
+    }, answers.map(String));
+
+    const cdp = await touchContext.newCDPSession(touchPage);
+    // Both touch points go down in the SAME dispatchTouchEvent call - two
+    // fingers landing at once, not two quick taps in a row.
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: points.map((p) => ({ x: p.x, y: p.y })),
+    });
+    await touchPage.waitForTimeout(300);
+
+    const disabledPerCard = await touchPage.evaluate(() =>
+      [...document.querySelectorAll(".kmg-race-player-card")].map((card) =>
+        [...card.querySelectorAll(".kmg-choice")].some((b) => b.disabled),
+      ),
+    );
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+    const bothRegistered = disabledPerCard.length === 2 && disabledPerCard.every(Boolean);
+    if (!bothRegistered) {
+      note(
+        currentRoute,
+        `a genuinely simultaneous two-finger tap on two different player cards did not register both answers (multi-touch regression): ${JSON.stringify(disabledPerCard)}`,
+      );
+    }
+    console.log(`  compete local multi-touch: two simultaneous taps -> both registered: ${bothRegistered}`);
+  }
+
+  await touchContext.close();
+}
 
 // Leaving mid-race must stop the shared timer, same as bliksem above - the
 // exact same class of leak, in a page that reimplements its own countdown.
