@@ -97,6 +97,9 @@ a fraction the child cannot type into a whole-number box.
   this into a classroom platform: pupil accounts, objective tracking, exams.
 - **[CHANGELOG.md](CHANGELOG.md)** — what changed.
 - **[SESSIONS.md](SESSIONS.md)** — why, and what was learned along the way.
+- **[CLAUDE.md](CLAUDE.md)** — the working conventions for this repo: read the
+  changelog and session log first, update both before committing, and how to
+  run the checks and test the deploy.
 
 ## Privacy
 

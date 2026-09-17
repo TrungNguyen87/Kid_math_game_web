@@ -21,7 +21,18 @@ export function el(tag, props = {}, children = []) {
     if (key === "html") node.innerHTML = value;
     else if (key === "text") node.textContent = value;
     else if (key === "class") node.classList.add(...String(value).split(/\s+/).filter(Boolean));
-    else if (key === "style" && typeof value === "object") Object.assign(node.style, value);
+    // Custom properties have to go through setProperty(): a CSS variable is
+    // not a CSSStyleDeclaration field, so `Object.assign(node.style, {"--x":
+    // 1})` assigns a plain JS property to the style object and silently
+    // changes nothing on the page. Every `--kmg-cols` in this codebase was
+    // quietly falling back to its CSS default because of it.
+    else if (key === "style" && typeof value === "object") {
+      for (const [prop, propValue] of Object.entries(value)) {
+        if (propValue == null) continue;
+        if (prop.startsWith("--")) node.style.setProperty(prop, String(propValue));
+        else node.style[prop] = propValue;
+      }
+    }
     else if (key === "dataset") Object.assign(node.dataset, value);
     else if (key.startsWith("on") && typeof value === "function") {
       node.addEventListener(key.slice(2).toLowerCase(), value);

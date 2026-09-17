@@ -2229,6 +2229,28 @@ table.kmg-table th {
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: 0.85rem;
 }
+
+/* --- The shared-screen (local) arena -------------------------------------
+   Two children racing on one phone have to be able to reach their own card
+   at the same moment. Everything here exists to protect that:
+
+   - `touch-action: none` so a second finger landing while the first is still
+     down can never be reinterpreted by the browser as a pan or a pinch-zoom
+     gesture, which is the thing that suppresses or cancels the events the
+     second player's tap depends on. Safe here precisely because the arena is
+     sized to fit the screen, so there is nothing inside it to scroll past.
+   - no text selection and no long-press callout, so holding a finger on a
+     card cannot start a selection that swallows the next tap.
+   - a fixed two-column grid at phone widths (see the media query below)
+     instead of the wrapping `auto-fit` default, which stacks the cards
+     vertically and puts every player but the first below the fold.          */
+.kmg-race-arena.is-local,
+.kmg-race-arena.is-local .kmg-choice {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 .kmg-race-player-card {
   padding: 0.85rem;
   border: 2px solid var(--border);
@@ -2247,6 +2269,131 @@ table.kmg-table th {
 .kmg-race-scoretag {
   font-weight: 800;
   color: var(--orange-dark);
+}
+
+/* Phone: fit every player's card on one screen, side by side, so two (or
+   more) children can each keep a thumb on their own half. The numbers below
+   are the smallest that still leave every choice button comfortably above
+   the 44px minimum touch target at 320px viewport width.
+
+   Both a narrow viewport (portrait) and a short one (landscape, where the
+   full-size cards are what overflows) need the compact treatment - hence the
+   two conditions. Only the column count differs between them, below. */
+@media (max-width: 600px), (max-height: 560px) {
+  .kmg-race-arena.is-local {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+  .kmg-race-arena.is-local .kmg-race-player-card {
+    padding: 0.5rem 0.4rem;
+  }
+  .kmg-race-arena.is-local .kmg-race-card-head {
+    margin-bottom: 0.3rem;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+  }
+  .kmg-race-arena.is-local .kmg-race-card-head strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kmg-race-arena.is-local .kmg-race-scoretag {
+    flex: none;
+    font-size: 0.8rem;
+  }
+  .kmg-race-arena.is-local .kmg-question {
+    padding: 0.5rem 0.55rem;
+    border-width: 2px;
+    font-size: clamp(1rem, 5vw, 1.3rem);
+  }
+  .kmg-race-arena.is-local .kmg-choices {
+    gap: 0.4rem;
+    margin: 0.45rem 0 0;
+  }
+  .kmg-race-arena.is-local .kmg-choice {
+    min-height: 2.9rem;
+    padding: 0.55rem 0.25rem;
+    border-width: 2px;
+    font-size: 1.1rem;
+  }
+  .kmg-race-arena.is-local .kmg-race-feedback {
+    min-height: 1.1rem;
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* Spend the leftover screen on the buttons rather than on empty space
+     below them. Two children sharing a phone each get roughly half the
+     width, so height is the only dimension left to make their targets
+     bigger with - and a bigger target is the whole point of the exercise.
+     The `vh` line is the fallback for browsers without `dvh`; `dvh` is what
+     keeps this honest while a mobile browser's toolbar slides away. */
+  body.kmg-racing .kmg-race-play.is-local {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 10rem);
+    min-height: calc(100dvh - 10rem);
+  }
+  body.kmg-racing .kmg-race-arena.is-local {
+    flex: 1;
+    /* Rows stretch into the screen until the cards hit their max-height,
+       then the leftover is shared as margin above and below rather than
+       dumped underneath. */
+    grid-auto-rows: 1fr;
+    align-content: center;
+  }
+  .kmg-race-arena.is-local .kmg-race-player-card {
+    display: flex;
+    flex-direction: column;
+    /* Grow into the screen, but stop before a choice button becomes a
+       ribbon; past this the extra space looks better as margin. */
+    max-height: 30rem;
+  }
+  /* Split the slack rather than giving it all to the buttons: a 77px-wide
+     button 250px tall is a ribbon, and the question is the other thing a
+     child needs to read quickly. Two thirds to the buttons, one third to
+     the sum. */
+  .kmg-race-arena.is-local .kmg-question {
+    flex: 1;
+    max-height: 7rem;
+    justify-content: center;
+  }
+  .kmg-race-arena.is-local .kmg-choices {
+    flex: 2;
+    grid-auto-rows: 1fr;
+  }
+}
+
+/* A race in progress claims the page's spare vertical space: the 5rem of
+   bottom padding `.kmg-main` keeps for comfortable scrolling is exactly what
+   pushes a player card off a short screen, and there is nothing to scroll to
+   during a race anyway. `body.kmg-racing` is set by compete.js for as long as
+   the play view is up. */
+body.kmg-racing .kmg-main {
+  padding-bottom: 1.25rem;
+}
+@media (max-height: 560px) {
+  body.kmg-racing .kmg-main {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+  body.kmg-racing .kmg-race-round-indicator {
+    margin-bottom: 0.2rem;
+    font-size: 0.85rem;
+  }
+  body.kmg-racing .kmg-race-timerbar {
+    margin-bottom: 0.4rem;
+  }
+}
+
+/* Landscape phone: height is the scarce dimension and width is plentiful, so
+   put every player in one row rather than wrapping onto a second one that
+   would not fit. `--kmg-race-players` is set by compete.js from the actual
+   roster size. */
+@media (max-height: 560px) and (min-width: 601px) {
+  .kmg-race-arena.is-local {
+    grid-template-columns: repeat(var(--kmg-race-players, 2), minmax(0, 1fr));
+  }
 }
 
 .kmg-race-summary-grid {

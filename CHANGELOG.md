@@ -5,6 +5,91 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed (round 14 - local Race Mode multi-touch, on an actual phone this time)
+
+**Round 13's multi-touch fix was real but incomplete, and the check that
+passed it was run at the wrong screen size.** On a 390x844 phone, local
+("together on this device") Race Mode laid the player cards out in a single
+column - `.kmg-race-arena`'s `repeat(auto-fit, minmax(15rem, 1fr))` fits one
+column below about 600px - underneath the page's own heading and its "how
+this works" intro, which together are about 430px tall. Player 1's card ran
+from y=520 to y=870; **player 2's card started at y=884, below the bottom of
+an 844px screen.** No amount of correct event handling helps a button that is
+not on the screen: the second child had to scroll to their own card, and once
+they did, the first child's was gone. That is the literal shape of "only one
+person can touch the screen at a time", and it survived round 13 untouched
+because round 13's regression check ran in a 1280x900 desktop context with
+`hasTouch: true` bolted on - a width where the two cards sit side by side
+and everything already worked.
+
+Reproduced first, then fixed:
+
+- **The page's chrome gets out of the way during a race.** `compete.js` now
+  hides the page heading and the intro block while the play view is up, and
+  sets `body.kmg-racing` so the stylesheet can also reclaim `.kmg-main`'s
+  5rem of bottom padding (an ancestor the arena cannot reach from its own
+  selector). Both come back on the setup and results screens and when
+  leaving the page mid-race.
+- **The arena is a fixed two-column grid at phone widths**, with compact
+  card padding, question and button sizing, instead of the wrapping
+  `auto-fit` default. Two, three, four, even all six players fit on one
+  390x844 screen with nothing to scroll. A short viewport (landscape phone)
+  gets the same compaction plus a single row of `--kmg-race-players`
+  columns, since there width is the plentiful dimension and height is not.
+- **The leftover screen goes to the buttons.** Each card stretches into the
+  space the intro used to occupy, up to a cap, so a choice button on an
+  iPhone 12 is about 77x144 CSS px rather than 77x48. Bigger targets are the
+  whole point when two children are jabbing at one phone at once.
+- **`touch-action: none` on the local arena and its buttons**, plus no text
+  selection and no long-press callout, so a second finger landing while the
+  first is still down cannot be reinterpreted by the browser as a pan or a
+  pinch-zoom (which is what suppresses or cancels the events the second
+  player's tap rides on). This is only safe because the arena now fits the
+  screen - there is nothing inside it left to scroll past.
+- **A third input path: one `touchstart` listener on `document`** that walks
+  `changedTouches` and submits for every finger that landed on a choice
+  button. When several touches arrive in the same input frame a browser is
+  allowed to deliver a *single* `touchstart` carrying all of them, dispatched
+  at the first touch's target - a listener on the other player's button would
+  never fire at all. `click` (mouse, keyboard, assistive tech) and round 13's
+  `pointerdown` both stay; answering is idempotent per player per round, so a
+  tap arriving three ways is still one answer.
+
+**`el()` could not set CSS custom properties at all** (`web/js/dom.js`). A
+CSS variable is not a `CSSStyleDeclaration` field, so
+`Object.assign(node.style, {"--kmg-cols": "3"})` quietly set a plain JS
+property on the style object and changed nothing on the page. Every
+`--kmg-cols` in the codebase had been silently falling back to its CSS
+default since it was introduced, which is why a 5- or 6-option choice grid
+rendered as two columns where `ui.js`, `games/common.js` and `games/logica.js`
+all ask for three. Custom properties now go through `setProperty()`. Measured
+the newly-three-column grids at 320, 360 and 390px wide: the smallest button
+is 90x138, comfortably over the 44px minimum target. (`getallenjacht`'s
+5-column hunt grid is unaffected - its value matched the CSS fallback.)
+
+- Tests: `tests/web/smoke.mjs`'s `compete:local:multitouch` scenario is
+  rebuilt around a real phone context (390x844, `isMobile`) instead of a
+  desktop viewport, and now checks the three things that have to hold
+  together - every player's answer button on screen, the play view not
+  scrolling, and a genuinely simultaneous two-finger CDP
+  `Input.dispatchTouchEvent` registering both answers - plus a second pass
+  with `click` and `pointerdown` suppressed at the capture phase, so the
+  `touchstart` path is proved to carry its own weight rather than being
+  shadowed by the other two. Confirmed by reverting `compete.js` and
+  `app.css` to the previous commit and re-running: all four assertions fail,
+  naming the off-screen card and the 1298px-of-content-in-an-844px-screen
+  directly.
+- Verified: `npm test` (85/85), `npm run lint`, `npm run check:precache`
+  (48/48 files, unchanged file list), `npm run test:smoke` against
+  `node server.js` (17 routes, both race modes, the new phone multi-touch
+  checks, service worker and offline reload - all clean), and the deploy
+  workflow's two real steps (`BUILD_ID` stamp, `check_precache.py`) re-run
+  locally against a scratch copy of `web/` and `tools/`. Beyond the suite:
+  the fix was measured at 320x568, 360x640, 390x844, 844x390 landscape and
+  768x1024, with 2, 3, 4 and 6 players, checking in each case that every
+  answer button is inside the viewport, that nothing scrolls, and that no
+  button falls below 44px. `deploy-pages.yml` is untouched.
+
 ### Fixed (round 13 - local Race Mode multi-touch, reward coins no longer capped per day)
 
 **Two players tapping two different cards on one shared tablet at the same

@@ -366,50 +366,94 @@ if (!localFinished) {
 }
 console.log(`  compete local: played ${localRoundsPlayed} round(s) side by side -> results ${localFinished ? "shown" : "MISSING"}`);
 
-// Two players tapping two different cards at the exact same instant must
-// BOTH register - not just whichever finger a touch browser treats as
-// "first" in a multi-touch gesture (a plain click event used to only be
-// synthesized for that first touch point, silently dropping the second
-// player's simultaneous tap - see the onPointerdown handler in
-// web/js/pages/compete.js). This needs a real touch-capable browser context
-// (hasTouch: true) and the low-level CDP Input.dispatchTouchEvent, which
-// sends both touch points down together through Chromium's actual touch
-// input pipeline - a JS-dispatched PointerEvent does not reliably reproduce
-// this, since Chromium's mouse-compatibility click synthesis kicks in for a
-// script-dispatched touch pointerdown regardless of whether a second finger
-// is already down, masking exactly the bug this is meant to catch. A
-// dedicated context keeps hasTouch scoped to just this check.
+// Two children racing on ONE PHONE have to be able to answer at the same
+// moment. That needs two separate things to hold, and round 13 only got the
+// second one:
+//
+//   1. Every player's card has to be ON THE SCREEN at once. On a 390x844
+//      phone the cards stacked vertically and the page's own heading and
+//      intro sat above them, so player 2's card started at y=884 - below the
+//      fold of an 844px screen. No amount of correct event handling helps a
+//      button nobody can reach, and this is why "only one person can touch
+//      the screen at a time" survived round 13's fix.
+//   2. Two simultaneous taps both have to REGISTER. A touch browser only
+//      synthesizes a mouse-compatibility `click` for the first finger of a
+//      multi-touch gesture, so `click` alone silently drops the second
+//      player's tap; compete.js also listens on `pointerdown` and on a
+//      document-level `touchstart` that walks `changedTouches`.
+//
+// The context below is a real PHONE (isMobile, 390x844) rather than a
+// desktop viewport with hasTouch bolted on - round 13's check ran at
+// 1280x900, where the cards fit side by side anyway, which is exactly why it
+// passed while the phone stayed broken. The taps go through the low-level
+// CDP Input.dispatchTouchEvent, both points in one call: a JS-dispatched
+// PointerEvent proves nothing here, because Chromium synthesizes a
+// compatibility click for a script-dispatched touch pointerdown whether or
+// not another finger is already down, masking the very bug this catches.
 currentRoute = "compete:local:multitouch";
 {
-  const touchContext = await browser.newContext({ viewport: { width: 1280, height: 900 }, hasTouch: true });
-  const touchPage = await touchContext.newPage();
-  touchPage.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
-  touchPage.on("console", (message) => {
-    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
-  });
+  /**
+   * Play one local round on a phone-sized touch context and report what
+   * happened. `silence` names event types to swallow at the capture phase,
+   * so one input path can be tested with the others switched off.
+   */
+  async function phoneRaceRound(silence = []) {
+    const touchContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      deviceScaleFactor: 2,
+    });
+    const touchPage = await touchContext.newPage();
+    touchPage.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+    touchPage.on("console", (message) => {
+      if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+    });
 
-  await touchPage.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
-  await touchPage.waitForSelector(".kmg-race-mode-tab");
-  await touchPage.locator(".kmg-race-mode-tab").nth(1).click();
-  await touchPage.waitForSelector(".kmg-levelrow .kmg-levelbtn");
-  await touchPage.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
-  await touchPage.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
-  await touchPage.waitForSelector(".kmg-race-arena .kmg-race-player-card", { timeout: 6000 });
+    await touchPage.goto(`${baseUrl}/#/compete`, { waitUntil: "networkidle" });
+    await touchPage.waitForSelector(".kmg-race-mode-tab");
+    await touchPage.locator(".kmg-race-mode-tab").nth(1).click();
+    await touchPage.waitForSelector(".kmg-levelrow .kmg-levelbtn");
+    await touchPage.locator(".kmg-levelbtn", { hasText: /^0$/ }).first().click();
+    await touchPage.locator(".kmg-btn-primary", { hasText: /🏁/ }).first().click();
+    await touchPage.waitForSelector(".kmg-race-arena .kmg-race-player-card", { timeout: 8000 });
 
-  const cards = touchPage.locator(".kmg-race-player-card");
-  const texts = await cards.locator(".kmg-question-text").allTextContents();
-  const answers = texts.map((t) => computeRaceAnswer(t ?? ""));
+    if (silence.length) {
+      await touchPage.evaluate((types) => {
+        for (const type of types) {
+          // A capture-phase listener on document stops the event before it
+          // reaches the button; touchstart is handled ON document, so that
+          // one needs stopImmediatePropagation from window instead.
+          document.addEventListener(type, (e) => e.stopPropagation(), true);
+          if (type === "touchstart") {
+            window.addEventListener("touchstart", (e) => e.stopImmediatePropagation(), true);
+          }
+        }
+      }, silence);
+    }
 
-  if (answers.length !== 2 || answers.some((a) => a == null)) {
-    note(currentRoute, `could not parse both player cards' questions: ${JSON.stringify(texts)}`);
-  } else {
-    // Locate each card's correct-answer button center, in-page.
-    const points = await touchPage.evaluate((answerStrings) => {
-      return [...document.querySelectorAll(".kmg-race-player-card")].map((card, i) => {
+    const cards = touchPage.locator(".kmg-race-player-card");
+    const texts = await cards.locator(".kmg-question-text").allTextContents();
+    const answers = texts.map((text) => computeRaceAnswer(text ?? ""));
+    if (answers.length !== 2 || answers.some((a) => a == null)) {
+      note(currentRoute, `could not parse both player cards' questions: ${JSON.stringify(texts)}`);
+      await touchContext.close();
+      return null;
+    }
+
+    const layout = await touchPage.evaluate((answerStrings) => {
+      const buttons = [...document.querySelectorAll(".kmg-race-player-card")].map((card, i) => {
         const btn = [...card.querySelectorAll(".kmg-choice")].find((b) => b.textContent.trim() === answerStrings[i]);
         const r = btn.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        return {
+          x: r.left + r.width / 2,
+          y: r.top + r.height / 2,
+          width: Math.round(r.width),
+          height: Math.round(r.height),
+          onScreen: r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth,
+        };
       });
+      return { buttons, viewportHeight: window.innerHeight, scrollHeight: document.documentElement.scrollHeight };
     }, answers.map(String));
 
     const cdp = await touchContext.newCDPSession(touchPage);
@@ -417,28 +461,69 @@ currentRoute = "compete:local:multitouch";
     // fingers landing at once, not two quick taps in a row.
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchStart",
-      touchPoints: points.map((p) => ({ x: p.x, y: p.y })),
+      touchPoints: layout.buttons.map((p) => ({ x: p.x, y: p.y })),
     });
-    await touchPage.waitForTimeout(300);
+    await touchPage.waitForTimeout(350);
 
-    const disabledPerCard = await touchPage.evaluate(() =>
+    const registered = await touchPage.evaluate(() =>
       [...document.querySelectorAll(".kmg-race-player-card")].map((card) =>
         [...card.querySelectorAll(".kmg-choice")].some((b) => b.disabled),
       ),
     );
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }).catch(() => {});
+    await touchContext.close();
+    return { ...layout, registered };
+  }
 
-    const bothRegistered = disabledPerCard.length === 2 && disabledPerCard.every(Boolean);
+  const result = await phoneRaceRound();
+  if (result) {
+    const offScreen = result.buttons.filter((b) => !b.onScreen).length;
+    if (offScreen) {
+      note(
+        currentRoute,
+        `${offScreen} of 2 player cards' answer buttons are off-screen on a 390x844 phone - a second child physically cannot reach them`,
+      );
+    }
+    if (result.scrollHeight > result.viewportHeight + 1) {
+      note(
+        currentRoute,
+        `the local race play view scrolls on a phone (${result.scrollHeight}px of content in a ${result.viewportHeight}px screen); every player's card must fit at once`,
+      );
+    }
+    // The arena sets touch-action: none, so a target that shrank below the
+    // 44px minimum could not be scrolled away from either.
+    const tooSmall = result.buttons.filter((b) => b.width < 44 || b.height < 44).length;
+    if (tooSmall) {
+      note(currentRoute, `${tooSmall} choice buttons are under the 44px minimum touch target: ${JSON.stringify(result.buttons)}`);
+    }
+    const bothRegistered = result.registered.length === 2 && result.registered.every(Boolean);
     if (!bothRegistered) {
       note(
         currentRoute,
-        `a genuinely simultaneous two-finger tap on two different player cards did not register both answers (multi-touch regression): ${JSON.stringify(disabledPerCard)}`,
+        `a genuinely simultaneous two-finger tap on two different player cards did not register both answers (multi-touch regression): ${JSON.stringify(result.registered)}`,
       );
     }
-    console.log(`  compete local multi-touch: two simultaneous taps -> both registered: ${bothRegistered}`);
+    console.log(
+      `  compete local multi-touch (phone 390x844): both cards on screen: ${!offScreen}, both taps registered: ${bothRegistered}`,
+    );
   }
 
-  await touchContext.close();
+  // The touchstart path has to work on its own, because on a browser that
+  // coalesces several simultaneous touches into one touchstart event it is
+  // the only path that sees the second finger. Switching click and
+  // pointerdown off is the only way to tell that it is carrying its weight
+  // rather than being shadowed by them.
+  const touchOnly = await phoneRaceRound(["click", "pointerdown"]);
+  if (touchOnly) {
+    const ok = touchOnly.registered.length === 2 && touchOnly.registered.every(Boolean);
+    if (!ok) {
+      note(
+        currentRoute,
+        `with click and pointerdown suppressed, the document-level touchstart handler did not register both simultaneous taps: ${JSON.stringify(touchOnly.registered)}`,
+      );
+    }
+    console.log(`  compete local multi-touch: touchstart path alone registers both taps: ${ok}`);
+  }
 }
 
 // Leaving mid-race must stop the shared timer, same as bliksem above - the

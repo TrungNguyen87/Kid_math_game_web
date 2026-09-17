@@ -9,6 +9,178 @@ rediscover them.
 
 ---
 
+## Session 13 — 17 September 2026
+
+**Branch:** `claude/eager-albattani-543f9g`
+
+### Asked
+
+1. Read the memory and the changelog first.
+2. Multi-touch in local competition mode is **still** not working on a real
+   phone - only one person can touch the screen at a time. Make it possible
+   for both to touch at once, because that is fairer.
+3. Test the deployment on GitHub, and always save the changelog and the
+   memory - in this session and every later one.
+
+### Decided: reproduce on a phone before touching anything, because round 12 already "fixed" this
+
+Round 12 (CHANGELOG round 13) added a `pointerdown` handler to the local
+race's answer buttons and shipped a regression test that passed. The user
+says it still fails on their phone. Two possibilities: the fix was wrong, or
+the test was measuring something the phone does not do. So the first move was
+not to write code but to re-run round 12's own check **in a phone context**
+(`isMobile: true`, 390x844, deviceScaleFactor 3) rather than the 1280x900
+`hasTouch: true` desktop context it actually shipped with.
+
+It failed instantly, and the reason was not an event at all:
+
+```
+layout: [ { y: 691, inViewport: true,  cardTop: 520, cardBottom: 870 },
+          { y: 1055, inViewport: false, cardTop: 884, cardBottom: 1234 } ]
+vh: 844, scrollHeight: 1298
+events: pointerdown card 0 ... ; pointerdown card -1 (nothing there)
+```
+
+**Player 2's card starts 40px below the bottom of the screen.** The arena's
+`repeat(auto-fit, minmax(15rem, 1fr))` fits exactly one column under ~600px,
+so the cards stack; above them sit the page heading (68px) and the
+"how this works" intro (294px), still rendered during play. The second
+child's card is not hard to reach - it is not on the screen. Round 12's fix
+was correct and necessary; it just could not be the whole answer, and at
+1280x900 the two cards sit side by side so the check never saw the problem.
+
+**The lesson worth keeping: a touch test at a desktop viewport is not a
+phone test.** `hasTouch: true` gives you touch events; `isMobile: true` plus
+a phone-sized viewport gives you the layout the child is actually looking at.
+The bug lived entirely in the second one.
+
+### Decided: fix the layout first, then harden the event path anyway
+
+Layout, in order of how much room each freed:
+
+- Hide the page heading and the intro while the play view is up
+  (`setRacePlaying()` in `compete.js`) - about 430px back, and nobody reads
+  "how this works" mid-race.
+- `body.kmg-racing` so the stylesheet can also take back `.kmg-main`'s 5rem
+  of bottom padding. That padding is an *ancestor's*, so the arena cannot
+  ask for it from its own selector - hence a body class rather than
+  something scoped to the arena. It is removed in the page's cleanup
+  function too, or it would survive navigating away mid-race.
+- A fixed two-column grid at phone widths, with compact card/question/button
+  sizing. Two, three, four and all six players now fit on one 390x844 screen.
+- A short viewport (landscape phone) gets the same compaction but a single
+  row of `--kmg-race-players` columns - there width is plentiful and height
+  is not, so wrapping onto a second row is exactly wrong.
+- The freed space goes to the buttons, capped: a choice button goes from
+  77x48 to about 77x144 on an iPhone 12. Two children jabbing at one phone
+  want big targets more than they want whitespace.
+
+Then the event path, as defence against the parts of this that Chromium on
+Linux cannot demonstrate:
+
+- `touch-action: none` on the local arena and its buttons, plus no text
+  selection and no long-press callout. A second finger landing while the
+  first is down must never be reinterpreted as a pan or a pinch-zoom, since
+  that is what suppresses or cancels the second player's events. This is only
+  safe *because* the arena now fits the screen - with the old stacked layout
+  it would have trapped scrolling instead.
+- A third input path: one `touchstart` listener on `document` that walks
+  `changedTouches`. When several touches land in the same input frame a
+  browser may deliver a **single** `touchstart` carrying all of them,
+  dispatched at the first touch's target - a per-button listener on the other
+  player's card would then never fire at all, and neither would one on a
+  shared ancestor if a finger landed outside it. Document level plus
+  `changedTouches` is the only arrangement that sees every finger.
+
+Answering is idempotent per player per round (`localAnsweredThisRound`), so
+a tap arriving as `touchstart`, `pointerdown` *and* a synthesized `click` is
+still one answer. That guard is what makes three overlapping paths safe.
+
+### Found along the way: `el()` has never been able to set a CSS custom property
+
+Setting `--kmg-race-players` from JS did nothing. `dom.js`'s `el()` did
+`Object.assign(node.style, value)`, and a CSS variable is not a
+`CSSStyleDeclaration` field - `Object.assign` puts a plain JS property on the
+style object and the page never hears about it. Verified directly in a
+browser: `Object.assign(n.style, {"--x": "4"})` leaves
+`getComputedStyle(n).getPropertyValue("--x")` empty, while
+`n.style.setProperty("--x", "4")` works.
+
+This is not new and it is not only mine: **every `--kmg-cols` in the codebase
+had been silently falling back to its CSS default** since it was introduced.
+`ui.js`, `games/common.js` and `games/logica.js` all ask for three columns
+when a question has more than four options, and all of them rendered two.
+(`getallenjacht`'s hunt grid was the lucky one - its 5 matched the CSS
+fallback of 5, so it looked right by coincidence.) Fixed in `el()` by routing
+`--*` through `setProperty()`. Measured the newly-three-column grids at 320,
+360 and 390px: smallest button 90x138, comfortably over the 44px minimum, so
+this corrects the layout without shrinking anything below a usable target.
+
+Worth remembering as a pattern: **a silent no-op is the worst kind of bug in
+a hand-rolled helper.** Nothing threw, nothing logged, and the CSS fallback
+made every page look plausible. The only reason it surfaced is that this
+time the fallback (2) was wrong for the new use.
+
+### Verification
+
+- The rebuilt `compete:local:multitouch` scenario in `tests/web/smoke.mjs`
+  now runs in a phone context and asserts three things together: every
+  player's answer button inside the viewport, the play view not scrolling,
+  and a simultaneous two-finger CDP `Input.dispatchTouchEvent` registering
+  both answers. Plus a second pass with `click` and `pointerdown` swallowed
+  at the capture phase, which proves the `touchstart` path works on its own
+  rather than being shadowed - the same "would this test pass with the fix
+  reverted?" discipline session 12 established.
+- Confirmed it fails against the previous commit: reverted `compete.js` and
+  `app.css` to `HEAD` and re-ran - all four assertions fired, naming the
+  off-screen card and 1298px of content in an 844px screen.
+- `npm test` (85/85), `npm run lint`, `npm run check:precache` (48/48,
+  unchanged file list), `npm run test:smoke` against `node server.js` - all
+  17 routes, both race modes, service worker and offline reload clean.
+- Beyond the suite, measured at 320x568, 360x640, 390x844, 844x390 landscape
+  and 768x1024, with 2, 3, 4 and 6 players: every answer button inside the
+  viewport, nothing scrolling, no button under 44px in any combination.
+- Deploy: `deploy-pages.yml` untouched; its two real steps (`BUILD_ID` stamp
+  via `sed`, `tools/check_precache.py`) re-run locally against a scratch copy
+  of `web/` and `tools/` - both pass, 48 files as before. Note the workflow
+  only fires on pushes to `main` under `web/**`, so a branch push does not
+  deploy; the live deploy happens when this branch merges.
+
+### Notes for running the browser tests in this environment
+
+`playwright` is not a project dependency (`smoke.mjs` resolves it via
+`createRequire` and says so plainly if missing). `npm install -g playwright`
+installs a version whose expected Chromium build does not match the one
+pre-installed at `/opt/pw-browsers`, so a bare `chromium.launch()` fails with
+"Executable doesn't exist". Two things make it run:
+`NODE_PATH=$(npm root -g)` so `createRequire` finds the global package, and
+launching with `executablePath: "/opt/pw-browsers/chromium"`. The committed
+test is deliberately left without that path - it is an environment quirk, not
+something CI should carry.
+
+### Still open
+
+- **The `touch-action: none` and `touchstart` additions are defence, not
+  demonstrated fixes.** The demonstrated bug was the layout, and that is
+  proved both ways. Chromium on Linux dispatches a separate `pointerdown`
+  per touch point and never coalesced `changedTouches` in any run here, so
+  the gesture-suppression and coalescing cases could not be reproduced -
+  they are guarded against because iOS Safari and WebKit are where those
+  behaviours actually bite, and there is no WebKit-on-a-real-phone in this
+  environment. If a future session sees this reported again, get the phone's
+  browser and OS version first: that is the missing variable.
+- The `dom.js` custom-property fix changes some choice grids from two
+  columns to the three their call sites always asked for. Measured as safe
+  at 320px, but it is a visible change to games nobody complained about -
+  if a grid looks wrong somewhere unexpected, this is the change to look at.
+- `.kmg-race-arena.is-local` carries `touch-action: none`, which is only
+  correct while the arena fits the screen. Anything that adds height to a
+  player card (a hint line, an avatar, a longer question) needs the
+  no-scroll assertion in the smoke test re-checked, not just the layout
+  eyeballed - that assertion is what keeps the two rules consistent.
+
+---
+
 ## Session 12 — 17 September 2026
 
 **Branch:** `claude/upbeat-bardeen-em98oa`
