@@ -241,6 +241,55 @@ if (await switchButton.count()) {
   }
 }
 
+// --- replaying an already-graduated easy level must not pay extra coins ----
+// (state.js: canEarnAtLevel()/graduateIfCrossedEasyTier()). The 6-in-a-row
+// streak in "rewards:earn" above already carried tafel from level 0 through
+// level 2 for real, graduating it out of the easy tier - picking level 0
+// again now, via the level picker, is a manual replay of already-earned
+// content, not a fresh pass.
+
+currentRoute = "rewards:easy-replay";
+await page.goto(`${baseUrl}/#/tafel`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-question");
+
+await page.locator('.kmg-levelbtn[data-level="2"]').click();
+await page.locator('.kmg-levelbtn[data-level="0"]').click();
+await page.waitForTimeout(200);
+
+const coinsBeforeReplay = Number(await page.locator(".kmg-scorebox-coins").first().textContent());
+const scoreBeforeReplay = Number(await page.locator(".kmg-scorebox-value").first().textContent());
+
+const replayText = await page.locator(".kmg-question-text").textContent();
+const [ra, rb] = [...replayText.matchAll(/\d+/g)].map((m) => Number(m[0]));
+if (!Number.isFinite(ra) || !Number.isFinite(rb)) {
+  note("rewards:easy-replay", `could not parse question "${replayText}"`);
+} else {
+  await page.locator(".kmg-numinput").fill(String(ra * rb));
+  await page.locator(".kmg-btn-primary").first().click();
+  await page.waitForSelector(".kmg-banner-ok", { timeout: 4000 });
+
+  const bannerText = await page.locator(".kmg-banner-msg").first().textContent();
+  if (!bannerText.includes("🔁")) {
+    note("rewards:easy-replay", `expected a practice/no-bonus note in the feedback, got "${bannerText}"`);
+  }
+
+  const scoreAfterReplay = Number(await page.locator(".kmg-scorebox-value").first().textContent());
+  const coinsAfterReplay = Number(await page.locator(".kmg-scorebox-coins").first().textContent());
+  if (scoreAfterReplay !== scoreBeforeReplay) {
+    note(
+      "rewards:easy-replay",
+      `a graduated game's easy-level replay must not grant score either: ${scoreBeforeReplay} -> ${scoreAfterReplay}`,
+    );
+  }
+  if (coinsAfterReplay !== coinsBeforeReplay) {
+    note(
+      "rewards:easy-replay",
+      `replaying an already-graduated easy level should not pay coins: ${coinsBeforeReplay} -> ${coinsAfterReplay}`,
+    );
+  }
+  console.log(`  easy-level replay: coins stayed at ${coinsBeforeReplay} after a correct answer back at level 0`);
+}
+
 // --- the answer must be recorded for the parent dashboard ------------------
 
 currentRoute = "dashboard:data";

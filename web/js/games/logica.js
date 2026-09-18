@@ -440,7 +440,7 @@ export function render(container) {
 
     const level = getLevel(GAME_KEY);
     const points = 5 * (level + 1);
-    settleAnswer({
+    const { pointsAwarded } = settleAnswer({
       gameKey: GAME_KEY,
       level,
       questionText: problem.text,
@@ -452,7 +452,11 @@ export function render(container) {
     });
 
     if (isCorrect) {
-      shell.setFeedback("success", t("logica.correct", { points, explain: problem.explain }), {
+      const practiceOnly = pointsAwarded < points;
+      const successText = practiceOnly
+        ? `${t("logica.correct", { points: pointsAwarded, explain: problem.explain })} ${t("common.practice_no_bonus")}`
+        : t("logica.correct", { points: pointsAwarded, explain: problem.explain });
+      shell.setFeedback("success", successText, {
         icon: "🧠",
       });
       shell.scheduleAdvance(() => newQuestion());

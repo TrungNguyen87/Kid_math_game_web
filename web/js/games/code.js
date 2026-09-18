@@ -17,7 +17,7 @@ import { t } from "../i18n.js";
 import { choice, randInt, sample } from "../rng.js";
 import { el, clear, raw } from "../dom.js";
 import { markdown } from "../markdown.js";
-import { addScore, getLevel } from "../state.js";
+import { addScore, awardablePoints, getLevel } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
 import { expander, gameShell, recordedCaption } from "../ui.js";
 import { bigCelebration } from "../fx.js";
@@ -146,8 +146,10 @@ export function render(container) {
       // Efficiency bonus: cracking it on guess 1 of 8 pays roughly double what
       // cracking it on the last guess does.
       const bonus = Math.max(0, maxGuesses - used);
-      const earned = basePoints * 2 + Math.floor((basePoints * bonus) / 2);
-      addScore(earned);
+      const rawEarned = basePoints * 2 + Math.floor((basePoints * bonus) / 2);
+      // Easy-level guard - see canEarnAtLevel() in state.js.
+      const earned = awardablePoints(GAME_KEY, level, rawEarned);
+      if (earned > 0) addScore(earned);
       bigCelebration();
       settleAnswer({
         gameKey: GAME_KEY,

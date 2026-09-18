@@ -114,7 +114,7 @@ export function typedAnswerGame(config) {
       widget.reveal?.(isCorrect, correctAnswerDisplay);
 
       const earned = points(level);
-      settleAnswer({
+      const { pointsAwarded } = settleAnswer({
         gameKey,
         level,
         questionText: problem.text,
@@ -126,7 +126,11 @@ export function typedAnswerGame(config) {
       });
 
       if (isCorrect) {
-        shell.setFeedback("success", t(`${gameKey}.correct`, { points: earned }), {
+        const practiceOnly = pointsAwarded < earned;
+        const successText = practiceOnly
+          ? `${t(`${gameKey}.correct`, { points: pointsAwarded })} ${t("common.practice_no_bonus")}`
+          : t(`${gameKey}.correct`, { points: pointsAwarded });
+        shell.setFeedback("success", successText, {
           icon: okIcon,
         });
         // Straight on to the next question while the child is in flow. A

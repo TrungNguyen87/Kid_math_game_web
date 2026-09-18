@@ -1,16 +1,16 @@
 /**
  * Beloningswinkel / Reward Shop - what a child's coins are actually for.
  *
- * Two collections, "characters" (equip one to show next to your name in the
- * sidebar) and "stickers" (pure collectibles), both unlocked with the coins
- * every correct answer already pays out (see addScore() in state.js - coins
- * never expire, get capped, or reset, so the balance shown here is always
- * everything a child has ever saved up, minus whatever they've spent). The
- * whole page doubles as the "collection to show a parent": the intro line
- * says so, and every locked card stays visible - dimmed, with either its
- * price or the real reason it is still locked - rather than being hidden,
- * so the *size* of the collection is always in view, not just what's
- * already been unlocked.
+ * Three collections, "characters" (equip one to show next to your name in
+ * the sidebar), "stickers" and "special gifts" (both pure collectibles),
+ * all unlocked with the coins every correct answer already pays out (see
+ * addScore() in state.js - coins never expire, get capped, or reset, so the
+ * balance shown here is always everything a child has ever saved up, minus
+ * whatever they've spent). The whole page doubles as the "collection to
+ * show a parent": the intro line says so, and every locked card stays
+ * visible - dimmed, with either its price or the real reason it is still
+ * locked - rather than being hidden, so the *size* of the collection is
+ * always in view, not just what's already been unlocked.
  */
 import { t, tMd } from "../i18n.js";
 import { el, raw, clear } from "../dom.js";
@@ -32,6 +32,7 @@ import * as sound from "../sound.js";
 const CATEGORIES = [
   { key: "avatar", headingKey: "rewards.characters_heading" },
   { key: "sticker", headingKey: "rewards.stickers_heading" },
+  { key: "gift", headingKey: "rewards.gifts_heading" },
 ];
 
 export function render(container) {

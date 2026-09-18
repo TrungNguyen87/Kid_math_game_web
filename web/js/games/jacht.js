@@ -20,7 +20,7 @@ import { t } from "../i18n.js";
 import { choice, randInt, sample, shuffle } from "../rng.js";
 import { countdownRingSvg } from "../visuals.js";
 import { el, clear, raw, append } from "../dom.js";
-import { addScore, getLevel } from "../state.js";
+import { addScore, awardablePoints, getLevel } from "../state.js";
 import { adaptAfterRound, settleAnswer } from "../gameflow.js";
 import { gameShell, recordedCaption, statRow } from "../ui.js";
 import { bigCelebration, floatPoints } from "../fx.js";
@@ -208,8 +208,10 @@ export function render(container) {
     cleared = didClear;
 
     if (didClear) {
-      const bonus = basePoints * 3;
-      addScore(bonus);
+      // Easy-level guard, same as every tapped hit below - see
+      // canEarnAtLevel() in state.js.
+      const bonus = awardablePoints(GAME_KEY, getLevel(GAME_KEY), basePoints * 3);
+      if (bonus > 0) addScore(bonus);
       roundPoints += bonus;
       bigCelebration();
     } else {
@@ -238,8 +240,8 @@ export function render(container) {
 
     if (round.targets.has(number)) {
       found.add(number);
-      const gained = basePoints;
-      addScore(gained);
+      const gained = awardablePoints(GAME_KEY, getLevel(GAME_KEY), basePoints);
+      if (gained > 0) addScore(gained);
       roundPoints += gained;
       sound.playCorrect(found.size);
       // Restyle the one tile rather than repainting the grid: a child on a
@@ -247,7 +249,7 @@ export function render(container) {
       tile.classList.add("is-hit");
       tile.textContent = `✅ ${number}`;
       tile.disabled = true;
-      floatPoints(tile, `+${gained}`);
+      if (gained > 0) floatPoints(tile, `+${gained}`);
       paintStats();
       if (found.size === round.targets.size) finishRound(true);
     } else {

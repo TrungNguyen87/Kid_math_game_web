@@ -9,6 +9,150 @@ rediscover them.
 
 ---
 
+## Session 14 — 18 September 2026
+
+**Branch:** `claude/reward-points-special-chars-ai1rp5`
+
+### Asked
+
+1. Add a function so a child cannot earn more reward points by staying at an
+   easy level: the easy level should only pay out the first time, a replay
+   should not earn extra points.
+2. Design and add more special characters to encourage reaching higher
+   levels, plus more stickers, plus whatever other special gifts seemed
+   worth adding.
+
+### Decided: "the easy level" is Warm-up and Easy (levels 0-1), and "first
+time" means "until the child actually levels out of it"
+
+Neither phrase is defined anywhere in the app, so both needed a concrete
+reading before writing any code. "Easy level" was read as the two tiers the
+app's own vocabulary already calls easy - `common.difficulty_warmup` and
+`common.difficulty_easy` (`ui-bits.js`'s `DIFFICULTY_KEYS`) - rather than
+just level 0, since a level-1 grind is barely harder. "First time" was read
+as "the first honest pass through that tier, ending when the child's own
+streak earns a real level-up out of it" rather than, say, "the very first
+correct answer ever" (too punitive - a child needs several easy-level
+correct answers just to reach the level-up streak) or a calendar day (round
+7/8 already tried a *daily* cap for a different problem and round 12 removed
+it after finding it silently discarded earnings - re-read before reaching
+for a time-based cap again). Landing on "graduates once, permanently, per
+game" ties the guard to the same signal the leveling system already uses,
+so no new session/day bookkeeping was needed at all.
+
+### Decided: score and coins both stop, not just coins
+
+`addScore()` (`state.js`) has always moved `totalScore` and `coins` together
+1:1, on purpose (round 12's reasoning: coins are the same lifetime number as
+score, just spendable) - so the guard sits in front of that one call rather
+than trying to let score through while blocking coins. A "replay" answer
+still updates the streak, the level, `questionsAnswered` and badges through
+the normal `registerAttempt()`/`countAttemptOnly()` path - those measure
+practice and progress, which a replay genuinely is - only the payout itself
+is skipped.
+
+### Found along the way: the natural hook point graduated a game on a manual
+level-picker click, and the project's own smoke test caught it before this
+shipped
+
+The obvious place to mark "graduated out of the easy tier" was inside
+`setLevel()`, since every level change - automatic or manual - passes through
+it. First version did exactly that: compare the level before and after
+inside `setLevel()`, mark the flag if the game crossed from ≤1 to >1.
+`npm test` passed immediately. `npm run test:smoke` did not - it hung for 30
+seconds and crashed on a locator timeout waiting for an affordable reward
+card that could no longer exist.
+
+The cause: the smoke test's own reward-shop scenario resets a game to a known
+level-0 state before scripting six correct answers, by clicking the level
+picker to level 2 and then back to 0 (`tests/web/smoke.mjs`, predates this
+session - the comment there says *why*: "two clicks to different levels
+always land on the second one"). That round-trip alone - a manual pick, nine
+questions before a single one had even been answered - satisfied "crossed
+from an easy level to a non-easy level", so by the time the script started
+answering questions the game had already been marked graduated, and the six
+correct answers that followed paid nothing. The reward shop then had no
+affordable card at all, and the test hung waiting for one.
+
+This is worth being glad about rather than annoyed by: it is exactly the
+class of bug a Node unit test cannot see (state.js's own functions behaved
+exactly as written) but a real page interacting with real UI controls
+catches immediately, which is the entire reason this project keeps a browser
+smoke test at all. The fix was to stop treating "any level change" as the
+signal and use the actual signal instead: `graduateIfCrossedEasyTier()` is
+now called only from inside `registerAttempt()`'s streak-based level-up and
+`gameflow.js`'s `adaptAfterRound()` - the two places a level-up is *earned*,
+never from `setLevel()` itself, which a level-picker click, a
+`onLevelChange` reset, or a parent/older sibling poking around all also call.
+Added a Node test that pins this distinction down directly - a bare
+`setLevel()` round-trip across the boundary must never graduate a game - and
+confirmed it fails against the `setLevel()`-based version before the fix and
+passes after, the same discipline the multi-touch test used in session 12.
+
+### Decided: characters/stickers grow within the existing tiers, gifts are a
+new third collection, not a new tier
+
+"Higher levels" is already how epic/legendary/mythic are gated (level 3, 4,
+and `MAX_LEVEL` respectively); adding more items at those same gates was
+enough to make "more to reach for at a higher level" true without inventing
+a new gating dimension (e.g. "N games at level 5") that would need new state
+functions and new tests to trust. The one deliberately *un*touched tier is
+ultra - round 8's comment says "exactly one item lives here" and that
+reasoning still holds, so nothing was added there.
+
+"Special gifts" became a third `category` (`"gift"`) in `REWARD_DEFS` rather
+than folding into stickers, specifically because `web/js/pages/rewards.js`'s
+`section()`/`rewardCard()` functions were already written generically enough
+(only `category === "avatar"` gets special-cased, for the equip button) that
+a new category needed zero new rendering code - just one more entry in the
+page's `CATEGORIES` list. Worth remembering as a pattern: that genericity was
+a round-7/8 decision, not something added for this session, and it is
+exactly what made "add a whole new kind of reward" a five-minute change
+instead of a new page.
+
+### Verification
+
+- `npm test` (92/92, up from 85 - 7 new: the easy-level guard's behaviour,
+  its manual-pick-does-not-graduate regression, a reload round-trip, plus
+  reward-catalog id-uniqueness/translation-coverage/gift-collection checks).
+- `find web/js -name "*.js" | xargs -n1 node --check` on every file, not just
+  the three `npm run lint` reaches - session 8 already flagged that a
+  dynamically-imported page module can carry a syntax error straight through
+  `npm run lint` undetected.
+- `npm run check:precache` (48/48, unchanged list - this round only edited
+  existing files).
+- `npm start` + `npm run test:smoke`: all 17 routes and every existing
+  scenario, plus a new `rewards:easy-replay` scenario that forces tafel back
+  to level 0 after it has already graduated for real, answers correctly, and
+  checks score, coins and the feedback banner all agree nothing was paid.
+  Reverted-and-confirmed-failing twice over, per the project's own
+  discipline: the Node tests against the `setLevel()`-based first attempt,
+  and the smoke scenario against a build with `awardablePoints()` bypassed
+  in `settleAnswer()` (reported all three wrong signals: no practice note,
+  score 50→55, coins 10→15).
+- The deploy workflow's two real steps (`BUILD_ID` stamp, `check_precache.py`)
+  re-run locally against a scratch copy of `web/` and `tools/` - both pass,
+  48 files, unchanged. `deploy-pages.yml` itself untouched.
+
+### Still open
+
+- The easy-level guard is a one-way, per-game, per-profile flag with no UI of
+  its own - a parent cannot see "which games have graduated" anywhere, and
+  there is no way to reset it short of clearing the whole profile. Fine for
+  what was asked (stop the farming), but a future session adding "why can't
+  I earn coins here" messaging beyond the inline practice note should know
+  the flag exists and where (`state.easyLevelCleared`).
+- `EASY_LEVEL_MAX` (1) and the exact reward-tier costs/gates are this
+  session's judgement call, same caveat round 7 already left about
+  `DAILY_COIN_CAP` and tier pricing: there is no telemetry behind either
+  number, just a plausible reading of the request.
+- The new "gift" category reuses stickers' pure-collectible behaviour
+  exactly (no equip button, just unlock-and-display) - if a future request
+  wants gifts to *do* something distinct from a sticker, that behaviour does
+  not exist yet.
+
+---
+
 ## Session 13 — 17 September 2026
 
 **Branch:** `claude/eager-albattani-543f9g`

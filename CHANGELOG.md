@@ -5,6 +5,106 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 15 - the easy level only pays out once, plus a "Special Gifts" collection and 31 new characters/stickers)
+
+**A child could sit at the easiest questions forever and coins would keep
+coming.** Warm-up and Easy (levels 0-1) now pay reward coins/score the first
+time a game is worked through - exactly enough to level up and out of them -
+but once that has happened, coming back to an easy level again (a slip back
+down after two wrong answers, or picking it again on purpose from the level
+picker) still counts for practice and progress, just no more coins. Levels
+2 and up are never touched by this: the guard only ever applies to the two
+tiers a child can answer almost without thinking.
+
+- **`state.js`**: `EASY_LEVEL_MAX` (1), a per-game `easyLevelCleared` flag
+  persisted with the rest of the profile (same as levels/badges/coins),
+  `canEarnAtLevel()`/`awardablePoints()` to check it, and
+  `graduateIfCrossedEasyTier(gameKey, fromLevel, toLevel)` to set it.
+  Deliberately **not** wired into `setLevel()` itself - see "found along the
+  way" below for why that first attempt broke the reward shop's own smoke
+  test. It is called only from the two places a level-up is actually earned:
+  `registerAttempt()`'s streak logic and `adaptAfterRound()`
+  (`gameflow.js`), never from a manual level-picker click.
+- **`gameflow.js`**: `settleAnswer()` runs `points` through `awardablePoints()`
+  before crediting anything (when `score: true`) and now returns the actual
+  `pointsAwarded`, so the log and the parent dashboard show what was really
+  paid out, not the nominal amount. The three games that score their own
+  points before calling `settleAnswer()` with `score: false`
+  (`bliksem.js`, `jacht.js`, `code.js`) gate their own `addScore()` calls the
+  same way, and skip the "+N" popup entirely when the guard pays nothing -
+  a floating "+0" would read as a bug rather than a rule.
+- **`common.js`** (the 8 typed-answer games) and **`logica.js`** now show a
+  short practice note (`common.practice_no_bonus`, both languages) alongside
+  the normal correct-answer feedback whenever the guard reduced the payout,
+  so a child (or a parent watching) sees *why* the coins didn't move instead
+  of it looking broken.
+
+**Found along the way: the first version of this graduated every game the
+moment its level picker was clicked past Easy, not just when a real streak
+earned it - and the project's own smoke test caught it.** The natural-looking
+place to mark "graduated" was inside `setLevel()` itself, since that is what
+both an automatic level-up and a manual level-picker click both call. But the
+reward-shop smoke test scenario forces a game back to level 0 via two
+level-picker clicks (`0 -> 2 -> 0`) to get a clean, predictable state before
+scripting six correct answers - and that manual round-trip alone satisfied
+"leveled past Easy, then back down", permanently blocking the very first
+honest coin payout the scenario needed. Re-ran `npm run test:smoke` after the
+first version and watched it hang on a 30-second timeout waiting for an
+affordable reward card that could no longer exist. The fix: graduation is now
+set by `graduateIfCrossedEasyTier()`, called only from the two *automatic*
+leveling paths (`registerAttempt()`, `adaptAfterRound()`) - never from
+`setLevel()` directly - so browsing the level picker, or a parent/older
+sibling trying a harder level for fun, can never cost a child their first
+real payout. A Node test pins this down directly
+(`a manual level pick across the easy-tier boundary does not graduate the
+game`), confirmed to fail against the first version before the fix and pass
+after.
+
+**A "Special Gifts" collection, plus 10 more characters and 11 more
+stickers**, at the higher levels the request specifically asked to
+encourage. The reward catalog was 49 items (26 characters, 23 stickers)
+across 7 tiers; it is now 80 (36 characters, 34 stickers, and a new **10-item
+Special Gifts** collection - trophies, medals and keepsakes rather than a
+character or a sticker) across the same tiers and the same level/mastery
+gates, so the shop's "how special is this" reading stays consistent across
+all three collections. New characters and stickers are spread across every
+tier from Uncommon through Mythic (two new Mythic characters -
+"Tsunami Blade Master" and "Frostfang Wolf Spirit" - and two new Mythic
+stickers, continuing the original-anime-hero design from round 8; no real
+franchise characters, same reasoning as before). `web/js/pages/rewards.js`
+needed no new rendering logic at all - its `CATEGORIES` list and generic
+`section()`/`rewardCard()` functions already treat any category as "unlock
+with coins, gated by tier/level/mastery", so "gift" slotted in as a third
+entry next to "avatar" and "sticker".
+
+- Tests: two new Node tests directly exercise the easy-level guard's actual
+  behaviour (pays out once, blocks a replay after a real graduation, and
+  specifically that a manual level pick never graduates on its own) plus a
+  reload round-trip proving `easyLevelCleared` survives a saved profile
+  exactly like levels and coins do; a reward-catalog test that every id is
+  unique and every `nameKey` resolves to a real translation in both
+  languages (this would have caught a copy-paste mistake in the 31 new
+  entries); a new browser scenario in `tests/web/smoke.mjs`
+  (`rewards:easy-replay`) that forces tafel back to level 0 after the
+  existing reward-shop scenario already graduated it for real, answers one
+  more correct question, and asserts the score, the coins, and the feedback
+  banner all agree that nothing extra was paid. All three new checks were
+  reverted-and-confirmed-failing before landing: the state.js tests against
+  the first (`setLevel()`-based) version of the guard, and the smoke
+  scenario against a build with the guard's `awardablePoints()` call bypassed
+  entirely (it reported all three: no practice note, score 50→55, coins
+  10→15).
+- Verified: `npm test` (92/92, up from 85), `npm run lint`,
+  `find web/js -name "*.js" | xargs -n1 node --check` (every dynamically
+  imported page/game module parses - `npm run lint` alone does not reach
+  them, per session 8's note), `npm run check:precache` (48/48 files,
+  unchanged list - no files were added or removed), `npm start` +
+  `npm run test:smoke` (all 17 routes, every existing scenario, and the new
+  `rewards:easy-replay` scenario, all clean), and the deploy workflow's two
+  real steps (`BUILD_ID` stamp, `check_precache.py`) re-run locally against a
+  scratch copy of `web/` and `tools/`. `deploy-pages.yml` itself is
+  untouched.
+
 ### Fixed (round 14 - local Race Mode multi-touch, on an actual phone this time)
 
 **Round 13's multi-touch fix was real but incomplete, and the check that

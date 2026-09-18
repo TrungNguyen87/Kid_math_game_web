@@ -17,7 +17,7 @@ import { t } from "../i18n.js";
 import { choice, randInt, shuffle } from "../rng.js";
 import { countdownRingSvg } from "../visuals.js";
 import { el, clear, raw, append } from "../dom.js";
-import { addScore, getLevel, state } from "../state.js";
+import { addScore, awardablePoints, getLevel, state } from "../state.js";
 import { adaptAfterRound, settleAnswer } from "../gameflow.js";
 import { gameShell, recordedCaption, statRow } from "../ui.js";
 import { bigCelebration, confetti, floatPoints } from "../fx.js";
@@ -218,11 +218,17 @@ export function render(container) {
       correct += 1;
       combo += 1;
       const multiplier = COMBO_STEPS[Math.min(combo, COMBO_STEPS.length - 1)];
-      gained = basePoints * multiplier;
-      if (elapsed <= FAST_ANSWER_SECONDS) gained += basePoints; // speed bonus
+      let raw = basePoints * multiplier;
+      if (elapsed <= FAST_ANSWER_SECONDS) raw += basePoints; // speed bonus
+      // The easy-level guard: once this game has graduated past Warm-up/Easy
+      // once, a slip back down there no longer pays out - see
+      // canEarnAtLevel() in state.js.
+      gained = awardablePoints(GAME_KEY, level, raw);
       roundPoints += gained;
-      addScore(gained);
-      floatPoints(button, `+${gained}`);
+      if (gained > 0) {
+        addScore(gained);
+        floatPoints(button, `+${gained}`);
+      }
     } else {
       combo = 0;
     }

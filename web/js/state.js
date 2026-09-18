@@ -19,6 +19,9 @@ export const MAX_LEVEL = 5;
 export const LEVEL_UP_STREAK = 3; // correct answers in a row needed to level up
 export const LEVEL_DOWN_STREAK = 2; // wrong answers in a row that drop a level
 export const SESSION_GOAL_MINUTES = 45;
+// Warm-up (0) and Easy (1) - the two tiers a child can answer almost without
+// thinking. See canEarnAtLevel() for why they only pay reward points once.
+export const EASY_LEVEL_MAX = 1;
 
 export const GAME_KEYS = [
   "tafel",
@@ -69,6 +72,10 @@ function freshGameStreaks() {
   return Object.fromEntries(GAME_KEYS.map((k) => [k, { correct: 0, wrong: 0 }]));
 }
 
+function freshEasyLevelCleared() {
+  return {};
+}
+
 function randomId() {
   return Math.random().toString(16).slice(2, 10);
 }
@@ -109,6 +116,10 @@ export const state = {
   unlockedRewards: new Set(),
   equippedAvatar: null,
   gamesTried: new Set(),
+  // Which games have ever leveled up out of the easy tier (Warm-up/Easy) -
+  // see canEarnAtLevel(). Once true for a game, correct answers back at an
+  // easy level in that game are practice, not a fresh payout.
+  easyLevelCleared: freshEasyLevelCleared(),
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
 };
@@ -138,6 +149,7 @@ export function saveCurrentProfile() {
     unlockedRewards: [...state.unlockedRewards].sort(),
     equippedAvatar: state.equippedAvatar,
     gamesTried: [...state.gamesTried].sort(),
+    easyLevelCleared: { ...state.easyLevelCleared },
     updatedAt: new Date().toISOString(),
   };
   writeJson(PROFILES_KEY, profiles);
@@ -161,6 +173,7 @@ export function applyProfile(name) {
     state.equippedAvatar = null;
     state.gamesTried = new Set();
     state.gameStreaks = freshGameStreaks();
+    state.easyLevelCleared = freshEasyLevelCleared();
     emitChange();
     return false;
   }
@@ -174,6 +187,7 @@ export function applyProfile(name) {
   state.equippedAvatar = profile.equippedAvatar || null;
   state.gamesTried = new Set(profile.gamesTried || []);
   state.gameStreaks = freshGameStreaks();
+  state.easyLevelCleared = { ...(profile.easyLevelCleared || {}) };
   emitChange();
   return true;
 }
@@ -269,6 +283,43 @@ export function setLevel(gameKey, level) {
 }
 
 /**
+ * Whether a correct answer at `level` in `gameKey` should still pay reward
+ * points. The easy tier (Warm-up/Easy) pays out normally the first time a
+ * child works through it - exactly enough to reach level 2 - but once
+ * they've graduated out of it once (see graduateIfCrossedEasyTier() below),
+ * coming back to an easy level again - a slip back down after wrong
+ * answers, or picking it again on purpose - is practice, not a new payout.
+ * Otherwise a child could sit on the easiest questions and earn coins
+ * indefinitely instead of progressing. Levels above the easy tier are never
+ * gated by this.
+ */
+export function canEarnAtLevel(gameKey, level) {
+  if (level > EASY_LEVEL_MAX) return true;
+  return !state.easyLevelCleared[gameKey];
+}
+
+/** The points actually payable for one correct answer, after that guard. */
+export function awardablePoints(gameKey, level, points) {
+  return canEarnAtLevel(gameKey, level) ? points : 0;
+}
+
+/**
+ * Mark a game as having graduated out of the easy tier, if `fromLevel` was
+ * inside it and `toLevel` is not. Called only from the *automatic* leveling
+ * paths below and adaptAfterRound() in gameflow.js - i.e. only when the
+ * child's own streak of correct answers earned the level-up - never from a
+ * manual level-picker click. That distinction matters: browsing the level
+ * picker up and back down again (or a parent/older sibling trying a harder
+ * level for fun) must never cost a child their first honest, coin-earning
+ * pass through Warm-up/Easy.
+ */
+export function graduateIfCrossedEasyTier(gameKey, fromLevel, toLevel) {
+  if (fromLevel <= EASY_LEVEL_MAX && toLevel > EASY_LEVEL_MAX) {
+    state.easyLevelCleared[gameKey] = true;
+  }
+}
+
+/**
  * Update the counters after an answer and adapt the level: up after
  * LEVEL_UP_STREAK correct in a row, down after LEVEL_DOWN_STREAK wrong.
  * @returns {{leveledUp: boolean, leveledDown: boolean}}
@@ -289,6 +340,7 @@ export function registerAttempt(gameKey, isCorrect) {
     if (streak.correct >= LEVEL_UP_STREAK && currentLevel < max) {
       setLevel(gameKey, currentLevel + 1);
       leveledUp = true;
+      graduateIfCrossedEasyTier(gameKey, currentLevel, currentLevel + 1);
     }
   } else {
     streak.wrong += 1;
@@ -335,6 +387,7 @@ export function clearAllProfiles() {
   state.equippedAvatar = null;
   state.gamesTried = new Set();
   state.gameStreaks = freshGameStreaks();
+  state.easyLevelCleared = freshEasyLevelCleared();
   state.streaks = 0;
   state.questionsAnswered = 0;
   state.correctAnswered = 0;
