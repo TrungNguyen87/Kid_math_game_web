@@ -9,6 +9,90 @@ rediscover them.
 
 ---
 
+## Session 15 — 18 September 2026
+
+**Branch:** `claude/reward-points-special-chars-ai1rp5`
+
+### Asked
+
+1. Session 14's easy-level reward guard should apply to every level, not
+   just Warm-up and Easy (0-1).
+2. Test everything before committing, and make sure it will run smoothly
+   once deployed via GitHub Pages.
+
+### Decided: track *which* levels a game has cleared, not *whether* it has
+left the easy tier
+
+Session 14's `easyLevelCleared` was a single boolean per game - true once a
+game had ever leveled past level 1, false otherwise - which only made sense
+because there was one boundary to cross. Generalizing to "every level" needs
+a set, not a boolean: `state.clearedLevels[gameKey]` is now the actual set
+of levels that game has leveled all the way through. `canEarnAtLevel()`
+becomes a plain set-membership check with no special-cased cutoff at all.
+
+One consequence worth stating plainly because it was not asked for
+explicitly but follows directly from "the level being left behind is what
+gets cleared": a game's own **top** level (`MAX_LEVEL`, or Tafel Monster's 6)
+can never be cleared this way, because there is no higher level to level up
+into - `clearLevel()` is only ever called with the level a child just left,
+and nobody ever "leaves" the top by leveling further. So the hardest content
+in any game keeps paying no matter how many times it's played, which is the
+right behavior on reflection: reaching the ceiling is not "replaying
+something easier", it is still the hardest thing available. Added a test for
+this specifically (`a game's own top level never gets cleared...`) so a
+future session does not read the lack of a top-level cap as an oversight.
+
+### Kept: clearing still only happens on real leveling, never on a manual pick
+
+Session 14's actual hard-won lesson - `clearLevel()` (renamed from
+`graduateIfCrossedEasyTier()`) must only be called from `registerAttempt()`'s
+streak logic and `adaptAfterRound()`, never from `setLevel()` itself -
+carried over unchanged, because the reasoning behind it (the smoke test's
+own "reset to level 0" trick uses a manual level-picker round-trip) applies
+at every level, not just the old easy/hard boundary. Re-verified with a
+renamed but otherwise identical regression test
+(`a manual level pick across a level boundary does not clear it`).
+
+### Verification
+
+- `npm test` (93/93) - the round-15 easy-tier tests were rewritten rather
+  than added to: one now levels a throwaway key through 0, 1 *and* 2 and
+  checks all three become unpayable replays (proving the guard is not
+  limited to the first two levels), a new one confirms a game's own top
+  level survives 50 more correct answers still paying, and the manual-pick
+  and reload-persistence tests were carried over under the new API names.
+  Reverted the fix (reintroduced a hardcoded `level > 1` early return in
+  `canEarnAtLevel`) and confirmed the two behavioural tests fail - one
+  because level 2 stayed payable after being leveled through, the other
+  because a reloaded profile's cleared level-2 flag was ignored - then
+  restored the real fix and re-ran clean.
+- `npm run lint`, plus `find web/js -name "*.js" | xargs -n1 node --check`
+  on every file `npm run lint` itself does not reach (session 8's finding,
+  still the right thing to re-check any time a page/game module changes).
+- `npm run check:precache` - 48/48 files, unchanged, since this round only
+  edited existing files.
+- `npm start` + `npm run test:smoke` - all 17 routes and every existing
+  scenario clean, including the renamed `rewards:level-replay` scenario
+  (was `rewards:easy-replay`) - its actual behaviour did not need to change,
+  since a level-0 replay was always one true instance of the general rule;
+  only the comments and the note/log labels were updated so they stop
+  implying the guard is easy-level-specific.
+- The deploy workflow's two real steps (`BUILD_ID` stamp, `check_precache.py`)
+  re-run locally against a scratch copy of `web/` and `tools/` - both pass,
+  48 files, unchanged. `deploy-pages.yml` itself untouched, and nothing
+  outside `web/` (the test suite) reaches the live GitHub Pages deploy.
+
+### Still open
+
+- Same caveats round 15 already left: no telemetry behind exactly how many
+  correct answers "clearing" a level should take (it is whatever
+  `LEVEL_UP_STREAK`/`adaptAfterRound`'s ratio already were, unchanged by
+  this round), and no parent-facing UI shows which levels have been cleared
+  per game - only the inline "already earned coins for this level" note at
+  the moment it applies.
+
+---
+
 ## Session 14 — 18 September 2026
 
 **Branch:** `claude/reward-points-special-chars-ai1rp5`

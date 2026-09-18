@@ -211,72 +211,89 @@ test("changing level resets that game's streak counters", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Easy-level guard: the easy tier only pays reward points once per game
+// Level-replay guard: every level only pays reward points once per game
 // ---------------------------------------------------------------------------
 
-test("canEarnAtLevel pays the easy tier the first time, then blocks a replay after graduating", () => {
+test("canEarnAtLevel pays any level the first time, then blocks a replay after it's been leveled through", () => {
   // A throwaway key nothing else in this suite touches, so earlier tests'
-  // leveling doesn't leave it already graduated.
-  const key = "kmg_test_easy_guard_a";
+  // leveling doesn't leave any of its levels already cleared.
+  const key = "kmg_test_level_guard_a";
 
-  // Never played before: Warm-up and Easy both still pay out.
+  // Never played before: every level, easy or hard, still pays out.
   assert.equal(state.canEarnAtLevel(key, state.MIN_LEVEL), true);
-  assert.equal(state.canEarnAtLevel(key, state.EASY_LEVEL_MAX), true);
+  assert.equal(state.canEarnAtLevel(key, 3), true);
+  assert.equal(state.canEarnAtLevel(key, state.MAX_LEVEL), true);
   assert.equal(state.awardablePoints(key, state.MIN_LEVEL, 10), 10);
-  assert.equal(state.awardablePoints(key, state.EASY_LEVEL_MAX, 10), 10);
-  // A level above the easy tier is never gated, first time or not.
-  assert.equal(state.awardablePoints(key, state.EASY_LEVEL_MAX + 1, 10), 10);
+  assert.equal(state.awardablePoints(key, 3, 10), 10);
 
-  // Graduate out of the easy tier for the first time: sitting at the top of
-  // it (Easy), three correct answers in a row levels up and out, exactly
-  // how a child actually does this.
-  state.setLevel(key, state.EASY_LEVEL_MAX);
-  let result;
-  for (let i = 0; i < 3; i++) result = state.registerAttempt(key, true);
-  assert.equal(result.leveledUp, true);
-  assert.equal(state.getLevel(key), state.EASY_LEVEL_MAX + 1);
+  // Level all the way through 0, 1 and 2 for the first time: three correct
+  // answers in a row levels up and out of each one in turn, exactly how a
+  // child actually does this.
+  for (let level = state.MIN_LEVEL; level < 3; level++) {
+    state.setLevel(key, level);
+    let result;
+    for (let i = 0; i < 3; i++) result = state.registerAttempt(key, true);
+    assert.equal(result.leveledUp, true);
+  }
+  assert.equal(state.getLevel(key), 3);
 
-  // A slip back down to an easy level (two wrong answers) is now a replay:
-  // it still counts for progress, but pays no more reward points.
+  // A slip back down (two wrong answers) is now a replay of level 2: it
+  // still counts for progress, but pays no more reward points.
   state.registerAttempt(key, false);
   const dropped = state.registerAttempt(key, false);
   assert.equal(dropped.leveledDown, true);
-  assert.ok(state.getLevel(key) <= state.EASY_LEVEL_MAX);
-  assert.equal(state.canEarnAtLevel(key, state.getLevel(key)), false);
-  assert.equal(state.awardablePoints(key, state.getLevel(key), 10), 0);
+  assert.equal(state.getLevel(key), 2);
+  assert.equal(state.canEarnAtLevel(key, 2), false);
+  assert.equal(state.awardablePoints(key, 2, 10), 0);
+  // Level 0 and level 1 were levelled through too, on the way up, so they
+  // are replays now as well - the guard is not limited to Warm-up/Easy.
+  assert.equal(state.canEarnAtLevel(key, 0), false);
+  assert.equal(state.canEarnAtLevel(key, 1), false);
 
-  // But a level above the easy tier still pays, exactly as before.
-  assert.equal(state.awardablePoints(key, state.EASY_LEVEL_MAX + 1, 10), 10);
+  // But level 3, never yet levelled all the way through, still pays.
+  assert.equal(state.awardablePoints(key, 3, 10), 10);
 });
 
-test("a manual level pick across the easy-tier boundary does not graduate the game - only real leveling does", () => {
+test("a game's own top level never gets cleared, so it always pays even after many rounds there", () => {
+  // There is nowhere higher to level into from the top, so the automatic
+  // leveling path can never mark it as a replay - the hardest content a
+  // child can reach should never stop paying just for being played a lot.
+  const key = "kmg_test_level_guard_top";
+  state.setLevel(key, state.MAX_LEVEL);
+  for (let i = 0; i < 50; i++) state.registerAttempt(key, true);
+  assert.equal(state.canEarnAtLevel(key, state.MAX_LEVEL), true);
+  assert.equal(state.awardablePoints(key, state.MAX_LEVEL, 10), 10);
+});
+
+test("a manual level pick across a level boundary does not clear it - only real leveling does", () => {
   // This is the exact bug the browser smoke test caught: forcing a clean
   // level 0 via two level-picker clicks (0 -> 2 -> 0, the same trick the
   // smoke test uses to reset a game between scenarios) must not itself cost
-  // the child their first honest, coin-earning pass through the easy tier.
-  const key = "kmg_test_easy_guard_manual";
+  // the child their first honest, coin-earning pass through any level.
+  const key = "kmg_test_level_guard_manual";
   state.setLevel(key, state.MIN_LEVEL);
   state.setLevel(key, state.MAX_LEVEL); // e.g. a level-picker click, not a streak
   state.setLevel(key, state.MIN_LEVEL); // picked back down again
   assert.equal(
     state.canEarnAtLevel(key, state.MIN_LEVEL),
     true,
-    "browsing the level picker must never cost a child their first easy-level payout",
+    "browsing the level picker must never cost a child their first payout at any level",
   );
+  assert.equal(state.canEarnAtLevel(key, state.MAX_LEVEL), true);
 });
 
-test("picking the easy level again on purpose, after really graduating, is also a replay", () => {
-  const key = "kmg_test_easy_guard_b";
-  // Graduate the way registerAttempt()/adaptAfterRound() actually do it -
-  // never via a bare setLevel() call, which must stay graduation-neutral.
-  state.graduateIfCrossedEasyTier(key, state.MIN_LEVEL, state.MAX_LEVEL);
+test("picking an already-cleared level again on purpose is also a replay", () => {
+  const key = "kmg_test_level_guard_b";
+  // Clear it the way registerAttempt()/adaptAfterRound() actually do it -
+  // never via a bare setLevel() call, which must stay clearing-neutral.
+  state.clearLevel(key, state.MIN_LEVEL);
   assert.equal(state.canEarnAtLevel(key, state.MIN_LEVEL), false);
 
   state.setLevel(key, state.MIN_LEVEL); // a manual pick back down, not a level-up
   assert.equal(state.awardablePoints(key, state.MIN_LEVEL, 25), 0);
 });
 
-test("a fresh profile has never graduated any game's easy tier", () => {
+test("a fresh profile has never cleared any game's levels", () => {
   const store = new Map();
   const originalLocalStorage = globalThis.localStorage;
   globalThis.localStorage = {
@@ -285,23 +302,29 @@ test("a fresh profile has never graduated any game's easy tier", () => {
     removeItem: (k) => store.delete(k),
   };
   try {
-    state.state.playerName = "__test_easy_guard_reload__";
-    const key = "kmg_test_easy_guard_c";
-    state.graduateIfCrossedEasyTier(key, state.MIN_LEVEL, state.MAX_LEVEL);
+    state.state.playerName = "__test_level_guard_reload__";
+    const key = "kmg_test_level_guard_c";
+    state.clearLevel(key, state.MIN_LEVEL);
+    state.clearLevel(key, 2);
     assert.equal(state.canEarnAtLevel(key, state.MIN_LEVEL), false);
+    assert.equal(state.canEarnAtLevel(key, 2), false);
+    // A level never cleared for this game must stay payable.
+    assert.equal(state.canEarnAtLevel(key, 1), true);
     state.saveCurrentProfile();
 
-    // Reload the same profile: the graduation must survive, exactly like
-    // levels, badges and coins already do.
-    state.applyProfile("__test_easy_guard_reload__");
+    // Reload the same profile: the cleared levels must survive, exactly
+    // like levels, badges and coins already do.
+    state.applyProfile("__test_level_guard_reload__");
     assert.equal(
       state.canEarnAtLevel(key, state.MIN_LEVEL),
       false,
-      "graduating out of the easy tier must survive a reload",
+      "a cleared level must survive a reload",
     );
+    assert.equal(state.canEarnAtLevel(key, 2), false);
+    assert.equal(state.canEarnAtLevel(key, 1), true);
 
     // A different, never-seen player name starts with a clean slate.
-    state.applyProfile("__test_easy_guard_new_player__");
+    state.applyProfile("__test_level_guard_new_player__");
     assert.equal(state.canEarnAtLevel(key, state.MIN_LEVEL), true);
   } finally {
     if (originalLocalStorage === undefined) delete globalThis.localStorage;

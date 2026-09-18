@@ -147,7 +147,7 @@ export function render(container) {
       // cracking it on the last guess does.
       const bonus = Math.max(0, maxGuesses - used);
       const rawEarned = basePoints * 2 + Math.floor((basePoints * bonus) / 2);
-      // Easy-level guard - see canEarnAtLevel() in state.js.
+      // Level-replay guard - see canEarnAtLevel() in state.js.
       const earned = awardablePoints(GAME_KEY, level, rawEarned);
       if (earned > 0) addScore(earned);
       bigCelebration();

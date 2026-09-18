@@ -208,7 +208,7 @@ export function render(container) {
     cleared = didClear;
 
     if (didClear) {
-      // Easy-level guard, same as every tapped hit below - see
+      // Level-replay guard, same as every tapped hit below - see
       // canEarnAtLevel() in state.js.
       const bonus = awardablePoints(GAME_KEY, getLevel(GAME_KEY), basePoints * 3);
       if (bonus > 0) addScore(bonus);

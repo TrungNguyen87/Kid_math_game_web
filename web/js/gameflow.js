@@ -16,9 +16,9 @@ import {
   MIN_LEVEL,
   addScore,
   awardablePoints,
+  clearLevel,
   countAttemptOnly,
   getLevel,
-  graduateIfCrossedEasyTier,
   registerAttempt,
   resetStreak,
   saveCurrentProfile,
@@ -49,7 +49,7 @@ import { levelLabel } from "./ui-bits.js";
  *   is finally cracked).
  * @param {Element} [options.burstFrom]  element to fire the confetti out of.
  * @returns {{leveledUp: boolean, leveledDown: boolean, pointsAwarded: number}}
- *   pointsAwarded is `points` reduced by the easy-level guard (see
+ *   pointsAwarded is `points` reduced by the level-replay guard (see
  *   awardablePoints() in state.js) when `score` is true, or `points`
  *   unchanged when the caller already applied that guard itself (score:
  *   false, e.g. a timed game's own bonus scoring).
@@ -142,7 +142,7 @@ export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRa
   if (ratio >= upRatio && current < MAX_LEVEL) {
     setLevel(gameKey, current + 1);
     const newLevel = getLevel(gameKey);
-    graduateIfCrossedEasyTier(gameKey, current, newLevel);
+    clearLevel(gameKey, current);
     levelUpOverlay(t("common.level_up", { level: newLevel }), levelLabel(newLevel));
     sound.playLevelUp();
     bigCelebration();

@@ -220,9 +220,9 @@ export function render(container) {
       const multiplier = COMBO_STEPS[Math.min(combo, COMBO_STEPS.length - 1)];
       let raw = basePoints * multiplier;
       if (elapsed <= FAST_ANSWER_SECONDS) raw += basePoints; // speed bonus
-      // The easy-level guard: once this game has graduated past Warm-up/Easy
-      // once, a slip back down there no longer pays out - see
-      // canEarnAtLevel() in state.js.
+      // The level-replay guard: once this level has already been leveled
+      // through once, a slip back down (or a manual re-pick) no longer pays
+      // out - see canEarnAtLevel() in state.js.
       gained = awardablePoints(GAME_KEY, level, raw);
       roundPoints += gained;
       if (gained > 0) {

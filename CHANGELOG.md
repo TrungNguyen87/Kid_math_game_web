@@ -5,6 +5,58 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed (round 16 - the level-replay guard now covers every level, not just Warm-up/Easy)
+
+**Round 15's guard only stopped a child farming Warm-up and Easy (levels
+0-1); every other level still paid coins on every replay.** The request was
+"for all levels, not just 0 and 1" - the guard is now the same rule applied
+uniformly: any level pays reward coins/score the first time a child levels
+all the way through it, and a later replay of that same level (a slip back
+down, or picking it again from the level picker) pays nothing more,
+whichever level it is.
+
+- **`state.js`**: `EASY_LEVEL_MAX` and the single per-game
+  `easyLevelCleared` boolean are gone. `state.clearedLevels` now tracks, per
+  game, the actual *set* of levels a child has leveled all the way through
+  (a `Set` per game key, serialized to a sorted array when a profile is
+  saved and restored the same way `unlockedRewards` already is).
+  `canEarnAtLevel()` checks that set directly instead of comparing against a
+  fixed cutoff. `graduateIfCrossedEasyTier(gameKey, fromLevel, toLevel)` is
+  replaced by the simpler `clearLevel(gameKey, level)`, called with exactly
+  the level being left behind - still only from the automatic leveling paths
+  (`registerAttempt()`'s streak logic, `adaptAfterRound()` in
+  `gameflow.js`), never from a manual `setLevel()` call, for the same reason
+  round 15 found the hard way (see its own entry above).
+- **The one level this can never gate in practice is a game's own top level**
+  (`MAX_LEVEL`, or Tafel Monster's 6): there is nowhere higher to level up
+  into, so `clearLevel()` never fires for it and it always pays - a child who
+  has reached the hardest content in a game is still doing the hardest
+  content, not replaying something easier. This was true by construction
+  once the guard became "the level being left behind", not something added
+  as a special case.
+- **`common.practice_no_bonus`** (both languages) no longer says "this easy
+  level" - it now reads "this level", since the note now shows up at any
+  level the guard applies to, not just Warm-up/Easy.
+
+- Tests: the Node tests from round 15 are rewritten for the general case -
+  leveling through 0, 1 *and* 2 in one test and confirming all three become
+  unpayable replays afterwards (not just the two "easy" ones), a new test
+  that a game's own top level keeps paying after 50 more correct answers
+  there, and the manual-pick and reload-persistence tests carried over with
+  the renamed API. Confirmed the two behavioural tests fail against a build
+  with the old `level > 1` cutoff reintroduced, and pass again once removed.
+  `tests/web/smoke.mjs`'s reward-shop scenario (renamed
+  `rewards:level-replay`) is unchanged in what it exercises - level 0 was
+  already a valid case of the general rule - just renamed and re-commented
+  to stop implying the guard is easy-level-specific.
+- Verified: `npm test` (93/93), `npm run lint`,
+  `find web/js -name "*.js" | xargs -n1 node --check`, `npm run
+  check:precache` (48/48, unchanged), `npm start` + `npm run test:smoke`
+  (all 17 routes and every scenario clean), and the deploy workflow's two
+  real steps re-run locally against a scratch copy of `web/` and `tools/`.
+  `deploy-pages.yml` itself is untouched, and nothing outside `web/`
+  (the test suite) reaches the live GitHub Pages deploy.
+
 ### Added (round 15 - the easy level only pays out once, plus a "Special Gifts" collection and 31 new characters/stickers)
 
 **A child could sit at the easiest questions forever and coins would keep
