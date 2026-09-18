@@ -15,6 +15,8 @@ import {
   MAX_LEVEL,
   MIN_LEVEL,
   addScore,
+  awardablePoints,
+  clearLevel,
   countAttemptOnly,
   getLevel,
   registerAttempt,
@@ -46,7 +48,11 @@ import { levelLabel } from "./ui-bits.js";
  *   points (a speed bonus, or a deduction game paying out only when the code
  *   is finally cracked).
  * @param {Element} [options.burstFrom]  element to fire the confetti out of.
- * @returns {{leveledUp: boolean, leveledDown: boolean}}
+ * @returns {{leveledUp: boolean, leveledDown: boolean, pointsAwarded: number}}
+ *   pointsAwarded is `points` reduced by the level-replay guard (see
+ *   awardablePoints() in state.js) when `score` is true, or `points`
+ *   unchanged when the caller already applied that guard itself (score:
+ *   false, e.g. a timed game's own bonus scoring).
  */
 export function settleAnswer({
   gameKey,
@@ -60,6 +66,11 @@ export function settleAnswer({
   score = true,
   burstFrom = null,
 }) {
+  // A game that scores its own points (score: false) has already run its
+  // gained amount through awardablePoints() before calling this - gating it
+  // again here would be a no-op at best. Only the common path needs it.
+  const pointsAwarded = score ? awardablePoints(gameKey, level, points) : points;
+
   logAttempt({
     gameKey,
     gameName: t(`game.${gameKey}.name`),
@@ -68,7 +79,7 @@ export function settleAnswer({
     studentAnswer,
     correctAnswer,
     isCorrect,
-    points,
+    points: pointsAwarded,
   });
 
   let leveledUp = false;
@@ -83,7 +94,7 @@ export function settleAnswer({
   }
 
   if (isCorrect) {
-    if (score) addScore(points);
+    if (score && pointsAwarded > 0) addScore(pointsAwarded);
     sound.playCorrect(state.streaks);
     if (burstFrom) {
       const rect = burstFrom.getBoundingClientRect();
@@ -110,7 +121,7 @@ export function settleAnswer({
   }
 
   saveCurrentProfile();
-  return { leveledUp, leveledDown };
+  return { leveledUp, leveledDown, pointsAwarded };
 }
 
 /**
@@ -131,6 +142,7 @@ export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRa
   if (ratio >= upRatio && current < MAX_LEVEL) {
     setLevel(gameKey, current + 1);
     const newLevel = getLevel(gameKey);
+    clearLevel(gameKey, current);
     levelUpOverlay(t("common.level_up", { level: newLevel }), levelLabel(newLevel));
     sound.playLevelUp();
     bigCelebration();

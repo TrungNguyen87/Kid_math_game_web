@@ -69,6 +69,10 @@ function freshGameStreaks() {
   return Object.fromEntries(GAME_KEYS.map((k) => [k, { correct: 0, wrong: 0 }]));
 }
 
+function freshClearedLevels() {
+  return {};
+}
+
 function randomId() {
   return Math.random().toString(16).slice(2, 10);
 }
@@ -109,6 +113,10 @@ export const state = {
   unlockedRewards: new Set(),
   equippedAvatar: null,
   gamesTried: new Set(),
+  // Per game, the set of levels a child has already leveled all the way
+  // through - see canEarnAtLevel(). A level in this set has already paid
+  // out once; coming back to it later is practice, not a fresh payout.
+  clearedLevels: freshClearedLevels(),
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
 };
@@ -138,6 +146,9 @@ export function saveCurrentProfile() {
     unlockedRewards: [...state.unlockedRewards].sort(),
     equippedAvatar: state.equippedAvatar,
     gamesTried: [...state.gamesTried].sort(),
+    clearedLevels: Object.fromEntries(
+      Object.entries(state.clearedLevels).map(([k, levels]) => [k, [...levels].sort((a, b) => a - b)]),
+    ),
     updatedAt: new Date().toISOString(),
   };
   writeJson(PROFILES_KEY, profiles);
@@ -161,6 +172,7 @@ export function applyProfile(name) {
     state.equippedAvatar = null;
     state.gamesTried = new Set();
     state.gameStreaks = freshGameStreaks();
+    state.clearedLevels = freshClearedLevels();
     emitChange();
     return false;
   }
@@ -174,6 +186,9 @@ export function applyProfile(name) {
   state.equippedAvatar = profile.equippedAvatar || null;
   state.gamesTried = new Set(profile.gamesTried || []);
   state.gameStreaks = freshGameStreaks();
+  state.clearedLevels = Object.fromEntries(
+    Object.entries(profile.clearedLevels || {}).map(([k, levels]) => [k, new Set(levels)]),
+  );
   emitChange();
   return true;
 }
@@ -269,6 +284,44 @@ export function setLevel(gameKey, level) {
 }
 
 /**
+ * Whether a correct answer at `level` in `gameKey` should still pay reward
+ * points. Every level pays out normally the first time a child works
+ * through it - exactly until their own streak levels them up out of it -
+ * but once a level has been cleared that way (see clearLevel() below),
+ * coming back to it again - a slip back down after wrong answers, or
+ * picking it again on purpose from the level picker - is practice, not a
+ * new payout. Otherwise a child could sit on one level and earn coins
+ * indefinitely instead of progressing.
+ *
+ * The one level this never applies to in practice is a game's own top level
+ * (MAX_LEVEL, or Tafel Monster's 6): there is nowhere higher to level up
+ * into, so it can never be "cleared" by the mechanism below and always pays
+ * - a child who has reached the hardest content is still doing the hardest
+ * content, not replaying something easier.
+ */
+export function canEarnAtLevel(gameKey, level) {
+  return !state.clearedLevels[gameKey]?.has(level);
+}
+
+/** The points actually payable for one correct answer, after that guard. */
+export function awardablePoints(gameKey, level, points) {
+  return canEarnAtLevel(gameKey, level) ? points : 0;
+}
+
+/**
+ * Mark `level` as cleared for `gameKey` - called only from the *automatic*
+ * leveling paths below and adaptAfterRound() in gameflow.js, i.e. only when
+ * the child's own streak of correct/round performance earned the level-up,
+ * never from a manual level-picker click. That distinction matters:
+ * browsing the level picker up and back down again (or a parent/older
+ * sibling trying a harder level for fun) must never cost a child their
+ * first honest, coin-earning pass through a level.
+ */
+export function clearLevel(gameKey, level) {
+  (state.clearedLevels[gameKey] ??= new Set()).add(level);
+}
+
+/**
  * Update the counters after an answer and adapt the level: up after
  * LEVEL_UP_STREAK correct in a row, down after LEVEL_DOWN_STREAK wrong.
  * @returns {{leveledUp: boolean, leveledDown: boolean}}
@@ -289,6 +342,7 @@ export function registerAttempt(gameKey, isCorrect) {
     if (streak.correct >= LEVEL_UP_STREAK && currentLevel < max) {
       setLevel(gameKey, currentLevel + 1);
       leveledUp = true;
+      clearLevel(gameKey, currentLevel);
     }
   } else {
     streak.wrong += 1;
@@ -335,6 +389,7 @@ export function clearAllProfiles() {
   state.equippedAvatar = null;
   state.gamesTried = new Set();
   state.gameStreaks = freshGameStreaks();
+  state.clearedLevels = freshClearedLevels();
   state.streaks = 0;
   state.questionsAnswered = 0;
   state.correctAnswered = 0;

@@ -4,10 +4,10 @@
  * Every correct answer already pays coins alongside the score (see
  * addScore() in state.js - coins are never capped or rolled back, so a big
  * day of play always leaves a child closer to what they're saving for) -
- * this module is only about spending them: a static catalog of characters
- * and stickers, and the actions that unlock and equip them. Unlocks are
- * permanent and persisted with the rest of the player's profile, exactly
- * like badges and levels.
+ * this module is only about spending them: a static catalog of characters,
+ * stickers and special gifts, and the actions that unlock and equip them.
+ * Unlocks are permanent and persisted with the rest of the player's profile,
+ * exactly like badges and levels.
  *
  * Two things gate the priciest items, on top of the coin cost:
  *   - minLevel: the child must have pushed at least one game to that level,
@@ -68,21 +68,29 @@ export const REWARD_DEFS = [
   { id: "avatar_tiger", category: "avatar", tier: "uncommon", emoji: "🐯", nameKey: "rewards.avatar_tiger", cost: UNCOMMON, minLevel: 0 },
   { id: "avatar_owl", category: "avatar", tier: "uncommon", emoji: "🦉", nameKey: "rewards.avatar_owl", cost: UNCOMMON, minLevel: 0 },
   { id: "avatar_elephant", category: "avatar", tier: "uncommon", emoji: "🐘", nameKey: "rewards.avatar_elephant", cost: UNCOMMON, minLevel: 0 },
+  { id: "avatar_butterfly", category: "avatar", tier: "uncommon", emoji: "🦋", nameKey: "rewards.avatar_butterfly", cost: UNCOMMON, minLevel: 0 },
+  { id: "avatar_bee", category: "avatar", tier: "uncommon", emoji: "🐝", nameKey: "rewards.avatar_bee", cost: UNCOMMON, minLevel: 0 },
 
   // --- Rare: needs level 2 in something, not just coins --------------------
   { id: "avatar_unicorn", category: "avatar", tier: "rare", emoji: "🦄", nameKey: "rewards.avatar_unicorn", cost: RARE, minLevel: 2 },
   { id: "avatar_dragon", category: "avatar", tier: "rare", emoji: "🐲", nameKey: "rewards.avatar_dragon", cost: RARE, minLevel: 2 },
   { id: "avatar_mermaid", category: "avatar", tier: "rare", emoji: "🧜", nameKey: "rewards.avatar_mermaid", cost: RARE, minLevel: 2 },
   { id: "avatar_genie", category: "avatar", tier: "rare", emoji: "🧞", nameKey: "rewards.avatar_genie", cost: RARE, minLevel: 2 },
+  { id: "avatar_fairy", category: "avatar", tier: "rare", emoji: "🧚", nameKey: "rewards.avatar_fairy", cost: RARE, minLevel: 2 },
+  { id: "avatar_robot", category: "avatar", tier: "rare", emoji: "🤖", nameKey: "rewards.avatar_robot", cost: RARE, minLevel: 2 },
 
   // --- Epic: level 3 --------------------------------------------------------
   { id: "avatar_wizard", category: "avatar", tier: "epic", emoji: "🧙", nameKey: "rewards.avatar_wizard", cost: EPIC, minLevel: 3 },
   { id: "avatar_superhero", category: "avatar", tier: "epic", emoji: "🦸", nameKey: "rewards.avatar_superhero", cost: EPIC, minLevel: 3 },
   { id: "avatar_ninja", category: "avatar", tier: "epic", emoji: "🥷", nameKey: "rewards.avatar_ninja", cost: EPIC, minLevel: 3 },
+  { id: "avatar_detective", category: "avatar", tier: "epic", emoji: "🕵️", nameKey: "rewards.avatar_detective", cost: EPIC, minLevel: 3 },
+  { id: "avatar_archer", category: "avatar", tier: "epic", emoji: "🏹", nameKey: "rewards.avatar_archer", cost: EPIC, minLevel: 3 },
 
   // --- Legendary: level 4 ----------------------------------------------------
   { id: "avatar_astronaut", category: "avatar", tier: "legendary", emoji: "🚀", nameKey: "rewards.avatar_astronaut", cost: LEGENDARY, minLevel: 4 },
   { id: "avatar_king", category: "avatar", tier: "legendary", emoji: "🤴", nameKey: "rewards.avatar_king", cost: LEGENDARY, minLevel: 4 },
+  { id: "avatar_queen", category: "avatar", tier: "legendary", emoji: "👸", nameKey: "rewards.avatar_queen", cost: LEGENDARY, minLevel: 4 },
+  { id: "avatar_phoenix_knight", category: "avatar", tier: "legendary", emoji: "🔥🛡️", nameKey: "rewards.avatar_phoenix_knight", cost: LEGENDARY, minLevel: 4 },
 
   // --- Mythic: original anime-style heroes, needs a maxed game -------------
   // (Real franchise characters like Luffy are trademarked, so these are
@@ -90,6 +98,8 @@ export const REWARD_DEFS = [
   { id: "avatar_dragon_blade", category: "avatar", tier: "mythic", emoji: "🐉⚔️", nameKey: "rewards.avatar_dragon_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
   { id: "avatar_star_ninja", category: "avatar", tier: "mythic", emoji: "🥷✨", nameKey: "rewards.avatar_star_ninja", cost: MYTHIC, minLevel: MAX_LEVEL },
   { id: "avatar_galaxy_guardian", category: "avatar", tier: "mythic", emoji: "🌌🦸", nameKey: "rewards.avatar_galaxy_guardian", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "avatar_tsunami_blade", category: "avatar", tier: "mythic", emoji: "🌊⚔️", nameKey: "rewards.avatar_tsunami_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "avatar_frost_wolf", category: "avatar", tier: "mythic", emoji: "❄️🐺", nameKey: "rewards.avatar_frost_wolf", cost: MYTHIC, minLevel: MAX_LEVEL },
 
   // --- Ultra: the one capstone reward, rendered as a rotating 3D card ------
   { id: "avatar_3d_champion", category: "avatar", tier: "ultra", emoji: "🏆", nameKey: "rewards.avatar_3d_champion", cost: ULTRA, minLevel: MAX_LEVEL, requiresMastery: true, threeD: true },
@@ -103,6 +113,8 @@ export const REWARD_DEFS = [
   { id: "sticker_heart", category: "sticker", tier: "common", emoji: "❤️", nameKey: "rewards.sticker_heart", cost: COMMON, minLevel: 0 },
   { id: "sticker_sun", category: "sticker", tier: "common", emoji: "☀️", nameKey: "rewards.sticker_sun", cost: COMMON, minLevel: 0 },
   { id: "sticker_cloud", category: "sticker", tier: "common", emoji: "☁️", nameKey: "rewards.sticker_cloud", cost: COMMON, minLevel: 0 },
+  { id: "sticker_pizza", category: "sticker", tier: "common", emoji: "🍕", nameKey: "rewards.sticker_pizza", cost: COMMON, minLevel: 0 },
+  { id: "sticker_palette", category: "sticker", tier: "common", emoji: "🎨", nameKey: "rewards.sticker_palette", cost: COMMON, minLevel: 0 },
 
   { id: "sticker_clover", category: "sticker", tier: "uncommon", emoji: "🍀", nameKey: "rewards.sticker_clover", cost: UNCOMMON, minLevel: 0 },
   { id: "sticker_sparkle", category: "sticker", tier: "uncommon", emoji: "🌟", nameKey: "rewards.sticker_sparkle", cost: UNCOMMON, minLevel: 0 },
@@ -110,21 +122,52 @@ export const REWARD_DEFS = [
   { id: "sticker_comet", category: "sticker", tier: "uncommon", emoji: "☄️", nameKey: "rewards.sticker_comet", cost: UNCOMMON, minLevel: 0 },
   { id: "sticker_potion", category: "sticker", tier: "uncommon", emoji: "🧪", nameKey: "rewards.sticker_potion", cost: UNCOMMON, minLevel: 0 },
   { id: "sticker_key", category: "sticker", tier: "uncommon", emoji: "🗝️", nameKey: "rewards.sticker_key", cost: UNCOMMON, minLevel: 0 },
+  { id: "sticker_music_note", category: "sticker", tier: "uncommon", emoji: "🎵", nameKey: "rewards.sticker_music_note", cost: UNCOMMON, minLevel: 0 },
+  { id: "sticker_butterfly", category: "sticker", tier: "uncommon", emoji: "🦋", nameKey: "rewards.sticker_butterfly", cost: UNCOMMON, minLevel: 0 },
 
   { id: "sticker_trophy", category: "sticker", tier: "rare", emoji: "🏆", nameKey: "rewards.sticker_trophy", cost: RARE, minLevel: 2 },
   { id: "sticker_gem", category: "sticker", tier: "rare", emoji: "💎", nameKey: "rewards.sticker_gem", cost: RARE, minLevel: 2 },
   { id: "sticker_compass", category: "sticker", tier: "rare", emoji: "🧭", nameKey: "rewards.sticker_compass", cost: RARE, minLevel: 2 },
   { id: "sticker_shield", category: "sticker", tier: "rare", emoji: "🛡️", nameKey: "rewards.sticker_shield", cost: RARE, minLevel: 2 },
+  { id: "sticker_crystal_ball", category: "sticker", tier: "rare", emoji: "🔮", nameKey: "rewards.sticker_crystal_ball", cost: RARE, minLevel: 2 },
+  { id: "sticker_lightning", category: "sticker", tier: "rare", emoji: "⚡", nameKey: "rewards.sticker_lightning", cost: RARE, minLevel: 2 },
 
   { id: "sticker_medal", category: "sticker", tier: "epic", emoji: "🥇", nameKey: "rewards.sticker_medal", cost: EPIC, minLevel: 3 },
   { id: "sticker_flame_badge", category: "sticker", tier: "epic", emoji: "🔥", nameKey: "rewards.sticker_flame_badge", cost: EPIC, minLevel: 3 },
   { id: "sticker_diamond_badge", category: "sticker", tier: "epic", emoji: "💠", nameKey: "rewards.sticker_diamond_badge", cost: EPIC, minLevel: 3 },
+  { id: "sticker_shooting_star", category: "sticker", tier: "epic", emoji: "🌠", nameKey: "rewards.sticker_shooting_star", cost: EPIC, minLevel: 3 },
+  { id: "sticker_sparkler", category: "sticker", tier: "epic", emoji: "🎇", nameKey: "rewards.sticker_sparkler", cost: EPIC, minLevel: 3 },
 
   { id: "sticker_crown", category: "sticker", tier: "legendary", emoji: "👑", nameKey: "rewards.sticker_crown", cost: LEGENDARY, minLevel: 4 },
   { id: "sticker_galaxy", category: "sticker", tier: "legendary", emoji: "🌌", nameKey: "rewards.sticker_galaxy", cost: LEGENDARY, minLevel: 4 },
+  { id: "sticker_ufo", category: "sticker", tier: "legendary", emoji: "🛸", nameKey: "rewards.sticker_ufo", cost: LEGENDARY, minLevel: 4 },
 
   { id: "sticker_katana_emblem", category: "sticker", tier: "mythic", emoji: "🗡️✨", nameKey: "rewards.sticker_katana_emblem", cost: MYTHIC, minLevel: MAX_LEVEL },
   { id: "sticker_golden_scale", category: "sticker", tier: "mythic", emoji: "🐲✨", nameKey: "rewards.sticker_golden_scale", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "sticker_moon_blade", category: "sticker", tier: "mythic", emoji: "🌙⚔️", nameKey: "rewards.sticker_moon_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "sticker_wolf_ember", category: "sticker", tier: "mythic", emoji: "🔥🐺", nameKey: "rewards.sticker_wolf_ember", cost: MYTHIC, minLevel: MAX_LEVEL },
+
+  // ==========================================================================
+  // Special gifts - a third collection alongside characters and stickers:
+  // trophies, charms and keepsakes rather than a character or a sticker, same
+  // tiers and gates so the shop's "how special is this" reading stays
+  // consistent across all three.
+  // ==========================================================================
+  { id: "gift_mystery_box", category: "gift", tier: "common", emoji: "🎁", nameKey: "rewards.gift_mystery_box", cost: COMMON, minLevel: 0 },
+  { id: "gift_lucky_envelope", category: "gift", tier: "common", emoji: "🧧", nameKey: "rewards.gift_lucky_envelope", cost: COMMON, minLevel: 0 },
+
+  { id: "gift_bronze_medal", category: "gift", tier: "uncommon", emoji: "🥉", nameKey: "rewards.gift_bronze_medal", cost: UNCOMMON, minLevel: 0 },
+  { id: "gift_fanfare_horn", category: "gift", tier: "uncommon", emoji: "📯", nameKey: "rewards.gift_fanfare_horn", cost: UNCOMMON, minLevel: 0 },
+
+  { id: "gift_silver_cup", category: "gift", tier: "rare", emoji: "🥈", nameKey: "rewards.gift_silver_cup", cost: RARE, minLevel: 2 },
+  { id: "gift_treasure_map", category: "gift", tier: "rare", emoji: "🗺️", nameKey: "rewards.gift_treasure_map", cost: RARE, minLevel: 2 },
+
+  { id: "gift_treasure_bag", category: "gift", tier: "epic", emoji: "💰", nameKey: "rewards.gift_treasure_bag", cost: EPIC, minLevel: 3 },
+  { id: "gift_honor_ribbon", category: "gift", tier: "epic", emoji: "🎖️", nameKey: "rewards.gift_honor_ribbon", cost: EPIC, minLevel: 3 },
+
+  { id: "gift_trident_of_mastery", category: "gift", tier: "legendary", emoji: "🔱", nameKey: "rewards.gift_trident_of_mastery", cost: LEGENDARY, minLevel: 4 },
+
+  { id: "gift_celestial_seal", category: "gift", tier: "mythic", emoji: "🏯✨", nameKey: "rewards.gift_celestial_seal", cost: MYTHIC, minLevel: MAX_LEVEL },
 ];
 
 export const REWARD_MAP = Object.fromEntries(REWARD_DEFS.map((r) => [r.id, r]));
