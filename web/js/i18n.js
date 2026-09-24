@@ -1,9 +1,10 @@
 /**
  * Translation layer, ported 1:1 from utils/i18n.py.
  *
- * The strings themselves live in the generated i18n-data.js, which is built
- * from utils/i18n.py by tools/gen_i18n.py - so the Dutch and English copy
- * cannot drift between the two front-ends while both exist.
+ * The strings themselves live in i18n-data.js, edited by hand (the Streamlit
+ * front-end and its generator are gone). tests/web/test_logic.mjs keeps the
+ * Dutch and English tables in step, key for key and placeholder for
+ * placeholder.
  *
  * Two lookups, deliberately:
  *   t(key, vars)   -> plain text, for textContent / attributes.

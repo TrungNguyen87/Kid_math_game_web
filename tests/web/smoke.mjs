@@ -115,6 +115,11 @@ await page.waitForSelector(".kmg-question");
 
 const scoreBefore = Number(await page.locator(".kmg-scorebox-value").first().textContent());
 
+// Tafel Monster has seven levels (0-6). The picker used to be a fixed
+// six-column grid, which pushed the "6" onto a row of its own.
+const levelRows = await page.$$eval(".kmg-levelrow .kmg-levelbtn", (buttons) => new Set(buttons.map((b) => b.offsetTop)).size);
+if (levelRows !== 1) note("tafel:play", `the level picker wraps onto ${levelRows} rows`);
+
 // Tap out an answer on the on-screen pad, exactly as a child on a tablet does.
 await page.locator(".kmg-padkey", { hasText: /^7$/ }).first().click();
 const typed = await page.locator(".kmg-numinput").inputValue();
@@ -206,7 +211,10 @@ await page.waitForTimeout(300);
 if (!(await page.locator(".kmg-reward-card.is-unlocked").count())) {
   note("rewards:shop", "unlocking an item did not turn any card into is-unlocked");
 }
-if (!(await page.locator(".kmg-reward-card.is-equipped").count())) {
+// Scoped to the characters section: a colour theme (round 17) is equipped
+// too, so an unscoped count would pass even if no character had been.
+const equippedCharacters = page.locator("#kmg-rewards-avatar .kmg-reward-card.is-equipped");
+if (!(await equippedCharacters.count())) {
   note("rewards:shop", "no card is marked equipped after unlocking a character");
 }
 
@@ -231,11 +239,11 @@ if (await lockedMythicCard.count()) {
 }
 
 // Switching back to the default character must move the "equipped" tag.
-const switchButton = page.locator(".kmg-reward-card.is-unlocked .kmg-reward-btn").first();
+const switchButton = page.locator("#kmg-rewards-avatar .kmg-reward-card.is-unlocked .kmg-reward-btn").first();
 if (await switchButton.count()) {
   await switchButton.click();
   await page.waitForTimeout(200);
-  const stillOneEquipped = await page.locator(".kmg-reward-card.is-equipped").count();
+  const stillOneEquipped = await equippedCharacters.count();
   if (stillOneEquipped !== 1) {
     note("rewards:shop", `expected exactly one equipped card after switching, found ${stillOneEquipped}`);
   }
@@ -258,6 +266,12 @@ await page.waitForTimeout(200);
 
 const coinsBeforeReplay = Number(await page.locator(".kmg-scorebox-coins").first().textContent());
 const scoreBeforeReplay = Number(await page.locator(".kmg-scorebox-value").first().textContent());
+// Daily quests (quests.js) must not be a side door round the guard either: a
+// replay answer that paid nothing may not move any quest. Read through the
+// app's own module instance - same URL, so the same live state.
+const readDaily = () =>
+  page.evaluate(async () => JSON.stringify((await import("./js/state.js")).state.daily));
+const dailyBeforeReplay = await readDaily();
 
 const replayText = await page.locator(".kmg-question-text").textContent();
 const [ra, rb] = [...replayText.matchAll(/\d+/g)].map((m) => Number(m[0]));
@@ -287,8 +301,26 @@ if (!Number.isFinite(ra) || !Number.isFinite(rb)) {
       `replaying an already-cleared level should not pay coins: ${coinsBeforeReplay} -> ${coinsAfterReplay}`,
     );
   }
+  if ((await readDaily()) !== dailyBeforeReplay) {
+    note("rewards:level-replay", "a replay answer that paid nothing still moved today's quest progress");
+  }
   console.log(`  level replay: coins stayed at ${coinsBeforeReplay} after a correct answer back at level 0`);
 }
+
+// --- home tiles after a game has been played --------------------------------
+// Every tile of an already-tried game used to end in the literal word "null"
+// (Node.append() stringifies a null child), and Tafel Monster read "Level
+// 6/5" with its bar at 120%, because the tile assumed every game stops at 5.
+
+currentRoute = "home:tiles";
+await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+await page.waitForSelector(".kmg-tile");
+const tileTexts = await page.$$eval(".kmg-tile", (tiles) => tiles.map((tile) => tile.textContent));
+const nullTile = tileTexts.find((text) => /null|undefined|NaN/.test(text));
+if (nullTile) note("home:tiles", `a game tile renders junk text: "${nullTile.trim()}"`);
+const tafelMeta = await page.locator('.kmg-tile[href="#/tafel"] .kmg-tile-meta').textContent();
+if (!/\/6\b/.test(tafelMeta)) note("home:tiles", `Tafel Monster's tile should count levels out of 6, shows "${tafelMeta}"`);
+console.log(`  home tiles: ${tileTexts.length} tiles, tafel shows "${tafelMeta.trim()}"`);
 
 // --- the answer must be recorded for the parent dashboard ------------------
 
@@ -695,6 +727,103 @@ await phone
   .catch((error) => note("mobile", `could not tap the first control: ${error.message.split("\n")[0]}`));
 
 if (shotDir) await phone.screenshot({ path: path.join(shotDir, "mobile-breuken.png") });
+
+// --- round 17: buddy, daily quests + chest, treasures, themes, goal ---------
+// On a phone-sized page, because that is where the new home cards and the
+// shop's jump bar have to fit. A fresh context, so this player starts clean.
+
+currentRoute = "progression";
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  // Seed once, on the very first load only - a reseed on every navigation
+  // would undo the reload checks below (session 7's lesson).
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem("kmg.test.seeded")) return;
+    sessionStorage.setItem("kmg.test.seeded", "1");
+    localStorage.setItem(
+      "kmg.profiles",
+      JSON.stringify({ Sam: { totalScore: 300, coins: 200, levels: { tafel: 2 }, gamesTried: ["tafel"] } }),
+    );
+    localStorage.setItem("kmg.currentPlayer", "Sam");
+  });
+  const p = await ctx.newPage();
+  p.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  p.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+  const coins = async () => Number(await p.locator(".kmg-scorebox-coins").first().textContent());
+  const sideways = () => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+  await p.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-buddy");
+  if (!(await p.locator(".kmg-buddy-emoji").textContent())?.trim()) note(currentRoute, "the buddy has no picture");
+  const questRows = await p.locator(".kmg-quest").count();
+  if (questRows !== 3) note(currentRoute, `expected 3 daily quests on the home page, found ${questRows}`);
+  if (await p.locator(".kmg-chest-btn").count()) note(currentRoute, "the chest is openable before any quest is done");
+  if ((await sideways()) > 1) note(currentRoute, `home scrolls sideways on a phone by ${await sideways()}px`);
+  if (!(await p.locator('a[href^="mailto:nxtrung87@gmail.com"]').count())) {
+    note(currentRoute, "no feedback email link on the home page");
+  }
+
+  // Finishing three quests honestly would take a whole scripted session, and
+  // which three depends on the date. So mark today's three done through the
+  // app's own modules (same URL, same instance), then re-render with a hash
+  // round-trip rather than a reload, so the autosave cannot race it.
+  await p.evaluate(async () => {
+    const s = await import("./js/state.js");
+    const q = await import("./js/quests.js");
+    const today = s.dayKey();
+    s.state.daily = { ...s.freshDaily(today), completed: q.questsForDay(today).map((quest) => quest.id) };
+    s.saveCurrentProfile();
+  });
+  await p.evaluate(() => (location.hash = "#/uitleg"));
+  await p.waitForTimeout(250);
+  await p.evaluate(() => (location.hash = "#/home"));
+  await p.waitForSelector(".kmg-chest-btn", { timeout: 4000 }).catch(() => note(currentRoute, "all quests done but no chest button"));
+
+  const coinsBeforeChest = await coins();
+  await p.locator(".kmg-chest-btn").click();
+  await p.waitForSelector(".kmg-chest.is-open", { timeout: 4000 }).catch(() => note(currentRoute, "the chest did not open"));
+  const coinsAfterChest = await coins();
+  if (coinsAfterChest !== coinsBeforeChest + 40) {
+    note(currentRoute, `the chest should pay 40 coins: ${coinsBeforeChest} -> ${coinsAfterChest}`);
+  }
+
+  // Opened is opened: a reload must not re-arm today's chest.
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-quests");
+  if (await p.locator(".kmg-chest-btn").count()) note(currentRoute, "today's chest could be opened again after a reload");
+
+  // The shop: the treasure is in the collection, a theme can be bought and
+  // actually recolours the app (and stays on after a reload), and 🎯 pins a
+  // savings goal that shows up in the sidebar.
+  await p.goto(`${baseUrl}/#/rewards`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-reward-jump");
+  const treasures = await p.locator(".kmg-reward-card.is-treasure.is-unlocked").count();
+  if (treasures !== 1) note(currentRoute, `expected exactly 1 found treasure in the shop, found ${treasures}`);
+  if ((await sideways()) > 1) note(currentRoute, `the shop scrolls sideways on a phone by ${await sideways()}px`);
+
+  await p.locator('[data-reward="theme_ocean"] .kmg-btn-primary').click();
+  await p.waitForTimeout(200);
+  const theme = await p.evaluate(() => document.documentElement.dataset.theme);
+  if (theme !== "ocean") note(currentRoute, `buying the ocean theme did not apply it (data-theme="${theme}")`);
+
+  await p.locator('[data-reward="avatar_lion"] .kmg-reward-goalbtn').click();
+  await p.waitForTimeout(200);
+  if (!(await p.locator(".kmg-scorebox-goal").count())) note(currentRoute, "pinning a goal did not show it in the sidebar");
+
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-reward-card");
+  const themeAfterReload = await p.evaluate(() => document.documentElement.dataset.theme);
+  if (themeAfterReload !== "ocean") note(currentRoute, `the theme did not survive a reload (data-theme="${themeAfterReload}")`);
+  if (!(await p.locator(".kmg-reward-card.is-goal").count())) note(currentRoute, "the savings goal did not survive a reload");
+
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "progression-shop.png") });
+  console.log(
+    `  progression: 3 quests, chest ${coinsBeforeChest} -> ${coinsAfterChest} coins + ${treasures} treasure, theme "${themeAfterReload}", goal pinned`,
+  );
+  await ctx.close();
+}
 
 // --- offline, after the service worker has installed ------------------------
 

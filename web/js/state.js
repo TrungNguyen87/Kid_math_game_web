@@ -73,6 +73,43 @@ function freshClearedLevels() {
   return {};
 }
 
+/**
+ * The child's own calendar day, "YYYY-MM-DD" in *local* time. Daily quests
+ * and the play-day streak roll over at the child's midnight - a UTC day
+ * would flip at 01:00 or 02:00 in the Netherlands, in the middle of a late
+ * homework session.
+ */
+export function dayKey(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The day before `day` ("YYYY-MM-DD"), done in calendar terms so DST can't skip one. */
+export function previousDayKey(day) {
+  const [y, m, d] = day.split("-").map(Number);
+  return dayKey(new Date(y, m - 1, d - 1));
+}
+
+/** Today's quest progress - see quests.js. Reset lazily when the day changes. */
+export function freshDaily(day = null) {
+  return {
+    day,
+    correct: 0,
+    points: 0,
+    streak: 0,
+    speed: 0,
+    featured: 0,
+    games: [],
+    completed: [],
+    chestOpened: false,
+  };
+}
+
+function freshPlayStreak() {
+  return { last: null, count: 0, best: 0 };
+}
+
 function randomId() {
   return Math.random().toString(16).slice(2, 10);
 }
@@ -117,6 +154,18 @@ export const state = {
   // through - see canEarnAtLevel(). A level in this set has already paid
   // out once; coming back to it later is practice, not a fresh payout.
   clearedLevels: freshClearedLevels(),
+  // Daily quests (quests.js) and the "days in a row" play streak.
+  daily: freshDaily(),
+  playStreak: freshPlayStreak(),
+  questsCompleted: 0,
+  chestsOpened: 0,
+  // The reward a child is saving up for (rewards.js setGoal), and the colour
+  // theme they picked in the shop.
+  goalReward: null,
+  equippedTheme: null,
+  // The highest buddy stage (buddy.js) already celebrated, so growing is
+  // announced exactly once.
+  buddySeenStage: 0,
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
 };
@@ -149,6 +198,13 @@ export function saveCurrentProfile() {
     clearedLevels: Object.fromEntries(
       Object.entries(state.clearedLevels).map(([k, levels]) => [k, [...levels].sort((a, b) => a - b)]),
     ),
+    daily: { ...state.daily, games: [...state.daily.games], completed: [...state.daily.completed] },
+    playStreak: { ...state.playStreak },
+    questsCompleted: state.questsCompleted,
+    chestsOpened: state.chestsOpened,
+    goalReward: state.goalReward,
+    equippedTheme: state.equippedTheme,
+    buddySeenStage: state.buddySeenStage,
     updatedAt: new Date().toISOString(),
   };
   writeJson(PROFILES_KEY, profiles);
@@ -159,20 +215,36 @@ export function saveCurrentProfile() {
   }
 }
 
+/**
+ * Every player-scoped field back to a brand-new player. One function, used by
+ * both applyProfile() and clearAllProfiles(), so a field added later cannot
+ * be reset in one place and forgotten in the other.
+ */
+function resetPlayerFields() {
+  state.totalScore = 0;
+  state.levels = freshLevels();
+  state.badges = [];
+  state.coins = 0;
+  state.unlockedRewards = new Set();
+  state.equippedAvatar = null;
+  state.gamesTried = new Set();
+  state.gameStreaks = freshGameStreaks();
+  state.clearedLevels = freshClearedLevels();
+  state.daily = freshDaily();
+  state.playStreak = freshPlayStreak();
+  state.questsCompleted = 0;
+  state.chestsOpened = 0;
+  state.goalReward = null;
+  state.equippedTheme = null;
+  state.buddySeenStage = 0;
+}
+
 /** Restore a saved profile into the live state. Returns true if one existed. */
 export function applyProfile(name) {
   const profile = allProfiles()[name];
   state.playerName = name;
   if (!profile) {
-    state.totalScore = 0;
-    state.levels = freshLevels();
-    state.badges = [];
-    state.coins = 0;
-    state.unlockedRewards = new Set();
-    state.equippedAvatar = null;
-    state.gamesTried = new Set();
-    state.gameStreaks = freshGameStreaks();
-    state.clearedLevels = freshClearedLevels();
+    resetPlayerFields();
     emitChange();
     return false;
   }
@@ -189,6 +261,25 @@ export function applyProfile(name) {
   state.clearedLevels = Object.fromEntries(
     Object.entries(profile.clearedLevels || {}).map(([k, levels]) => [k, new Set(levels)]),
   );
+  // Profiles saved before round 17 have none of the fields below; each one
+  // falls back to a fresh value rather than `undefined`.
+  const daily = profile.daily || {};
+  state.daily = {
+    ...freshDaily(daily.day ?? null),
+    ...daily,
+    games: [...(daily.games || [])],
+    completed: [...(daily.completed || [])],
+  };
+  state.playStreak = { ...freshPlayStreak(), ...(profile.playStreak || {}) };
+  state.questsCompleted = profile.questsCompleted || 0;
+  state.chestsOpened = profile.chestsOpened || 0;
+  state.goalReward = profile.goalReward || null;
+  state.equippedTheme = profile.equippedTheme || null;
+  // An existing player's buddy starts out already at whatever stage their
+  // score has earned - no surprise "your buddy grew!" for points banked
+  // before the buddy existed. buddy.js owns the thresholds, so this is -1
+  // here and resolved there (see buddy.js syncBuddyStage()).
+  state.buddySeenStage = Number.isInteger(profile.buddySeenStage) ? profile.buddySeenStage : -1;
   emitChange();
   return true;
 }
@@ -234,6 +325,41 @@ export function addScore(points = 10) {
   // they're saving for, never less close.
   state.coins += points;
   emitChange();
+}
+
+/**
+ * Coins that are a *gift* rather than points for an answer - a finished
+ * daily quest, a treasure chest. They go straight to the spendable balance
+ * and leave totalScore alone: the score (and the buddy that grows with it)
+ * stays a record of answers actually earned.
+ */
+export function grantBonusCoins(amount) {
+  if (!(amount > 0)) return;
+  state.coins += Math.round(amount);
+  emitChange();
+}
+
+/**
+ * Mark today as a day this player practised, and keep the "days in a row"
+ * streak: yesterday + today continues it, a gap restarts it at 1. Returns
+ * true the first time it is called on a new day.
+ */
+export function touchPlayDay(now = new Date()) {
+  const today = dayKey(now);
+  const streak = state.playStreak;
+  if (streak.last === today) return false;
+  streak.count = streak.last === previousDayKey(today) ? streak.count + 1 : 1;
+  streak.best = Math.max(streak.best, streak.count);
+  streak.last = today;
+  emitChange();
+  return true;
+}
+
+/** Days in a row as of `now` - 0 once a whole day has been missed. */
+export function currentPlayStreak(now = new Date()) {
+  const today = dayKey(now);
+  const { last, count } = state.playStreak;
+  return last === today || last === previousDayKey(today) ? count : 0;
 }
 
 /**
@@ -381,15 +507,7 @@ export function clearAllProfiles() {
   } catch {
     /* see writeJson */
   }
-  state.totalScore = 0;
-  state.levels = freshLevels();
-  state.badges = [];
-  state.coins = 0;
-  state.unlockedRewards = new Set();
-  state.equippedAvatar = null;
-  state.gamesTried = new Set();
-  state.gameStreaks = freshGameStreaks();
-  state.clearedLevels = freshClearedLevels();
+  resetPlayerFields();
   state.streaks = 0;
   state.questionsAnswered = 0;
   state.correctAnswered = 0;

@@ -18,7 +18,8 @@ import {
   state,
 } from "./state.js";
 import { currentRoute, onRouteChange } from "./router.js";
-import { equippedAvatarEmoji } from "./rewards.js";
+import { applyTheme, equippedAvatarEmoji, goalInfo } from "./rewards.js";
+import { feedbackHref } from "./ui-bits.js";
 import * as sound from "./sound.js";
 
 let previousScore = null;
@@ -100,8 +101,9 @@ export function buildShell(root) {
   ]);
 
   const parentLink = el("a.kmg-parentlink", { href: "#/dashboard" });
+  const feedbackLink = el("a.kmg-parentlink.kmg-feedbacklink", { href: feedbackHref("menu") });
 
-  controls.append(langGroup, soundToggle, parentLink);
+  controls.append(langGroup, soundToggle, parentLink, feedbackLink);
   drawer.append(brand, playerRow, scoreBox, progressBox, menu, controls);
 
   root.append(scrim, drawer, el("div.kmg-content", {}, [topbar, main]));
@@ -145,6 +147,7 @@ export function buildShell(root) {
         el("strong.kmg-scorebox-value", { text: String(state.streaks) }),
       ]),
       gained ? el("div.kmg-scorebox-delta", { text: `+${delta}` }) : null,
+      goalRow(),
     );
 
     // The box pops only on a run where the score actually went up - one that
@@ -155,11 +158,28 @@ export function buildShell(root) {
       scoreBox.classList.add("is-up");
     }
 
+    // On a phone the drawer is closed, so the top bar is the only place the
+    // coins show - and coins are what a child is actually watching.
     clear(topScore);
     topScore.append(
       el("span.kmg-topbar-score-star", { text: "🌟" }),
       el("strong", { text: String(state.totalScore) }),
+      el("span.kmg-topbar-sep", { "aria-hidden": "true" }),
+      el("span.kmg-topbar-score-star", { text: "🪙" }),
+      el("strong.kmg-topbar-coins", { text: String(state.coins) }),
     );
+  }
+
+  /** "Saving for 🦄 - 45%", with a mini bar, when the child has pinned a goal. */
+  function goalRow() {
+    const goal = goalInfo();
+    if (!goal) return null;
+    return el(`a.kmg-scorebox-goal${goal.ready ? ".is-ready" : ""}`, { href: "#/rewards", title: t(goal.def.nameKey) }, [
+      el("span.kmg-scorebox-icon", { text: "🎯" }),
+      el("span.kmg-scorebox-label", { text: `${t("sidebar.goal")}: ${goal.def.emoji}` }),
+      el("span.kmg-scorebox-goalpct", { text: `${goal.pct}%` }),
+      el("span.kmg-scorebox-goalbar", {}, [el("span", { style: { width: `${goal.pct}%` } })]),
+    ]);
   }
 
   function paintProgress() {
@@ -186,6 +206,8 @@ export function buildShell(root) {
     $(".kmg-brand-sub", drawer).textContent = t("app.icon_caption");
     menuButton.setAttribute("aria-label", t("app.menu"));
     parentLink.textContent = t("sidebar.parent_link");
+    feedbackLink.textContent = t("feedback.link");
+    feedbackLink.href = feedbackHref("menu");
     $(".kmg-switch-label", drawer).textContent = t("sidebar.sound_toggle");
     langGroup.setAttribute("aria-label", t("sidebar.language"));
     [...langGroup.children].forEach((button) =>
@@ -229,10 +251,21 @@ export function buildShell(root) {
     if (event.key === "Escape") closeDrawer();
   });
 
+  // One answer fires several state changes in a row (score, streak, level,
+  // quests...). Repainting the whole sidebar for each one is wasted work, so
+  // they are batched into a single repaint at the end of the current task -
+  // still before the browser paints, so nothing visibly lags.
+  let repaintQueued = false;
   onStateChange(() => {
-    paintPlayer();
-    paintScore();
-    paintProgress();
+    if (repaintQueued) return;
+    repaintQueued = true;
+    queueMicrotask(() => {
+      repaintQueued = false;
+      applyTheme();
+      paintPlayer();
+      paintScore();
+      paintProgress();
+    });
   });
   onRouteChange((path) => paintActive(path));
   onLanguageChange(() => {
@@ -247,6 +280,7 @@ export function buildShell(root) {
   // update when a question was answered.
   setInterval(paintProgress, 15000);
 
+  applyTheme();
   paintStatic();
   paintPlayer();
   paintScore();

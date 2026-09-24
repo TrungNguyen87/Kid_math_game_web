@@ -168,15 +168,18 @@ export function toast(message, icon = "✨", duration = 3200) {
  * The full-screen "Level 3!" card. Big, brief, and impossible to miss -
  * levelling up was previously just a small toast, which children missed.
  */
-export function levelUpOverlay(title, subtitle) {
+export function levelUpOverlay(title, subtitle, icon = "⭐") {
   const el = document.createElement("div");
   el.className = "kmg-levelcard";
   el.innerHTML = `
     <div class="kmg-levelcard-inner">
-      <div class="kmg-levelcard-star">⭐</div>
+      <div class="kmg-levelcard-star"></div>
       <div class="kmg-levelcard-title"></div>
       <div class="kmg-levelcard-sub"></div>
     </div>`;
+  // The same card announces a level-up, the buddy growing and a chest
+  // opening; the icon says which.
+  el.querySelector(".kmg-levelcard-star").textContent = icon;
   el.querySelector(".kmg-levelcard-title").textContent = title;
   el.querySelector(".kmg-levelcard-sub").textContent = subtitle || "";
   document.body.appendChild(el);

@@ -58,10 +58,13 @@ export function expander(summaryText, contentNode, { open = false } = {}) {
 export function levelPicker(gameKey, onChange) {
   const wrap = el("div.kmg-levelpicker");
   const label = el("div.kmg-levelpicker-label", { text: t("common.choose_level") });
-  const row = el("div.kmg-levelrow");
-  const badge = el("div.kmg-level-badge");
   const max = getMaxLevel(gameKey);
   const levels = getLevels(gameKey);
+  // One column per level, so Tafel Monster's seven levels (0-6) sit on one
+  // row like every other game's six instead of wrapping its "6" onto a line
+  // of its own.
+  const row = el("div.kmg-levelrow", { style: { "--kmg-levels": String(levels.length) } });
+  const badge = el("div.kmg-level-badge");
 
   const paint = (animate = false) => {
     const current = getLevel(gameKey);

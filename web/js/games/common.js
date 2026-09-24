@@ -17,6 +17,7 @@ import { el } from "../dom.js";
 import { t } from "../i18n.js";
 import { getLevel, state } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
+import { randomPraise } from "../ui-bits.js";
 import {
   actionBar,
   gameShell,
@@ -132,6 +133,7 @@ export function typedAnswerGame(config) {
           : t(`${gameKey}.correct`, { points: pointsAwarded });
         shell.setFeedback("success", successText, {
           icon: okIcon,
+          tip: randomPraise(),
         });
         // Straight on to the next question while the child is in flow. A
         // wrong answer does not auto-advance: that is the one moment they

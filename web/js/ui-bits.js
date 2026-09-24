@@ -33,3 +33,29 @@ export function formatDecimal(value, digits = null) {
   const text = digits == null ? String(Number(value)) : Number(value).toFixed(digits);
   return text;
 }
+
+/** How many `praise.N` lines i18n-data.js carries (1-based, both languages). */
+export const PRAISE_COUNT = 16;
+
+/**
+ * One of a pool of cheerful lines for a correct answer. The per-game "✅
+ * Monster defeated!" message is the same every time; after the twentieth
+ * identical banner a child stops reading it. A rotating extra line keeps the
+ * praise feeling like it is about *this* answer.
+ */
+export function randomPraise(rng = Math.random) {
+  return t(`praise.${1 + Math.floor(rng() * PRAISE_COUNT)}`);
+}
+
+/** Where parents and children can send ideas and bug reports. */
+export const FEEDBACK_EMAIL = "nxtrung87@gmail.com";
+
+/**
+ * A mailto: link with a subject and a short prompt already filled in, so a
+ * parent can send feedback in two taps. `where` names the page it came from.
+ */
+export function feedbackHref(where = "") {
+  const subject = t("feedback.mail_subject") + (where ? ` (${where})` : "");
+  const body = t("feedback.mail_body");
+  return `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
