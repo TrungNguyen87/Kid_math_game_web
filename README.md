@@ -3,7 +3,7 @@
 Twelve maths games for Dutch primary-school children aged roughly 9–11, in
 Dutch and English, with six difficulty levels each and a dashboard for parents.
 
-**Play:** https://trungnguyen87.github.io/Kids_Math_Games/
+**Play:** https://trungnguyen87.github.io/Kid_math_game_web/
 *(after the one-time setup in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §4)*
 
 Free, no account, no ads, nothing to install — and it works offline once
@@ -36,52 +36,65 @@ Every game starts at a gentle warm-up level and gets harder after three correct
 answers in a row, easier after two wrong ones. A child can also just tap the
 level they want.
 
-## Two front-ends
+## Why keep coming back
 
-| | Where | Status |
-|---|---|---|
-| **`web/`** | Static site, deployed to GitHub Pages | **Current.** All twelve games. |
-| `app.py`, `pages/`, `utils/` | Streamlit | Reference implementation, still runs |
+Every correct answer pays coins for the **reward shop**: 49 characters, 46
+stickers, 18 special gifts and 7 colour themes that recolour the whole app.
+Tap 🎯 on an item to make it your savings goal; the sidebar then shows how
+close you are.
 
-The web version was ported from the Streamlit one and keeps its question
-generators, level curves, scoring, badges and both languages exactly. What
-changed is everything a child feels: real-time clocks instead of one-second
-server ticks, an on-screen number pad instead of a desktop spinner, canvas
-confetti, Web Audio sound, instant answers, and offline play.
+On top of that:
 
-`utils/i18n.py` is still the single source of truth for all 473 strings in both
-languages; `web/js/i18n-data.js` is generated from it.
+- **Rekie, the maths buddy**, hatches from an egg and grows through eight
+  stages into a cosmic dragon as the lifetime score rises.
+- **Three daily quests** (a bit of effort, a bit of skill, a bit of variety),
+  each paying bonus coins. Finish all three and the day's **treasure chest**
+  opens: more coins plus one of 12 treasures that can never be bought.
+- A **days-in-a-row** streak and **21 badges**.
+
+None of it can be farmed: an already-cleared level pays no coins, and quest
+progress only counts answers that actually earned points.
+
+## How it is built
+
+`web/` is a static site (plain HTML, CSS and ES modules; no build step and no
+framework) deployed to GitHub Pages by `.github/workflows/deploy-pages.yml`.
+It was ported from an earlier Streamlit version, which has since been removed
+from this repository.
+
+`web/js/i18n-data.js` holds every string in Dutch and English and is edited by
+hand; a test keeps the two languages in step key for key.
+
+Race Mode's *online* play needs `race-server.js` and so only works
+self-hosted (`npm start`); playing together on one device always works.
 
 Why this platform and not Streamlit: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §1.
 
 ## Running it locally
 
-The web app has no build step and no dependencies — but it does need a server,
-because ES modules and service workers will not load from a `file://` URL.
+The web app has no build step, but it does need a server, because ES modules
+and service workers will not load from a `file://` URL.
 
 ```bash
-npm start        # http://127.0.0.1:8080
+npm install
+npm start        # http://127.0.0.1:3000  (also runs the Race Mode server)
 ```
 
-or
+or, for the static site only:
 
 ```bash
 python3 -m http.server 8080 --directory web
 ```
 
-The Streamlit version, if you want to compare:
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
 ## Tests
 
 ```bash
-npm test                 # 62 logic tests - generators, scoring, levels, i18n parity
+npm test                 # Node logic tests: generators, scoring, levels, rewards, quests, i18n parity
+npm run lint             # syntax check of the entry points
 npm run check:precache   # every shipped file is in the service worker's cache list
-npm run test:smoke       # real Chromium: every route, gameplay, i18n, timers, mobile, offline
+npm start &              # then:
+npm run test:smoke       # real Chromium: every route, gameplay, rewards, both race modes, phone, offline
+npm run test:pages       # the deploy-stamped site served like GitHub Pages: sub-path, real 404s, offline
 ```
 
 The logic tests run each question generator several hundred times per level,
@@ -107,3 +120,12 @@ There is no server and no account. Scores, levels and the answer log live in
 the browser's own storage on the child's device. No analytics, no ad tech, no
 third-party fonts or CDNs on any page a child sees. The parent dashboard can
 export everything as CSV and delete everything with two clicks.
+
+The feedback link is a plain `mailto:` link: it opens the device's own mail
+app with a subject filled in, and nothing is sent unless someone presses send.
+
+## Feedback
+
+Ideas, questions, or found a bug? Email **[nxtrung87@gmail.com](mailto:nxtrung87@gmail.com)**.
+The app has the same address behind the "✉️" link in the menu, on the home
+page and on the parent dashboard.

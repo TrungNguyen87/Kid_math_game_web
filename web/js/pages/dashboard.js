@@ -12,7 +12,10 @@
 import { t, tMd } from "../i18n.js";
 import { el, raw, clear } from "../dom.js";
 import { MIN_RETENTION_DAYS, allAttempts, clearHistory, downloadCsv, toCsv, sessionAttempts } from "../log.js";
-import { clearAllProfiles, state } from "../state.js";
+import { clearAllProfiles, currentPlayStreak, state } from "../state.js";
+import { REWARD_DEFS, isUnlocked } from "../rewards.js";
+import { BUDDY_STAGES, buddyInfo } from "../buddy.js";
+import { FEEDBACK_EMAIL, feedbackHref } from "../ui-bits.js";
 import { expander, pageHeader, statRow } from "../ui.js";
 import { getGameIllustration } from "../illustrations.js";
 import { barChartH, chartTable, columnChart } from "../charts.js";
@@ -159,6 +162,53 @@ function activityTable(rows, showPlayers) {
   return el("div.kmg-table-scroll", {}, [table]);
 }
 
+/**
+ * The current player's longer-term rewards at a glance: what the daily
+ * quests, the play-day streak, the collection and the buddy are doing. A
+ * parent asking "why does she want to play every day now?" gets the answer
+ * here, along with the two rules that keep it honest.
+ */
+function motivationPanel() {
+  const buddy = buddyInfo();
+  const collected = REWARD_DEFS.filter((d) => d.cost !== 0 && isUnlocked(d.id)).length;
+  const collectable = REWARD_DEFS.filter((d) => d.cost !== 0).length;
+  return el("div", {}, [
+    el("h2", {
+      text: state.playerName
+        ? t("dash.rewards_heading", { name: state.playerName })
+        : t("dash.rewards_heading_anon"),
+    }),
+    statRow([
+      {
+        label: t("dash.metric_play_streak"),
+        value: currentPlayStreak(),
+        hint: t("quests.streak_best", { days: state.playStreak.best }),
+      },
+      { label: t("dash.metric_quests"), value: state.questsCompleted, hint: `🧰 ${state.chestsOpened}` },
+      { label: t("dash.metric_collection"), value: `${collected}/${collectable}` },
+      {
+        label: t("dash.metric_buddy"),
+        value: `${buddy.stage.emoji} ${buddy.index + 1}/${BUDDY_STAGES.length}`,
+        hint: t(buddy.stage.key),
+      },
+    ]),
+    el("p.kmg-caption", { text: t("dash.rewards_caption") }),
+  ]);
+}
+
+/** How to reach the person who made the app. */
+function feedbackPanel() {
+  return el("div.kmg-card.kmg-feedback", {}, [
+    el("h2", { text: `✉️ ${t("feedback.heading")}` }),
+    el("p", { text: t("feedback.dash_text") }),
+    el("p", {}, [
+      el("a.kmg-btn.kmg-btn-ghost.kmg-feedback-btn", { href: feedbackHref("dashboard"), text: t("feedback.button") }),
+      " ",
+      el("a.kmg-feedback-address", { href: feedbackHref("dashboard"), text: FEEDBACK_EMAIL }),
+    ]),
+  ]);
+}
+
 export function render(container) {
   const root = el("section.kmg-dash");
   const body = el("div");
@@ -184,6 +234,7 @@ export function render(container) {
         el("span.kmg-banner-icon", { text: "ℹ️" }),
         el("span.kmg-banner-body", { text: t("dash.no_data") }),
       ]),
+      feedbackPanel(),
     );
     container.append(root);
     return;
@@ -229,6 +280,8 @@ export function render(container) {
         { label: t("dash.metric_time"), value: totalMinutes(rows).toFixed(0) },
       ]),
 
+      motivationPanel(),
+
       el("h2", { text: t("dash.accuracy_chart_heading") }),
       barChartH(gameRows),
       expander(
@@ -260,6 +313,7 @@ export function render(container) {
       // Said plainly and next to the download button, because it is the one
       // thing about this page a parent has to know: nothing is on a server.
       el("p.kmg-caption", { text: t("dash.storage_note") }),
+      feedbackPanel(),
       dangerZone(),
     );
   }

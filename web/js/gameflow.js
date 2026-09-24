@@ -9,21 +9,25 @@
  * child is playing.
  */
 import { checkNewBadges } from "./badges.js";
+import { checkBuddyGrowth } from "./buddy.js";
+import { chestReady, recordQuestProgress } from "./quests.js";
+import { goalJustBecameReady } from "./rewards.js";
 import { logAttempt } from "./log.js";
 import { t } from "./i18n.js";
 import {
-  MAX_LEVEL,
   MIN_LEVEL,
   addScore,
   awardablePoints,
   clearLevel,
   countAttemptOnly,
   getLevel,
+  getMaxLevel,
   registerAttempt,
   resetStreak,
   saveCurrentProfile,
   setLevel,
   state,
+  touchPlayDay,
 } from "./state.js";
 import * as sound from "./sound.js";
 import { bigCelebration, confetti, levelUpOverlay, toast } from "./fx.js";
@@ -114,14 +118,55 @@ export function settleAnswer({
     toast(t("common.level_down", { level: getLevel(gameKey) }), "💪");
   }
 
-  for (const [badgeId, emoji] of checkNewBadges()) {
+  // The longer-term rewards (round 17): today counts towards the play-day
+  // streak whatever the answer, while quests only move on points actually
+  // paid (see quests.js for why).
+  touchPlayDay();
+  const finishedQuests = recordQuestProgress({ gameKey, isCorrect, pointsAwarded });
+  for (const quest of finishedQuests) {
+    toast(t("quests.done_toast", { quest: questLabel(quest), coins: quest.reward }), "📜", 4200);
+    sound.playBadge();
+  }
+  // The chest lives on the home page; say so the moment it unlocks, or a
+  // child mid-game has no way of knowing it is waiting for them.
+  if (finishedQuests.length && chestReady()) toast(t("quests.chest_ready_toast"), "🧰", 6000);
+  const grown = checkBuddyGrowth();
+  if (grown) {
+    // After the level-up card if both happen on the same answer, not on top of it.
+    setTimeout(() => {
+      levelUpOverlay(t("buddy.grew_title"), t(grown.key), grown.emoji);
+      sound.playFanfare();
+    }, leveledUp ? 1900 : 250);
+  }
+  if (goalJustBecameReady()) {
+    toast(t("goal.ready_toast"), "🎯", 5000);
+  }
+
+  announceNewBadges();
+  saveCurrentProfile();
+  return { leveledUp, leveledDown, pointsAwarded };
+}
+
+/**
+ * Check every badge and celebrate the ones just earned. Exported because a
+ * few badges are earned outside an answer - buying the tenth reward, opening
+ * a chest - and those pages call this directly.
+ */
+export function announceNewBadges() {
+  const newly = checkNewBadges();
+  for (const [badgeId, emoji] of newly) {
     toast(t(`badges.${badgeId}.name`), emoji, 4200);
     sound.playBadge();
     confetti({ count: 40 });
   }
+  return newly;
+}
 
-  saveCurrentProfile();
-  return { leveledUp, leveledDown, pointsAwarded };
+/** A quest's one-line description, e.g. "Answer 10 questions correctly". */
+export function questLabel(quest) {
+  const vars = { target: quest.target };
+  if (quest.game) vars.game = t(`game.${quest.game}.name`);
+  return t(`quests.kind_${quest.kind}`, vars);
 }
 
 /**
@@ -139,7 +184,7 @@ export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRa
   const ratio = correct / total;
   const current = getLevel(gameKey);
 
-  if (ratio >= upRatio && current < MAX_LEVEL) {
+  if (ratio >= upRatio && current < getMaxLevel(gameKey)) {
     setLevel(gameKey, current + 1);
     const newLevel = getLevel(gameKey);
     clearLevel(gameKey, current);

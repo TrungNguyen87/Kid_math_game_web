@@ -5,6 +5,152 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed (round 17 - small bugs found by auditing every page, plus stale docs)
+
+Found by opening every route in a real browser (desktop NL, phone EN in dark
+mode) with a seeded profile and scanning the rendered text, rather than by
+reading code. None of these threw an error; every one rendered wrong.
+
+- **Every home tile of an already-played game ended in the word "null".**
+  `home.js` built its tiles with `tile.append(..., tried ? null : badge)`,
+  and `Node.append()` prints a `null` child as text. This is the exact bug
+  session 6 fixed with `dom.js`'s `append()` helper, back in a spot that
+  never used the helper. The tiles now use `append()`.
+- **Tafel Monster's tile read "Level 6/5" with its bar at 120%**, and the
+  home page's overall-progress percentage could pass 100%, because both
+  assumed every game stops at `MAX_LEVEL` (5). Tafel goes to 6. Both now use
+  `getMaxLevel(game)`. Maxed games also get a small 👑 on their tile.
+- **Tafel Monster's level picker wrapped its "6" onto a second row.** The
+  picker was a fixed six-column grid. It now sets one column per level
+  (`--kmg-levels`, which only works since round 14's `el()` fix).
+- **`index.html`'s `apple-touch-icon` pointed at `icons/icon-180.png`, which
+  does not exist.** It 404s on GitHub Pages; `server.js` masked it by
+  answering every unknown path with `index.html` and a 200, so no test ever
+  saw it. It now points at `icon-256.png` (iOS scales it). A new
+  `npm run test:pages` check (see below) catches this class of bug.
+- **The home page announced "your name is saved" on every visit**, not just
+  when the name changed. It now only appears when the player changes.
+- **The first-visit Start button sat at the very bottom of the home page.**
+  It is now directly under the name box.
+- `adaptAfterRound()` compared against `MAX_LEVEL` instead of the game's own
+  maximum. Harmless today (only the speed games call it, and they stop at 5),
+  but wrong the moment a game with its own maximum used it.
+- The name label pointed at `for=""`; it now labels its input.
+- **README and `docs/DEPLOYMENT.md` gave the wrong live URL**
+  (`…/Kids_Math_Games/`). The deploy log's own environment URL is
+  `https://trungnguyen87.github.io/Kid_math_game_web/`; all links corrected.
+  README also still described a Streamlit front-end and `utils/i18n.py` that
+  were removed long ago, and `i18n-data.js`'s header said "GENERATED FILE -
+  do not edit", naming a generator that no longer exists. All corrected:
+  `i18n-data.js` is the hand-edited source of truth.
+
+### Added (round 17 - a buddy that grows, daily quests and a treasure chest, colour themes, a savings goal, 52 more rewards, 13 more badges, a feedback email)
+
+The request was to make learning more attractive: more gifts, characters and
+rewards, and a better reward system. The shop already had plenty to *buy*;
+what it lacked was reasons to come back tomorrow and things that show
+progress beyond a coin balance. Everything below follows one rule: none of it
+may become a way around the level-replay guard (rounds 15-16).
+
+- **Rekie, the maths buddy** (`web/js/buddy.js`): hatches from an egg and
+  grows through 8 stages into a cosmic dragon (🥚 🐣 🦎 🐲 🐉 and three glowing
+  dragon forms), shown on the home page with a speech bubble and a progress
+  bar. It grows on `totalScore`, which only rises for answers that actually
+  paid, so it cannot be fed by replays, bonus coins or spending. Growth is
+  announced once per stage with a full-screen card. Profiles saved before
+  this round start at the stage their score already earned, silently.
+- **Daily quests and a treasure chest** (`web/js/quests.js`): three small
+  quests a day, one from each slot (effort: answer 10-15 right or earn 80-150
+  points; skill: 5 or 8 in a row, or 40 points in a speed game; variety:
+  points in 3-4 different games, or 5 right in *today's featured game*).
+  Each pays 20-35 bonus coins; all three unlock the day's chest: 40 coins plus
+  one **treasure**. The day's quests are a pure function of the local date.
+  **Quests only move on answers that paid points**, so a replay at a cleared
+  level can never finish a quest and pay out.
+- **Treasures**: a 12-item collection that is never for sale (`cost: null`,
+  `chestOnly`). Each chest holds one the child does not have yet, every
+  unfound one equally likely, never a duplicate; once all are found a chest
+  pays 100 coins instead. Unfound treasures show as a dark silhouette.
+- **Colour themes**: a new shop category that *does* something: equip one
+  and the whole app recolours (Classic Orange (free), Ocean, Forest, Candy
+  Shop, Outer Space, Rainbow, Royal Gold), with separate light and dark
+  variants. Implemented by re-pointing the accent tokens under
+  `:root[data-theme]`; `rewards.js` `applyTheme()` also tints the browser
+  chrome.
+- **A savings goal**: tap 🎯 on any item in the shop to save up for it. It
+  shows in the sidebar (with a mini bar), on the home page and in the shop's
+  balance box; a toast says when it becomes buyable, and buying it clears it.
+- **A days-in-a-row streak**, counted on the child's local calendar day.
+- **52 more rewards** (80 → 132): 13 characters (49 total, incl. two new
+  original Mythic heroes, Sakura Samurai and Nebula Phoenix), 12 stickers
+  (46), 8 gifts (18), 7 themes, 12 treasures.
+- **13 more badges** (8 → 21): 20 in a row; 3, 7 and 30 days in a row; first
+  quest; first and tenth chest; 10 and 30 rewards collected; 1,000 and 5,000
+  points; Rekie becomes a dragon; level 3 in every game. The home page shows
+  "N of 21 earned" and lists earned badges first.
+- **16 rotating praise lines** under every correct answer in the typed and
+  logic games, so the 20th correct answer doesn't get the same banner as the
+  first.
+- **The shop**: a jump bar to each collection, items you can buy right now
+  shown in full colour with a green ring and "Buy now!" (instead of dimmed
+  like everything locked), a shorter "Buy · 40 🪙" button that no longer
+  wraps, and no duplicate price line.
+- **The phone top bar shows coins** next to the score.
+- **Parent dashboard**: a "rewards and motivation" panel (days in a row,
+  quests and chests, collection, buddy stage) that also explains the two
+  rules that keep it honest.
+- **Feedback email: nxtrung87@gmail.com** — a "✉️ Idea or bug? Email us"
+  link in the menu, a feedback card on the home page and on the dashboard
+  (a `mailto:` link with subject and a short prompt filled in; nothing is sent
+  unless someone presses send), and a Feedback section in the README.
+- The shell batches the several state changes one answer fires into one
+  sidebar repaint (`queueMicrotask`), and `applyProfile()`/`clearAllProfiles()`
+  now share one `resetPlayerFields()` instead of two copies that could drift.
+- 160 new translation keys per language (656 → 816), NL and EN.
+- `web/sw.js` `PRECACHE`: `buddy.js` and `quests.js` added (50 files).
+
+Tests:
+
+- **`tests/web/test_progression.mjs`** (25 new Node tests, 118 total): local
+  day and DST arithmetic; the play-day streak; bonus coins not touching score;
+  quests deterministic, every quest reachable, reset daily, paying once;
+  **a non-paying answer never moves a quest**; featured/speed/games/streak
+  quests; chest gating, once a day, no duplicate treasures across all 12, the
+  all-found prize; treasures unbuyable at any coins/level; themes (equip,
+  switch, CSS block per theme); savings goal; buddy stages and one-time
+  announcement; every new field surviving a save/reload; a pre-round-17
+  profile loading with defaults and no surprise announcement;
+  `clearAllProfiles()` resetting the new fields; new badges; copy for every
+  constructed key; the feedback `mailto:`.
+- **`tests/web/smoke.mjs`**: Tafel's picker on one row; home tiles free of
+  `null`/`undefined`/`NaN` and counting Tafel out of 6; today's quest progress
+  unchanged by the level-replay answer; and a new phone-sized `progression`
+  scenario (buddy and three quests render, no chest before the quests are
+  done, the chest pays 40 coins and a treasure and stays opened after a
+  reload, a bought theme recolours the app and survives a reload, a pinned goal
+  shows in the sidebar and survives a reload, no sideways scroll, the feedback
+  link is present). The two "exactly one equipped card" checks are now scoped
+  to the characters section: the free theme is equipped too, so an unscoped
+  check would have passed even with no character equipped.
+- **`npm run test:pages`** (`tests/web/pages-sim.mjs`, new): stamps a temp
+  copy of `web/` exactly as the deploy workflow does, serves it statically
+  under `/Kid_math_game_web/` with real 404s (no fallback), and opens every
+  route, checks every linked file and manifest icon, the stamped
+  service-worker cache name, and an offline reload.
+- Proved to fail without the fix: the quest guard, the no-duplicate chest and
+  the silent buddy sync (each reverted, one Node test failed for the right
+  reason, restored); the home-tile, Tafel "/6" and picker-row smoke checks
+  (reverted both fixes: three failures, "…Warming-upnullnull" among them);
+  `test:pages` (put `icon-180.png` back: a 404, while `server.js` still
+  answered 200).
+- Verified: `npm test` (118/118), `npm run lint`, `node --check` on all 42
+  files under `web/js`, `npm run check:precache` (50/50), `npm start` +
+  `npm run test:smoke` (all 17 routes and every scenario clean),
+  `npm run test:pages` (clean), and the deploy workflow's two real steps
+  (`BUILD_ID` stamp, `check_precache.py`) re-run on a scratch copy of `web/`
+  and `tools/`. `deploy-pages.yml` itself is untouched; every recent run on
+  `main` succeeded (checked via the Actions API).
+
 ### Changed (round 16 - the level-replay guard now covers every level, not just Warm-up/Easy)
 
 **Round 15's guard only stopped a child farming Warm-up and Easy (levels

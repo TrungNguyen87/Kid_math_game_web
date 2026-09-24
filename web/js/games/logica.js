@@ -17,6 +17,7 @@ import { el, raw } from "../dom.js";
 import { markdown } from "../markdown.js";
 import { getLevel } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
+import { randomPraise } from "../ui-bits.js";
 import {
   actionBar,
   gameShell,
@@ -458,6 +459,7 @@ export function render(container) {
         : t("logica.correct", { points: pointsAwarded, explain: problem.explain });
       shell.setFeedback("success", successText, {
         icon: "🧠",
+        tip: randomPraise(),
       });
       shell.scheduleAdvance(() => newQuestion());
     } else {

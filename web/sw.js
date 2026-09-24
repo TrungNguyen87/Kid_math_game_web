@@ -38,6 +38,8 @@ const PRECACHE = [
   "./js/state.js",
   "./js/badges.js",
   "./js/rewards.js",
+  "./js/buddy.js",
+  "./js/quests.js",
   "./js/log.js",
   "./js/sound.js",
   "./js/fx.js",

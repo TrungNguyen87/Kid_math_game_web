@@ -5,7 +5,7 @@ one this repository already uses, no server, no cold starts, and one click to
 turn on. The URL will be:
 
 ```
-https://trungnguyen87.github.io/Kids_Math_Games/
+https://trungnguyen87.github.io/Kid_math_game_web/
 ```
 
 Everything below is the reasoning, then the click-by-click steps.
@@ -116,7 +116,7 @@ UI — same thing.
 
 ### Step 2 — Turn Pages on
 
-1. Open **https://github.com/TrungNguyen87/Kids_Math_Games/settings/pages**
+1. Open **https://github.com/TrungNguyen87/Kid_math_game_web/settings/pages**
    (or: repository → **Settings** → **Pages** in the left sidebar).
 2. Under **Build and deployment**, find **Source**.
 3. Change it from *Deploy from a branch* to **GitHub Actions**.
@@ -143,7 +143,7 @@ It takes roughly 40 seconds. A green tick means it is live.
 ### Step 4 — Open it
 
 ```
-https://trungnguyen87.github.io/Kids_Math_Games/
+https://trungnguyen87.github.io/Kid_math_game_web/
 ```
 
 The link is also shown on the Actions run page and under Settings → Pages.
@@ -242,7 +242,7 @@ off.
 
 ## 7. Optional: a nicer address
 
-`trungnguyen87.github.io/Kids_Math_Games` is long for a child to type. Two ways
+`trungnguyen87.github.io/Kid_math_game_web` is long for a child to type. Two ways
 to shorten it, neither required.
 
 **A free `github.io` root address.** Create a second repository named exactly
