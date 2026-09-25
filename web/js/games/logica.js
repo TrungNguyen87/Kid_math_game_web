@@ -11,7 +11,7 @@
  * difficulty is entirely in spotting the pattern, which is the point.
  */
 import { t } from "../i18n.js";
-import { choice, randInt, sample, shuffle, unique } from "../rng.js";
+import { choice, coinFlip, randInt, sample, shuffle, unique } from "../rng.js";
 import { numberLineSvg, ratioBarSvg } from "../visuals.js";
 import { el, raw } from "../dom.js";
 import { markdown } from "../markdown.js";
@@ -69,6 +69,22 @@ function sequenceProblem(kinds) {
     const start = randInt(1, 5);
     seq = [0, 1, 2, 3, 4].map((i) => (start + i) ** 2);
     rule = t("logica.rule_square");
+  } else if (kind === "mul_add") {
+    // Groep 8: two operations per step, x2 then +1 (or +2, +3).
+    const add = randInt(1, 3);
+    seq = [randInt(1, 5)];
+    for (let i = 0; i < 4; i++) seq.push(seq[seq.length - 1] * 2 + add);
+    rule = t("logica.rule_mul_add", { add });
+  } else if (kind === "cube") {
+    const start = randInt(1, 3);
+    seq = [0, 1, 2, 3, 4].map((i) => (start + i) ** 3);
+    rule = t("logica.rule_cube");
+  } else if (kind === "growing") {
+    // The step itself grows by one each time: +2, +3, +4, +5.
+    const firstStep = randInt(1, 4);
+    seq = [randInt(1, 10)];
+    for (let i = 0; i < 4; i++) seq.push(seq[seq.length - 1] + firstStep + i);
+    rule = t("logica.rule_growing", { step: firstStep });
   } else {
     const x = randInt(1, 5);
     const y = randInt(2, 7);
@@ -268,17 +284,37 @@ function balanceProblem() {
 }
 
 /**
+ * The same substitution one step further: a = k1 b, b = k2 c, c = k3 d.
+ */
+function balance3Problem() {
+  const [symA, symB, symC, symD] = sample(["🔺", "🟦", "🟢", "⭐", "🟣", "🟠"], 4);
+  const k1 = randInt(2, 3);
+  const k2 = randInt(2, 3);
+  const k3 = randInt(2, 4);
+  return {
+    kind: "number",
+    text: t("logica.q_balance3", { a: symA, k1, b: symB, k2, c: symC, k3, d: symD }),
+    answer: k1 * k2 * k3,
+    explain: t("logica.why_balance3", { k1, k2, k3, total: k1 * k2 * k3 }),
+    visual: { kind: "ratio", parts: Array(k1).fill(1), labels: Array(k1).fill(symB) },
+  };
+}
+
+/**
  * A 3x3 magic square with one cell blanked out. Every row, column and diagonal
  * has the same total, so the missing cell is fully determined.
  */
-function magicSquareProblem() {
+function magicSquareProblem(hard = false) {
   const base = [
     [8, 1, 6],
     [3, 5, 7],
     [4, 9, 2],
   ]; // the classic 3x3, total 15
-  const mult = choice([1, 2, 3]);
-  const add = choice([0, 1, 2, 5, 10]);
+  // Scaling and shifting every cell keeps it magic; the groep 8 version
+  // also mirrors it, so the 8-1-6 top row cannot simply be remembered.
+  const mult = hard ? choice([3, 4, 5, 7]) : choice([1, 2, 3]);
+  const add = hard ? choice([4, 6, 11, 15, 20]) : choice([0, 1, 2, 5, 10]);
+  if (hard && coinFlip()) base.forEach((row) => row.reverse());
   const grid = base.map((row) => row.map((v) => v * mult + add));
   const total = grid[0].reduce((s, v) => s + v, 0);
   const ri = randInt(0, 2);
@@ -316,6 +352,20 @@ export function generate(level) {
       deductionProblem,
       magicSquareProblem,
       balanceProblem,
+    ],
+    // Groep 8 (round 18).
+    [
+      () => sequenceProblem(["fib", "mul_add", "growing"]),
+      deductionProblem,
+      () => magicSquareProblem(true),
+      balance3Problem,
+    ],
+    [
+      () => sequenceProblem(["mul_add", "cube", "growing", "alternate"]),
+      balance3Problem,
+      () => magicSquareProblem(true),
+      () => oddOneOutProblem(true),
+      deductionProblem,
     ],
   ];
   return choice(pools[level])();

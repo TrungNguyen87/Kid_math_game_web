@@ -15,7 +15,19 @@
  * localStorage access, and a maths game must not white-screen because of it.
  */
 export const MIN_LEVEL = 0; // level 0 is the extra-gentle warm-up tier
-export const MAX_LEVEL = 5;
+// Levels 0-5 are the groep 6/7 curve every game has always had; 6 and 7
+// (round 18) are groep 8 - "Kampioen" and "Legende". Every game, Tafel
+// Monster included, now runs 0-7.
+export const MAX_LEVEL = 7;
+/**
+ * The old top level. Things that were promised at "level 5" before groep 8
+ * existed - the mythic rewards, the "level 5" and Reken Meester badges - stay
+ * at 5, so raising the ceiling never moved a goal a child was already
+ * working towards.
+ */
+export const MASTER_LEVEL = 5;
+/** The first groep 8 level. */
+export const GROEP8_LEVEL = 6;
 export const LEVEL_UP_STREAK = 3; // correct answers in a row needed to level up
 export const LEVEL_DOWN_STREAK = 2; // wrong answers in a row that drop a level
 export const SESSION_GOAL_MINUTES = 45;
@@ -35,7 +47,28 @@ export const GAME_KEYS = [
   "logica",
   "code",
   "jacht",
+  // Reading and language (round 18).
+  "lezen",
+  "woorden",
+  "spelling",
+  // Arcade games (round 18): the questions come from the maths or the word
+  // games, the gameplay is a flying/jumping game.
+  "vlieg",
+  "sprong",
 ];
+
+/** The reading and language games - they feed the reading counters and quest. */
+export const READING_GAMES = new Set(["lezen", "woorden", "spelling"]);
+/** The arcade games - one run is a round, like the timed games. */
+export const ARCADE_GAMES = new Set(["vlieg", "sprong"]);
+
+/**
+ * Bonus coins for mastering a level for the first time - see clearLevel().
+ * Higher levels pay more, so the bonus itself says "keep climbing".
+ */
+export function masteryBonus(level) {
+  return 10 + 5 * level;
+}
 
 const PROFILES_KEY = "kmg.profiles";
 const CURRENT_KEY = "kmg.currentPlayer";
@@ -100,6 +133,7 @@ export function freshDaily(day = null) {
     streak: 0,
     speed: 0,
     featured: 0,
+    read: 0,
     games: [],
     completed: [],
     chestOpened: false,
@@ -166,6 +200,16 @@ export const state = {
   // The highest buddy stage (buddy.js) already celebrated, so growing is
   // announced exactly once.
   buddySeenStage: 0,
+  // Round 18. A dated record of every level a child has mastered - the
+  // "level passport" on the home page and the parent's mastery log - and the
+  // reading counters: words read in the reading games and micro-lessons,
+  // reading questions answered right, the best arcade run, and the
+  // micro-lessons (Leerhapjes) collected.
+  masteryLog: [],
+  wordsRead: 0,
+  readCorrect: 0,
+  arcadeBest: 0,
+  bites: {},
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
 };
@@ -205,6 +249,11 @@ export function saveCurrentProfile() {
     goalReward: state.goalReward,
     equippedTheme: state.equippedTheme,
     buddySeenStage: state.buddySeenStage,
+    masteryLog: state.masteryLog.map((entry) => ({ ...entry })),
+    wordsRead: state.wordsRead,
+    readCorrect: state.readCorrect,
+    arcadeBest: state.arcadeBest,
+    bites: JSON.parse(JSON.stringify(state.bites)),
     updatedAt: new Date().toISOString(),
   };
   writeJson(PROFILES_KEY, profiles);
@@ -237,6 +286,11 @@ function resetPlayerFields() {
   state.goalReward = null;
   state.equippedTheme = null;
   state.buddySeenStage = 0;
+  state.masteryLog = [];
+  state.wordsRead = 0;
+  state.readCorrect = 0;
+  state.arcadeBest = 0;
+  state.bites = {};
 }
 
 /** Restore a saved profile into the live state. Returns true if one existed. */
@@ -280,6 +334,17 @@ export function applyProfile(name) {
   // before the buddy existed. buddy.js owns the thresholds, so this is -1
   // here and resolved there (see buddy.js syncBuddyStage()).
   state.buddySeenStage = Number.isInteger(profile.buddySeenStage) ? profile.buddySeenStage : -1;
+  // A profile from before round 18 has cleared levels but no log: rebuild
+  // the log from them, undated ("earlier"), so the passport is complete.
+  state.masteryLog = Array.isArray(profile.masteryLog)
+    ? profile.masteryLog.filter((e) => e && typeof e.game === "string" && Number.isInteger(e.level)).map((e) => ({ ...e }))
+    : Object.entries(profile.clearedLevels || {}).flatMap(([game, levels]) =>
+        [...levels].sort((a, b) => a - b).map((level) => ({ game, level, at: null })),
+      );
+  state.wordsRead = profile.wordsRead || 0;
+  state.readCorrect = profile.readCorrect || 0;
+  state.arcadeBest = profile.arcadeBest || 0;
+  state.bites = profile.bites && typeof profile.bites === "object" ? JSON.parse(JSON.stringify(profile.bites)) : {};
   emitChange();
   return true;
 }
@@ -379,8 +444,13 @@ export function resetStreak() {
   emitChange();
 }
 
+/**
+ * A game's own top level. Every game runs 0-7 since round 18 (Tafel Monster
+ * used to be the one with 0-6); kept as a function so a game with its own
+ * ceiling is still one line, and so no caller goes back to assuming a shared
+ * constant.
+ */
 export function getMaxLevel(gameKey = null) {
-  if (gameKey === "tafel") return 6;
   return MAX_LEVEL;
 }
 
@@ -393,7 +463,7 @@ export function highestLevelReached() {
   return Math.max(MIN_LEVEL, ...GAME_KEYS.map((k) => getLevel(k)));
 }
 
-/** True once every game - Tafel Monster's own level 6 included - is maxed. */
+/** True once every game is at its own top level. */
 export function allGamesAtTrueMax() {
   return GAME_KEYS.every((k) => getLevel(k) >= getMaxLevel(k));
 }
@@ -420,7 +490,7 @@ export function setLevel(gameKey, level) {
  * indefinitely instead of progressing.
  *
  * The one level this never applies to in practice is a game's own top level
- * (MAX_LEVEL, or Tafel Monster's 6): there is nowhere higher to level up
+ * (getMaxLevel()): there is nowhere higher to level up
  * into, so it can never be "cleared" by the mechanism below and always pays
  * - a child who has reached the hardest content is still doing the hardest
  * content, not replaying something easier.
@@ -443,14 +513,56 @@ export function awardablePoints(gameKey, level, points) {
  * sibling trying a harder level for fun) must never cost a child their
  * first honest, coin-earning pass through a level.
  */
-export function clearLevel(gameKey, level) {
-  (state.clearedLevels[gameKey] ??= new Set()).add(level);
+export function clearLevel(gameKey, level, now = new Date()) {
+  const cleared = (state.clearedLevels[gameKey] ??= new Set());
+  if (cleared.has(level)) return 0;
+  cleared.add(level);
+  // First time only: log it, and pay a one-off mastery bonus. Because the
+  // set above can only ever gain a level once, dropping back and levelling
+  // up through the same level again pays nothing - the bonus rewards
+  // climbing, it cannot be farmed by sliding up and down.
+  state.masteryLog.push({ game: gameKey, level, at: new Date(now).toISOString() });
+  const bonus = masteryBonus(level);
+  grantBonusCoins(bonus);
+  return bonus;
+}
+
+/** Whether `level` of `gameKey` has already been mastered (and so no longer pays). */
+export function isLevelCleared(gameKey, level) {
+  return !!state.clearedLevels[gameKey]?.has(level);
+}
+
+/**
+ * Where a child playing an already-mastered level should go instead: the
+ * nearest level above `level` that still pays. A game's top level can never
+ * be cleared, so there always is one - unless `level` is the top itself.
+ * @returns {number|null}
+ */
+export function nextPayingLevel(gameKey, level = getLevel(gameKey)) {
+  for (let l = level + 1; l <= getMaxLevel(gameKey); l++) {
+    if (canEarnAtLevel(gameKey, l)) return l;
+  }
+  return null;
+}
+
+/** How many levels have been mastered, across every game. */
+export function masteredLevelCount() {
+  return Object.values(state.clearedLevels).reduce((sum, levels) => sum + levels.size, 0);
+}
+
+/** Add to the "words read" counter (reading games and micro-lessons). */
+export function addWordsRead(words) {
+  if (!(words > 0)) return;
+  state.wordsRead += Math.round(words);
+  emitChange();
 }
 
 /**
  * Update the counters after an answer and adapt the level: up after
  * LEVEL_UP_STREAK correct in a row, down after LEVEL_DOWN_STREAK wrong.
- * @returns {{leveledUp: boolean, leveledDown: boolean}}
+ * @returns {{leveledUp: boolean, leveledDown: boolean, masteryBonus: number}}
+ *   masteryBonus is the one-off coin gift paid when the level-up mastered a
+ *   level for the first time (0 otherwise).
  */
 export function registerAttempt(gameKey, isCorrect) {
   state.questionsAnswered += 1;
@@ -458,6 +570,7 @@ export function registerAttempt(gameKey, isCorrect) {
   const streak = (state.gameStreaks[gameKey] ??= { correct: 0, wrong: 0 });
   let leveledUp = false;
   let leveledDown = false;
+  let bonus = 0;
   const currentLevel = getLevel(gameKey);
   const max = getMaxLevel(gameKey);
 
@@ -468,7 +581,7 @@ export function registerAttempt(gameKey, isCorrect) {
     if (streak.correct >= LEVEL_UP_STREAK && currentLevel < max) {
       setLevel(gameKey, currentLevel + 1);
       leveledUp = true;
-      clearLevel(gameKey, currentLevel);
+      bonus = clearLevel(gameKey, currentLevel);
     }
   } else {
     streak.wrong += 1;
@@ -479,7 +592,7 @@ export function registerAttempt(gameKey, isCorrect) {
     }
   }
   emitChange();
-  return { leveledUp, leveledDown };
+  return { leveledUp, leveledDown, masteryBonus: bonus };
 }
 
 /** Count a question without touching the difficulty (used by timed rounds). */

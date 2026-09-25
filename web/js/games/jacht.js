@@ -32,7 +32,7 @@ const GRID_ROWS = 4;
 const LIVES = 3;
 
 // Seconds on the clock per level - it gets *shorter* as the rules get harder.
-const LEVEL_SECONDS = { 0: 75, 1: 70, 2: 60, 3: 55, 4: 50, 5: 45 };
+const LEVEL_SECONDS = { 0: 75, 1: 70, 2: 60, 3: 55, 4: 50, 5: 45, 6: 45, 7: 42 };
 
 const PRIMES = new Set([
   2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
@@ -82,10 +82,27 @@ export function rulesForLevel(level) {
       ["multiple", { n: 12 }, (n) => n % 12 === 0, [1, 120]],
     ];
   }
+  if (level === 5) {
+    return [
+      ["prime", {}, (n) => PRIMES.has(n), [2, 99]],
+      ["factor_of", { n: 72 }, (n) => 72 % n === 0, [1, 80]],
+      ["multiple_both", { a: 3, b: 4 }, (n) => n % 12 === 0, [1, 120]],
+    ];
+  }
+  // Groep 8 (round 18): bigger numbers and rules that combine two ideas.
+  if (level === 6) {
+    return [
+      ["multiple", { n: 15 }, (n) => n % 15 === 0, [1, 150]],
+      ["factor_of", { n: 96 }, (n) => 96 % n === 0, [1, 100]],
+      ["square", {}, (n) => Math.trunc(Math.sqrt(n)) ** 2 === n, [1, 150]],
+      ["multiple_both", { a: 4, b: 6 }, (n) => n % 12 === 0, [1, 150]],
+    ];
+  }
   return [
-    ["prime", {}, (n) => PRIMES.has(n), [2, 99]],
-    ["factor_of", { n: 72 }, (n) => 72 % n === 0, [1, 80]],
-    ["multiple_both", { a: 3, b: 4 }, (n) => n % 12 === 0, [1, 120]],
+    ["cube", {}, (n) => Math.round(Math.cbrt(n)) ** 3 === n, [1, 130]],
+    ["factor_of", { n: 120 }, (n) => 120 % n === 0, [1, 125]],
+    ["multiple_both", { a: 6, b: 8 }, (n) => n % 24 === 0, [1, 200]],
+    ["prime_between", { lo: 50, hi: 99 }, (n) => n >= 50 && n <= 99 && PRIMES.has(n), [40, 110]],
   ];
 }
 

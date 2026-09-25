@@ -2,9 +2,13 @@
  * Verhoudingen & Snelheid - ratios, map scale, speed/distance/time, unit
  * prices and multi-step travel problems.
  * Ported from pages/09_Verhoudingen_en_Snelheid.py.
+ *
+ * Levels 6-7 (round 18) are groep 8: sharing in a ratio, a real map scale
+ * (1 : 25 000 and up, answered in km), a speed from minutes rather than
+ * hours, scaling a recipe, and metres per second to km/h. All whole numbers.
  */
 import { getLanguage, t } from "../i18n.js";
-import { choice, gcd, randInt, range } from "../rng.js";
+import { choice, coinFlip, gcd, randInt, range } from "../rng.js";
 import { ratioBarSvg, speedDiagramSvg } from "../visuals.js";
 import { formatEuro, typedAnswerGame } from "./common.js";
 
@@ -71,6 +75,54 @@ export function generate(level) {
     answer = pricePerUnit;
     answerLabel = t("verhoudingen.answer_label_euro");
     visual = ratioBarSvg(Array(qty).fill(1), { labels: Array(qty).fill("?") });
+  } else if (level === 6) {
+    if (coinFlip()) {
+      let p = randInt(1, 5);
+      let q = randInt(2, 7);
+      while (gcd(p, q) !== 1 || p === q) {
+        p = randInt(1, 5);
+        q = randInt(2, 7);
+      }
+      const k = randInt(3, 12);
+      const total = (p + q) * k;
+      text = t("verhoudingen.q_share", { total, p, q });
+      answer = p * k;
+      answerLabel = t("verhoudingen.answer_label_number");
+      visual = ratioBarSvg([p, q], { labels: [`${p} ${t("verhoudingen.part_word")}`, `${q} ${t("verhoudingen.part_word")}`] });
+    } else {
+      // cm on the map x scale = cm in reality; / 100 000 = km. Pick the map
+      // distance so the answer is a whole number of km.
+      const scale = choice([25000, 50000, 100000, 200000]);
+      const step = 100000 / gcd(scale, 100000);
+      const mapCm = step * randInt(1, Math.max(2, Math.floor(20 / step)));
+      text = t("verhoudingen.q_scale_km", { scale: scale.toLocaleString(lang === "nl" ? "nl-NL" : "en-GB"), map_cm: mapCm });
+      answer = (mapCm * scale) / 100000;
+      answerLabel = t("verhoudingen.answer_label_km");
+    }
+  } else if (level === 7) {
+    const kind = choice(["minutes", "recipe", "ms"]);
+    if (kind === "minutes") {
+      const speed = choice([36, 45, 48, 60, 72, 90, 120]);
+      const minutes = choice([10, 15, 20, 30, 40, 45].filter((m) => (speed * m) % 60 === 0));
+      const distance = (speed * minutes) / 60;
+      text = t("verhoudingen.q_speed_minutes", { distance, minutes });
+      answer = speed;
+      answerLabel = t("verhoudingen.answer_label_kmh");
+      visual = speedDiagramSvg(distance, "km", minutes, t("units.min_abbr"));
+    } else if (kind === "recipe") {
+      const people = choice([2, 4, 5, 6]);
+      const perPerson = choice([25, 40, 50, 60, 75, 80, 120]);
+      let others = randInt(3, 12);
+      if (others === people) others += 1;
+      text = t("verhoudingen.q_recipe", { people, grams: people * perPerson, others });
+      answer = perPerson * others;
+      answerLabel = t("verhoudingen.answer_label_gram");
+    } else {
+      const ms = choice([5, 10, 15, 20, 25, 30]);
+      text = t("verhoudingen.q_ms_to_kmh", { ms });
+      answer = (ms * 36) / 10;
+      answerLabel = t("verhoudingen.answer_label_kmh");
+    }
   } else {
     const speed = choice(range(20, 121, 4));
     const time = randInt(1, 4);

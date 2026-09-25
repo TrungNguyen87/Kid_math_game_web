@@ -39,6 +39,11 @@ import {
  * @param {Function} [config.answer]      (problem, api) => answer widget
  * @param {Function} [config.extraTop]    (rerender) => node above the question
  * @param {Function} [config.points]      (level) => number
+ * @param {Function} [config.tipFor]      (problem) => string|null - a tip for
+ *   *this* question after a wrong answer, instead of the game's one tipKey
+ *   (the reading games explain the reading skill the question was about)
+ * @param {Function} [config.settleExtras] (problem) => extra settleAnswer()
+ *   options, e.g. { wordsRead } for a reading text
  */
 export function typedAnswerGame(config) {
   const {
@@ -53,6 +58,8 @@ export function typedAnswerGame(config) {
     answer: buildAnswer = defaultAnswer,
     extraTop = null,
     points = (level) => 5 * (level + 1),
+    tipFor = null,
+    settleExtras = () => ({}),
   } = config;
 
   return function render(container) {
@@ -124,6 +131,7 @@ export function typedAnswerGame(config) {
         isCorrect,
         points: earned,
         burstFrom: isCorrect ? bar.check : null,
+        ...settleExtras(problem),
       });
 
       if (isCorrect) {
@@ -143,7 +151,7 @@ export function typedAnswerGame(config) {
         shell.setFeedback(
           "error",
           `${t(`${gameKey}.incorrect`)} ${t("common.correct_answer_was", { answer: correctAnswerDisplay })}`,
-          { icon: badIcon, tip: tipKey ? t(tipKey) : null },
+          { icon: badIcon, tip: tipFor?.(problem) ?? (tipKey ? t(tipKey) : null) },
         );
       }
       streak.refresh();
@@ -206,9 +214,12 @@ const defaultAnswer = (problem, api) => numberAnswer(problem, api);
  * decision.
  */
 export function choiceAnswer(problem, api, { columns = null } = {}) {
-  const grid = el("div.kmg-choices", {
-    style: { "--kmg-cols": String(columns ?? (problem.options.length <= 4 ? 2 : 3)) },
-  });
+  // A problem can ask for its own column count - one column for answers
+  // that are whole sentences, as in the reading games.
+  const cols = columns ?? problem.columns ?? (problem.options.length <= 4 ? 2 : 3);
+  // One column means sentence answers: a calmer, left-aligned style, since
+  // the big bold number-button font makes a sentence three lines tall.
+  const grid = el(`div.kmg-choices${cols === 1 ? ".is-stacked" : ""}`, { style: { "--kmg-cols": String(cols) } });
   let picked = null;
 
   problem.options.forEach((option) => {

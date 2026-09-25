@@ -5,6 +5,184 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 18 - groep 8 levels, reading games, arcade games, learning bites, and a level passport)
+
+The request: more levels and more kinds of play, up to **groep 8** of the
+Dutch basisschool, for the maths *and* for reading; more interactive and
+creative games (micro-learning, a flying game, a Mario-style jumping game) to
+make children play and read more; and a log of the easy levels a child has
+finished, so they stop replaying them - in a way that feels like
+encouragement to go higher.
+
+**Groep 8 levels (6 and 7) in every game**
+
+- `MAX_LEVEL` is 7 for every game (`state.js`); Tafel Monster's special
+  level-6 ceiling is gone. Level 6 is *Kampioen (groep 8)*, level 7
+  *Legende (groep 8)*; the picker marks them with a dashed purple border and
+  the badge shows 🎓. Eight levels fit on one row at 360px.
+- New content at levels 6-7 for all twelve maths games: Tafel (squares of
+  11-25, three-digit × one-digit, long division), Breuken (fraction ×
+  fraction; unlike denominators such as 1/3 + 1/4), Meten (m², m³, dm³ = 1 l,
+  decimal amounts; hours/minutes to minutes/seconds; small units back to big
+  ones with a decimal answer), Procenten (part as a percentage, 21% btw,
+  percentage increase/decrease, a year of interest), X-Mysterie (x on both
+  sides, brackets, "two numbers together", a system with a coefficient),
+  Meetkunde (circles with π = 3,14 and a new `circleSvg` visual, litres in a
+  tank, surface area), Verhoudingen (sharing in a ratio, 1 : 25 000 maps in
+  km, speed from minutes, recipes, m/s to km/h), Getallen (order of
+  operations, rounding, negative × and :, powers, cubes and roots),
+  Bliksemronde, Getallenjacht (cubes, factors of 96/120, multiples of 6 and 8,
+  primes 50-99), Logica Lab (×2+k and growing sequences, cubes, a three-step
+  balance, a mirrored magic square) and Code Kraker (all nine digits, then a
+  five-digit code).
+- `MASTER_LEVEL` (5) keeps every promise that was made at the old top: the
+  mythic rewards still unlock at level 5, and the "level 5" and Reken Meester
+  badges still mean level 5. Raising the ceiling moved no one's goal.
+
+**Reading and language games** (content in `web/js/reading-data.js`)
+
+- 🔍 **Leesdetective** - a short text and three questions about it. Levels
+  0-1 are built from templates (a pet, a day out); levels 2-7 are 24
+  hand-written texts in both languages (stories, a letter, instructions, news,
+  an opinion piece, an advert). Every question names its **reading skill**
+  (find it in the text, order, pointing words, cause, signal words, word
+  meaning, main idea, fact or opinion, between the lines, purpose of the
+  text), and a wrong answer explains that skill.
+- 🧙 **Woordenschat Wizard** - picture words, opposites, synonyms, the
+  word that fits, harder words, and at groep 8 *uitdrukkingen* and
+  *spreekwoorden* (idioms and proverbs in English). 106 items per language.
+- 🌪️ **Spellingstorm** - Dutch: d/t by lengthening, ei/ij and au/ou, one
+  letter or two, -ig/-lijk/-heid/-tie, loan words, present-tense d/t/dt,
+  past tense and participles with *'t kofschip*, and the groep 8 traps
+  (*gebeurd/gebeurt*, *word jij* / *wordt hij*, *geverfd*). English:
+  digraphs, magic e, tricky words, suffixes, homophones, and words adults
+  misspell. 96 items per language; a wrong answer shows that level's rule.
+- A **words read** counter (texts count once, when first shown), a lifetime
+  count of reading questions right, and a new daily **reading quest**.
+
+**Arcade games** (`web/js/arcade.js` plus a world per game)
+
+- 🐦 **Fladdervogel** - tap to flap through gates with three openings; fly
+  through the right answer. 🦸 **Sprongheld** - a runner that jumps up into
+  the block with the right answer (a coin pops out), and from level 1 over a
+  spiky slime after every row. The hero is the child's equipped character.
+- Both have a **Sums / Words & spelling** switch, three lives, twelve
+  questions a run, a combo multiplier, a personal record, and adapt their
+  level once per run like the timed games. A wrong answer costs no life -
+  crashing does - so reading calmly pays.
+- The physics are plain data and a pure `step()`, so the Node tests fly and
+  run them. The canvas is sized from the room actually left under the
+  question, and on a phone on its side the question moves beside the
+  playfield.
+
+**Leerhapjes / Learning Bites** (`#/leerhapjes`, `bites.js`, `bites-data.js`)
+
+- 24 one-minute lessons (12 maths, 12 language, groep 6-8): one idea, one
+  worked example, three questions. 2 of 3 right puts the card in the album
+  (15 coins), 3 of 3 makes it gold (+5); the **bite of the day** adds 10.
+  Each pays once. Repeating is always possible and pays nothing.
+
+**Finished levels: logged, and turned into an invitation**
+
+- A dated **mastery log** (`state.masteryLog`) of every level a child
+  levels up out of, and a one-off **mastery bonus** (10 + 5 × level coins,
+  a gift like quest coins, never score). Sliding down and climbing back
+  through the same level pays nothing again.
+- The **level picker** marks mastered levels with a green ✓. Sitting on a
+  mastered level shows a **nudge**: "you've mastered this level - on level N
+  you earn coins again, plus a bonus when you master it", with a one-tap
+  "Go to level N" button.
+- The home page's **next challenge** card (`progress.js`) names the best
+  next step: climb off a mastered level, the new groep 8 levels, a game never
+  tried (reading first), or the lowest game. A **level passport** stamps
+  every mastered level per game; tiles show one pip per level.
+- The parent dashboard's new **mastered levels and reading** panel: levels
+  mastered per game, a dated log, words read, reading questions right and
+  bites collected.
+
+**Everything else**
+
+- Menu and home tiles grouped (Rekenen, Snel & slim, Taal & lezen, Arcade,
+  Meer). Six new hero illustrations.
+- 10 more badges (21 → 31): groep 8, legend, 10 and 40 levels mastered,
+  25 reading questions right, 1,000 and 5,000 words read, arcade hero,
+  5 bites and the full album. 7 more rewards (132 → 139), four of them only
+  for level 6 or 7.
+- Quests: the reading quest; the arcade games count for the speed quest;
+  the reading games can be the featured game.
+- Uitleg: groep 8 maths, reading strategies, idioms, spelling rules, arcade.
+- Title, manifest and page description now say groep 6, 7 & 8 and reading.
+- 271 new translation keys per language (816 → 1087), NL and EN.
+- `web/sw.js` `PRECACHE`: 11 new files (61).
+
+Tests:
+
+- **`tests/web/test_mastery.mjs`** (19): levels 0-7 everywhere; the
+  mastery bonus paid once, in coins not score, and **not farmable** by
+  sliding up and down; manual picks master nothing; `nextPayingLevel`; the
+  next-challenge priority; the passport; the round-18 fields surviving a
+  reload; a pre-round-18 profile getting an undated log rebuilt; mythic items
+  still at level 5 and the groep 8 items at 6/7; the new badges; the reading
+  quest ignoring non-paying answers; Getallenjacht's groep 8 rules hitting
+  exactly what their label says.
+- **`tests/web/test_reading.mjs`** (13): every spelling, vocabulary, text,
+  question and bite checked for an answer, distinct options, both languages
+  and no HTML-breaking characters; template texts containing the right answer
+  and never a wrong one; three questions per text and its words counted once;
+  the bite of the day stable all day; a bite paying each reward once.
+- **`tests/web/test_arcade.mjs`** (12): an autopilot scores 12/12 without a
+  crash at every level of both games (every right answer is reachable); a
+  wrong opening costs no life; falls and slimes do, and a run always ends;
+  one answer per gate or row; a row never starts above the last slime.
+- **`test_logic.mjs`**: generators run at levels 0-7 (and the three reading
+  games join the shared contract); groep 8 algebra answers checked by
+  substitution; circle answers recomputed from the picture; the two Tafel
+  "max 6" tests rewritten for "every game max 7".
+- **`smoke.mjs`**: 23 routes; the practice nudge after the replay scenario
+  (mastered 0 and 1 marked, one tap to level 2); tile pips, next challenge and
+  passport; the dashboard's mastery table; Leesdetective answered from the
+  text (three questions about one text, its words counted once); a groep 8
+  spelling mistake explaining 't kofschip; both arcade games' question *and*
+  playfield on screen at 360x640, 390x844 and 844x390 with the longest
+  questions; a Fladdervogel run ending by itself; the Sprongheld canvas
+  animating, stopping and being left mid-run cleanly; a bite of the day paying
+  30 coins once and staying gold after a reload.
+- **`pages-sim.mjs`**: the new routes under the Pages sub-path (23).
+
+Verified: `npm test` 167/167 (118 before); `npm run lint`; `node --check` on
+all 53 files under `web/js`; `npm run check:precache` 61/61; `npm run
+test:smoke` against a freshly started `node server.js`; `npm run test:pages`;
+the deploy workflow's `BUILD_ID` stamp and `check_precache.py` re-run on a
+scratch copy of `web/` and `tools/`. Proved to fail without the fix, then
+restored: the not-farmable mastery bonus, the row spacing, the stable bite of
+the day, the Getallenjacht prime label, the reading quest guard, and (smoke)
+the arcade sizing at 360x640.
+
+### Fixed (round 18 - found while building and testing this round)
+
+None of these reached a child: each was in this round's own new code (or its
+tests) and was fixed before committing. They are listed because each one is a
+kind of mistake worth recognising next time.
+
+- **The bite of the day could change during the day.** It was picked among
+  the bites not yet collected, so collecting any other bite shrank the pool
+  and moved the pick - and the promised +10 - to a different bite. It now
+  picks among the bites open at the start of the day. Caught by a Node test
+  before it shipped.
+- **Sprongheld could spawn a row of blocks right above the previous row's
+  slime** after an early bump on a row's first block, so jumping the slime
+  bumped a block by accident. The next row now starts clear of both.
+- **Getallenjacht's "primes between 50 and 99" rule** would also have
+  counted 41, 43 and 47 (in the grid's range) as targets.
+- **The arcade canvas overflowed small and landscape phones**: a fixed 170px
+  budget for the question let a three-line word question push the
+  playfield's bottom off a 360x640 screen, and a phone on its side lost the
+  question off the top. Now measured, with three lines reserved and a
+  side-by-side layout for short landscape screens.
+- The smoke test's `.kmg-btn-primary` "first" selector would have clicked the
+  new nudge button instead of the answer check; it is now scoped to the
+  action bar.
+
 ### Fixed (round 17 - small bugs found by auditing every page, plus stale docs)
 
 Found by opening every route in a real browser (desktop NL, phone EN in dark

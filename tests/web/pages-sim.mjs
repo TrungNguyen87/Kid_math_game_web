@@ -41,9 +41,11 @@ try {
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const SUBPATH = "/Kid_math_game_web/";
 const BUILD_ID = "pagesim00001"; // 12 characters, like ${GITHUB_SHA::12}
+// Kept in step with nav.js: every page must load under the Pages sub-path.
 const ROUTES = [
-  "home", "tafel", "breuken", "meten", "procenten", "algebra", "meetkunde", "verhoudingen",
-  "getallen", "bliksemronde", "getallenjacht", "logica", "code", "compete", "rewards", "uitleg", "dashboard",
+  "home", "leerhapjes", "tafel", "breuken", "meten", "procenten", "algebra", "meetkunde", "verhoudingen",
+  "getallen", "bliksemronde", "getallenjacht", "logica", "code", "lezen", "woorden", "spelling",
+  "fladdervogel", "sprongheld", "compete", "rewards", "uitleg", "dashboard",
 ];
 const TYPES = {
   ".html": "text/html; charset=utf-8",

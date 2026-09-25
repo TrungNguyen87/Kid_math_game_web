@@ -1,6 +1,8 @@
 /**
  * Breuken Baas - adding, subtracting, simplifying and multiplying fractions.
- * Ported from pages/02_Breuken_Baas.py.
+ * Ported from pages/02_Breuken_Baas.py. Levels 6-7 (round 18) are groep 8:
+ * a fraction times a fraction, and adding/subtracting with unlike
+ * denominators that are not multiples of each other.
  *
  * The one thing that is not a straight port is the explorer. Streamlit gave
  * it two sliders and redrew a picture on the server after each drag. Here the
@@ -17,6 +19,13 @@ import { typedAnswerGame } from "./common.js";
 import * as sound from "../sound.js";
 
 const GAME_KEY = "breuken";
+
+/** A numerator 1..d-1 already in lowest terms with d (so 2/4 is never asked). */
+function properNumerator(d) {
+  const options = [];
+  for (let n = 1; n < d; n++) if (gcd(n, d) === 1) options.push(n);
+  return choice(options);
+}
 
 export function generate(level) {
   let den;
@@ -80,13 +89,51 @@ export function generate(level) {
     [correctNum, correctDen] = [n1 * k + n2, d2];
     denEditable = true;
     visualFracs = [[n1, d1], [n2, d2]];
-  } else {
+  } else if (level === 5) {
     den = choice([3, 4, 5, 6]);
     const num = randInt(1, den - 1);
     const k = randInt(2, 4);
     text = t("breuken.q_multiply", { k, n: num, d: den });
     [correctNum, correctDen] = [num * k, den];
     visualFracs = [[num, den]];
+  } else if (level === 6) {
+    // Groep 8: a fraction times a fraction - teller × teller, noemer × noemer.
+    const d1 = randInt(2, 6);
+    const d2 = randInt(2, 6);
+    n1 = properNumerator(d1);
+    n2 = properNumerator(d2);
+    text = t("breuken.q_frac_times_frac", { n1, d1, n2, d2 });
+    [correctNum, correctDen] = [n1 * n2, d1 * d2];
+    denEditable = true;
+    visualFracs = [[n1, d1], [n2, d2]];
+  } else {
+    // Groep 8 top: unlike denominators where neither is a multiple of the
+    // other (1/3 + 1/4), so the common denominator has to be found, not read
+    // off. Subtraction always keeps the first fraction the bigger one.
+    let d1;
+    let d2;
+    do {
+      d1 = randInt(2, 6);
+      d2 = randInt(2, 6);
+    } while (d1 === d2 || d1 % d2 === 0 || d2 % d1 === 0);
+    const common = (d1 * d2) / gcd(d1, d2);
+    n1 = properNumerator(d1);
+    n2 = properNumerator(d2);
+    const a = n1 * (common / d1);
+    const b = n2 * (common / d2);
+    if (a !== b && coinFlip()) {
+      // Put the bigger fraction first so the answer is positive.
+      if (a < b) {
+        [n1, d1, n2, d2] = [n2, d2, n1, d1];
+      }
+      text = t("breuken.q_unlike_sub", { n1, d1, n2, d2 });
+      [correctNum, correctDen] = [Math.abs(a - b), common];
+    } else {
+      text = t("breuken.q_unlike_add", { n1, d1, n2, d2 });
+      [correctNum, correctDen] = [a + b, common];
+    }
+    denEditable = true;
+    visualFracs = [[n1, d1], [n2, d2]];
   }
 
   return { text, correctNum, correctDen, denEditable, visualFracs };

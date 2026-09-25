@@ -1,16 +1,24 @@
 /**
  * Meetkunde Meesters - perimeter, area, compound shapes, volume and angles.
  * Ported from pages/08_Meetkunde_Meesters.py.
+ *
+ * Levels 6-7 (round 18) are groep 8: the circle (circumference and area with
+ * pi = 3.14, so the answer is a decimal), how many litres fit in a tank
+ * measured in cm, and the surface area of a box.
  */
-import { t } from "../i18n.js";
+import { getLanguage, t } from "../i18n.js";
 import { choice, coinFlip, randInt, range } from "../rng.js";
-import { cuboidSvg, rectangleSvg, triangleSvg } from "../visuals.js";
-import { typedAnswerGame } from "./common.js";
+import { circleSvg, cuboidSvg, rectangleSvg, triangleSvg } from "../visuals.js";
+import { formatDecimal, typedAnswerGame } from "./common.js";
+
+/** The value of pi groep 8 works with. */
+export const PI = 3.14;
 
 const GAME_KEY = "meetkunde";
 const UNIT = "cm";
 
 export function generate(level) {
+  if (level >= 6) return groep8Problem(level);
   let text;
   let answer;
   let unitSuffix;
@@ -103,8 +111,76 @@ export function generate(level) {
   };
 }
 
+/**
+ * Groep 8. Level 6: circles. Level 7: litres in a tank measured in cm, and
+ * the surface area of a box.
+ */
+function groep8Problem(level) {
+  const lang = getLanguage();
+  if (level === 6) {
+    const r = randInt(2, 12);
+    if (coinFlip()) {
+      // Circumference: pi x d - given either the diameter or the radius, so
+      // "d = 2 x r" has to be remembered half the time.
+      const useDiameter = coinFlip();
+      const d = useDiameter ? r : 2 * r;
+      const answer = Math.round(PI * d * 100) / 100;
+      return {
+        text: t(useDiameter ? "meetkunde.q_circle_circ_d" : "meetkunde.q_circle_circ_r", { d, r, unit: UNIT }),
+        answer,
+        unitSuffix: UNIT,
+        visual: { kind: "circle", value: useDiameter ? d : r, show: useDiameter ? "diameter" : "radius" },
+        angles: null,
+        answerLabel: t("meetkunde.answer_label_decimal"),
+        decimal: true,
+        tolerance: 0.005,
+        answerDisplay: `${formatDecimal(answer, lang)} ${UNIT}`,
+      };
+    }
+    // Area: pi x r x r (always given the radius, the classic slip being d).
+    const answer = Math.round(PI * r * r * 100) / 100;
+    return {
+      text: t("meetkunde.q_circle_area", { r, unit: UNIT }),
+      answer,
+      unitSuffix: `${UNIT}²`,
+      visual: { kind: "circle", value: r, show: "radius" },
+      angles: null,
+      answerLabel: t("meetkunde.answer_label_decimal"),
+      decimal: true,
+      tolerance: 0.005,
+      answerDisplay: `${formatDecimal(answer, lang)} ${UNIT}²`,
+    };
+  }
+  if (coinFlip()) {
+    // Every side a multiple of 10 cm, so the volume is a whole number of litres.
+    const l = 10 * randInt(2, 8);
+    const w = 10 * randInt(2, 5);
+    const h = 10 * randInt(2, 5);
+    return {
+      text: t("meetkunde.q_tank_litres", { l, w, h }),
+      answer: (l * w * h) / 1000,
+      unitSuffix: "l",
+      visual: { kind: "cuboid", l, w, h },
+      angles: null,
+      answerLabel: t("meetkunde.answer_label_litres"),
+    };
+  }
+  const l = randInt(2, 10);
+  const w = randInt(2, 8);
+  const h = randInt(2, 8);
+  return {
+    text: t("meetkunde.q_surface", { l, w, h, unit: UNIT }),
+    answer: 2 * (l * w + l * h + w * h),
+    unitSuffix: `${UNIT}²`,
+    visual: { kind: "cuboid", l, w, h },
+    angles: null,
+    answerLabel: t("meetkunde.answer_label"),
+  };
+}
+
 function visuals(problem) {
   const v = problem.visual;
+  if (v.kind === "circle") return [circleSvg(v.value, { unit: UNIT, show: v.show })];
   if (v.kind === "rect") return [rectangleSvg(v.w, v.h, { unit: UNIT })];
   if (v.kind === "triangle") return [triangleSvg(v.base, v.height, { unit: UNIT })];
   if (v.kind === "cuboid") return [cuboidSvg(v.l, v.w, v.h, { unit: UNIT })];

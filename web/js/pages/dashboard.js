@@ -12,7 +12,11 @@
 import { t, tMd } from "../i18n.js";
 import { el, raw, clear } from "../dom.js";
 import { MIN_RETENTION_DAYS, allAttempts, clearHistory, downloadCsv, toCsv, sessionAttempts } from "../log.js";
-import { clearAllProfiles, currentPlayStreak, state } from "../state.js";
+import { clearAllProfiles, currentPlayStreak, getLevel, masteredLevelCount, state } from "../state.js";
+import { levelPassport, masteryLogNewestFirst } from "../progress.js";
+import { BITES } from "../bites-data.js";
+import { collectedCount } from "../bites.js";
+import { levelLabel } from "../ui-bits.js";
 import { REWARD_DEFS, isUnlocked } from "../rewards.js";
 import { BUDDY_STAGES, buddyInfo } from "../buddy.js";
 import { FEEDBACK_EMAIL, feedbackHref } from "../ui-bits.js";
@@ -196,6 +200,76 @@ function motivationPanel() {
   ]);
 }
 
+/**
+ * Round 18: the levels this player has mastered, per game and as a dated
+ * log, plus the reading numbers. This is the parent-facing side of "don't
+ * keep replaying the easy levels": which levels are done (and so no longer
+ * pay), when each was finished, and where the child is now.
+ */
+function masteryPanel() {
+  const log = masteryLogNewestFirst();
+  const perGame = levelPassport().filter((row) => row.cleared > 0 || state.gamesTried.has(row.game));
+  const gameName = (game) => t(`game.${game}.name`);
+  const when = (at) => (at ? new Date(at).toLocaleDateString() : t("dash.mastery_earlier"));
+
+  const summary = el("table.kmg-table.kmg-mastery-table", {}, [
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", { text: t("dash.col_game") }),
+        el("th", { text: t("dash.mastery_col_levels") }),
+        el("th", { text: t("dash.mastery_col_now") }),
+      ]),
+    ]),
+    el(
+      "tbody",
+      {},
+      perGame.map((row) =>
+        el("tr", {}, [
+          el("td", { text: gameName(row.game) }),
+          el("td", {
+            text: row.cells.map((cell, level) => (cell === "cleared" ? level : null)).filter((l) => l != null).join(", ") || "—",
+          }),
+          el("td", { text: `${getLevel(row.game)} · ${levelLabel(getLevel(row.game))}` }),
+        ]),
+      ),
+    ),
+  ]);
+
+  const history = el("table.kmg-table.kmg-mastery-log", {}, [
+    el("thead", {}, [
+      el("tr", {}, [
+        el("th", { text: t("dash.col_time") }),
+        el("th", { text: t("dash.col_game") }),
+        el("th", { text: t("dash.col_level") }),
+      ]),
+    ]),
+    el(
+      "tbody",
+      {},
+      log.map((entry) =>
+        el("tr", {}, [
+          el("td", { text: when(entry.at) }),
+          el("td", { text: gameName(entry.game) }),
+          el("td", { text: `${entry.level} · ${levelLabel(entry.level)}` }),
+        ]),
+      ),
+    ),
+  ]);
+
+  return el("div.kmg-mastery-panel", {}, [
+    el("h2", { text: t("dash.mastery_heading") }),
+    statRow([
+      { label: t("dash.metric_mastered"), value: masteredLevelCount() },
+      { label: t("dash.metric_words"), value: state.wordsRead },
+      { label: t("dash.metric_read_correct"), value: state.readCorrect },
+      { label: t("dash.metric_bites"), value: `${collectedCount()}/${BITES.length}` },
+    ]),
+    el("p.kmg-caption", { text: t("dash.mastery_caption") }),
+    perGame.length ? el("div.kmg-table-scroll", {}, [summary]) : el("p", { text: t("dash.mastery_none") }),
+    log.length ? expander(t("dash.mastery_log_heading", { count: log.length }), el("div.kmg-table-scroll", {}, [history])) : null,
+  ]);
+}
+
 /** How to reach the person who made the app. */
 function feedbackPanel() {
   return el("div.kmg-card.kmg-feedback", {}, [
@@ -281,6 +355,7 @@ export function render(container) {
       ]),
 
       motivationPanel(),
+      masteryPanel(),
 
       el("h2", { text: t("dash.accuracy_chart_heading") }),
       barChartH(gameRows),

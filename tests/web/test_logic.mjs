@@ -42,8 +42,12 @@ const bliksem = await import("../../web/js/games/bliksem.js");
 const logica = await import("../../web/js/games/logica.js");
 const code = await import("../../web/js/games/code.js");
 const jacht = await import("../../web/js/games/jacht.js");
+const lezen = await import("../../web/js/games/lezen.js");
+const woorden = await import("../../web/js/games/woorden.js");
+const spelling = await import("../../web/js/games/spelling.js");
 
-const LEVELS = [0, 1, 2, 3, 4, 5];
+// Every game runs 0-7 since round 18 (6 and 7 are groep 8).
+const LEVELS = [0, 1, 2, 3, 4, 5, 6, 7];
 const eachLevel = (fn) => LEVELS.forEach((level) => fn(level));
 
 // ---------------------------------------------------------------------------
@@ -177,7 +181,7 @@ test("a correct answer resets the wrong-streak, so 1 wrong + 1 right + 1 wrong d
   assert.equal(state.getLevel("tafel"), 3);
 });
 
-test("levels never leave 0..5 for standard games", () => {
+test("levels never leave MIN_LEVEL..MAX_LEVEL (0-7)", () => {
   state.setLevel("breuken", 5);
   for (let i = 0; i < 20; i++) state.registerAttempt("breuken", true);
   assert.equal(state.getLevel("breuken"), state.MAX_LEVEL);
@@ -187,11 +191,20 @@ test("levels never leave 0..5 for standard games", () => {
   assert.equal(state.getLevel("breuken"), state.MIN_LEVEL);
 });
 
-test("tafel monster level can reach level 6 and clamps at 6", () => {
-  state.setLevel("tafel", 5);
-  for (let i = 0; i < 3; i++) state.registerAttempt("tafel", true);
-  assert.equal(state.getLevel("tafel"), 6);
-  assert.equal(state.setLevel("tafel", 99), 6);
+test("every game, Tafel Monster included, levels into groep 8 (6, then 7) and clamps at 7", () => {
+  // Round 18: Tafel Monster used to be the one game with a level 6; now
+  // every game has groep 8 levels 6 and 7, and there is no special case.
+  assert.equal(state.MAX_LEVEL, 7);
+  for (const key of ["tafel", "breuken", "lezen", "vlieg"]) {
+    assert.equal(state.getMaxLevel(key), 7, key);
+    state.setLevel(key, 5);
+    for (let i = 0; i < 3; i++) state.registerAttempt(key, true);
+    assert.equal(state.getLevel(key), 6, `${key} should level from 5 into groep 8`);
+    for (let i = 0; i < 3; i++) state.registerAttempt(key, true);
+    assert.equal(state.getLevel(key), 7, key);
+    assert.equal(state.setLevel(key, 99), 7, key);
+    state.setLevel(key, 0);
+  }
 });
 
 test("setLevel clamps out-of-range input", () => {
@@ -418,12 +431,15 @@ test("highestLevelReached is the highest level across every game", () => {
   for (const k of state.GAME_KEYS) state.setLevel(k, 0);
 });
 
-test("allGamesAtTrueMax accounts for tafel's own max of 6, not the shared 5", () => {
+test("allGamesAtTrueMax needs every game at 7, the reading and arcade games included", () => {
   for (const k of state.GAME_KEYS) state.setLevel(k, state.getMaxLevel(k));
-  assert.equal(state.getLevel("tafel"), 6);
+  assert.equal(state.getLevel("tafel"), 7);
   assert.equal(state.allGamesAtTrueMax(), true);
-  state.setLevel("tafel", 5);
-  assert.equal(state.allGamesAtTrueMax(), false, "tafel at 5 of 6 is not actually maxed");
+  state.setLevel("tafel", 6);
+  assert.equal(state.allGamesAtTrueMax(), false, "tafel at 6 of 7 is not actually maxed");
+  state.setLevel("tafel", 7);
+  state.setLevel("spelling", 5);
+  assert.equal(state.allGamesAtTrueMax(), false, "a reading game at the old top of 5 is not maxed either");
   for (const k of state.GAME_KEYS) state.setLevel(k, 0);
 });
 
@@ -543,6 +559,9 @@ const GENERATORS = {
   verhoudingen: verhoudingen.generate,
   getallen: getallen.generate,
   logica: logica.generate,
+  lezen: lezen.generate,
+  woorden: woorden.generate,
+  spelling: spelling.generate,
 };
 
 for (const [name, generate] of Object.entries(GENERATORS)) {
@@ -704,17 +723,47 @@ test("procenten: numeric questions have whole-number answers", () => {
   });
 });
 
-test("algebra: only level 5 has two unknowns, and both are positive there", () => {
+test("algebra: only levels 5 and 7 have two unknowns, and both are positive there", () => {
   eachLevel((level) => {
     for (let i = 0; i < REPS; i++) {
       const problem = algebra.generate(level);
-      assert.equal(problem.twoVar, level === 5);
       if (level === 5) {
+        assert.equal(problem.twoVar, true);
         assert.ok(problem.answer.x > 0 && problem.answer.y > 0);
         assert.ok(problem.answer.x > problem.answer.y, "x - y must stay positive");
+      } else if (level === 7) {
+        // Level 7 mixes a two-unknown system with a one-unknown word puzzle.
+        if (problem.twoVar) assert.ok(problem.answer.x > 0 && problem.answer.y > 0);
+      } else {
+        assert.equal(problem.twoVar, false, `level ${level}`);
       }
     }
   });
+});
+
+test("algebra: groep 8 answers satisfy their own equations (checked by substitution)", () => {
+  for (let i = 0; i < REPS; i++) {
+    // Level 6: "ax + b = cx + d" or "a(x + b) = c", as shown on the scale.
+    const six = algebra.generate(6);
+    const [left, right] = six.visual[0];
+    const evaluate = (side, x) =>
+      Function("x", `return ${side.replace(/(\d)x/g, "$1*x").replace(/(\d)\(/g, "$1*(")};`)(x);
+    assert.equal(evaluate(left, six.answer.x), evaluate(right, six.answer.x), `${left} = ${right}, x=${six.answer.x}`);
+    assert.ok(Number.isInteger(six.answer.x) && six.answer.x > 0);
+
+    // Level 7: both equations of the system hold, or the word puzzle adds up.
+    const seven = algebra.generate(7);
+    if (seven.twoVar) {
+      for (const [lhs, rhs] of seven.visual) {
+        const value = Function("x", "y", `return ${lhs.replace(/(\d)x/g, "$1*x")};`)(seven.answer.x, seven.answer.y);
+        assert.equal(value, Number(rhs), `${lhs} = ${rhs}`);
+      }
+    } else {
+      const [lhs, rhs] = seven.visual[0];
+      const k = Number(lhs.match(/(\d+)x$/)[1]);
+      assert.equal(seven.answer.x * (k + 1), Number(rhs));
+    }
+  }
 });
 
 test("algebra: x is a whole number, and only levels 4+ can make it negative", () => {
@@ -727,16 +776,35 @@ test("algebra: x is a whole number, and only levels 4+ can make it negative", ()
   });
 });
 
-test("meetkunde: every answer is a positive whole number", () => {
+test("meetkunde: every answer is a positive whole number, except the circle level's pi answers", () => {
   eachLevel((level) => {
     for (let i = 0; i < REPS; i++) {
       const problem = meetkunde.generate(level);
-      assert.ok(
-        Number.isInteger(problem.answer) && problem.answer > 0,
-        `level ${level}: ${problem.answer} (${problem.text})`,
-      );
+      if (level === 6) {
+        // Circles: 3.14 x d or 3.14 x r x r - at most two decimals, and the
+        // number field must offer a decimal key and a tolerance for them.
+        assert.ok(problem.answer > 0);
+        assert.ok(Math.abs(problem.answer * 100 - Math.round(problem.answer * 100)) < 1e-6, String(problem.answer));
+        assert.equal(problem.decimal, true);
+        assert.ok(problem.tolerance > 0 && problem.tolerance < 0.01);
+      } else {
+        assert.ok(
+          Number.isInteger(problem.answer) && problem.answer > 0,
+          `level ${level}: ${problem.answer} (${problem.text})`,
+        );
+      }
     }
   });
+});
+
+test("meetkunde: circle answers are 3.14 times the right thing, recomputed from the picture", () => {
+  for (let i = 0; i < REPS; i++) {
+    const problem = meetkunde.generate(6);
+    const { value, show } = problem.visual;
+    const r = show === "diameter" ? value / 2 : value;
+    const expected = problem.unitSuffix.endsWith("²") ? meetkunde.PI * r * r : meetkunde.PI * 2 * r;
+    assert.ok(Math.abs(problem.answer - expected) < 0.005, `${problem.text} -> ${problem.answer}, expected ${expected}`);
+  }
 });
 
 test("meetkunde: the angle level's given angles and the answer add to the shape's total", () => {

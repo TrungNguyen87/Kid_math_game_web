@@ -13,7 +13,10 @@ export const DIFFICULTY_KEYS = [
   "common.difficulty_hard",
   "common.difficulty_expert",
   "common.difficulty_master",
-  "common.difficulty_monster",
+  // Levels 6 and 7 are groep 8 (round 18). Tafel Monster's old level 6 was
+  // called "Monster-level"; it is now simply every game's level 6.
+  "common.difficulty_champion",
+  "common.difficulty_legend",
 ];
 
 export function levelLabel(level) {

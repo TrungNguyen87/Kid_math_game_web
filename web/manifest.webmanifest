@@ -1,7 +1,7 @@
 {
-  "name": "Reken Spelletjes voor Groep 6 & 7",
+  "name": "Reken- & Leesspellen voor Groep 6, 7 & 8",
   "short_name": "Reken Spelletjes",
-  "description": "Gratis reken-spelletjes voor groep 6 en 7: tafels, breuken, procenten, meten, meetkunde, algebra en logica. Werkt offline, zonder account.",
+  "description": "Gratis reken- en leesspellen voor groep 6, 7 en 8: tafels, breuken, procenten, meten, meetkunde, algebra, logica, begrijpend lezen, woordenschat en spelling, plus arcadespellen en leerhapjes. Werkt offline, zonder account.",
   "lang": "nl",
   "dir": "ltr",
   "start_url": "./index.html",

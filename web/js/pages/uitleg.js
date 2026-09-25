@@ -20,6 +20,12 @@ const TOPICS = [
   ["logica", "🧠"],
   ["code", "🔐"],
   ["snel", "⚡"],
+  // Round 18: groep 8 maths, and reading, words and spelling.
+  ["groep8", "🎓"],
+  ["lezen", "🔍"],
+  ["woorden", "🧙"],
+  ["spelling", "🌪️"],
+  ["arcade", "🕹️"],
 ];
 
 export function render(container) {

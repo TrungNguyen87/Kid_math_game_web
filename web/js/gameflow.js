@@ -15,8 +15,11 @@ import { goalJustBecameReady } from "./rewards.js";
 import { logAttempt } from "./log.js";
 import { t } from "./i18n.js";
 import {
+  GROEP8_LEVEL,
   MIN_LEVEL,
+  READING_GAMES,
   addScore,
+  addWordsRead,
   awardablePoints,
   clearLevel,
   countAttemptOnly,
@@ -52,6 +55,8 @@ import { levelLabel } from "./ui-bits.js";
  *   points (a speed bonus, or a deduction game paying out only when the code
  *   is finally cracked).
  * @param {Element} [options.burstFrom]  element to fire the confetti out of.
+ * @param {number} [options.wordsRead=0]  words in the text this question was
+ *   about (reading games) - feeds the "words read" counter.
  * @returns {{leveledUp: boolean, leveledDown: boolean, pointsAwarded: number}}
  *   pointsAwarded is `points` reduced by the level-replay guard (see
  *   awardablePoints() in state.js) when `score` is true, or `points`
@@ -69,6 +74,7 @@ export function settleAnswer({
   adaptLevel = true,
   score = true,
   burstFrom = null,
+  wordsRead = 0,
 }) {
   // A game that scores its own points (score: false) has already run its
   // gained amount through awardablePoints() before calling this - gating it
@@ -88,13 +94,19 @@ export function settleAnswer({
 
   let leveledUp = false;
   let leveledDown = false;
+  let bonus = 0;
   if (adaptLevel) {
-    ({ leveledUp, leveledDown } = registerAttempt(gameKey, isCorrect));
+    ({ leveledUp, leveledDown, masteryBonus: bonus } = registerAttempt(gameKey, isCorrect));
   } else {
     // Still count the question and mark the game as tried, so the session
     // stats and the "explorer" badge stay honest - just without moving the
     // difficulty.
     countAttemptOnly(gameKey, isCorrect);
+  }
+
+  if (READING_GAMES.has(gameKey)) {
+    if (isCorrect) state.readCorrect += 1;
+    if (wordsRead > 0) addWordsRead(wordsRead);
   }
 
   if (isCorrect) {
@@ -110,10 +122,7 @@ export function settleAnswer({
   }
 
   if (leveledUp) {
-    const newLevel = getLevel(gameKey);
-    levelUpOverlay(t("common.level_up", { level: newLevel }), levelLabel(newLevel));
-    sound.playLevelUp();
-    bigCelebration();
+    celebrateLevelUp(gameKey, bonus);
   } else if (leveledDown) {
     toast(t("common.level_down", { level: getLevel(gameKey) }), "💪");
   }
@@ -170,6 +179,24 @@ export function questLabel(quest) {
 }
 
 /**
+ * The level-up card, plus - the first time a level is mastered - the one-off
+ * mastery bonus and a nudge about what the new level pays. Shared by the
+ * per-answer path and adaptAfterRound().
+ */
+function celebrateLevelUp(gameKey, bonus) {
+  const newLevel = getLevel(gameKey);
+  const subtitle = bonus > 0
+    ? `${levelLabel(newLevel)} · ${t("mastery.bonus_line", { coins: bonus })}`
+    : levelLabel(newLevel);
+  levelUpOverlay(t("common.level_up", { level: newLevel }), subtitle, newLevel >= GROEP8_LEVEL ? "🎓" : "⭐");
+  sound.playLevelUp();
+  bigCelebration();
+  if (bonus > 0) {
+    toast(t("mastery.toast", { level: newLevel - 1, coins: bonus }), "🏅", 4800);
+  }
+}
+
+/**
  * Level a timed game up or down once, based on how the whole round went
  * rather than on a streak of individual answers.
  *
@@ -177,7 +204,7 @@ export function questLabel(quest) {
  * far more reliably than three quick correct answers in a row does, since in
  * a speed game those three can just be three easy draws.
  *
- * @returns {{leveledUp: boolean, leveledDown: boolean}}
+ * @returns {{leveledUp: boolean, leveledDown: boolean, masteryBonus?: number}}
  */
 export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRatio = 0.4 } = {}) {
   if (total <= 0) return { leveledUp: false, leveledDown: false };
@@ -186,13 +213,11 @@ export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRa
 
   if (ratio >= upRatio && current < getMaxLevel(gameKey)) {
     setLevel(gameKey, current + 1);
-    const newLevel = getLevel(gameKey);
-    clearLevel(gameKey, current);
-    levelUpOverlay(t("common.level_up", { level: newLevel }), levelLabel(newLevel));
-    sound.playLevelUp();
-    bigCelebration();
+    const bonus = clearLevel(gameKey, current);
+    celebrateLevelUp(gameKey, bonus);
+    announceNewBadges();
     saveCurrentProfile();
-    return { leveledUp: true, leveledDown: false };
+    return { leveledUp: true, leveledDown: false, masteryBonus: bonus };
   }
   if (ratio <= downRatio && current > MIN_LEVEL) {
     setLevel(gameKey, current - 1);

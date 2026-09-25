@@ -22,7 +22,7 @@
  * The day's quests are a pure function of the date, so every profile on a
  * device sees the same three and a reload never re-rolls them.
  */
-import { dayKey, freshDaily, grantBonusCoins, saveCurrentProfile, state } from "./state.js";
+import { READING_GAMES, dayKey, freshDaily, grantBonusCoins, saveCurrentProfile, state } from "./state.js";
 import { REWARD_DEFS, isUnlocked } from "./rewards.js";
 
 // One quest is drawn from each slot per day. Targets are sized so an ordinary
@@ -44,13 +44,16 @@ export const QUEST_SLOTS = [
     { id: "games_3", kind: "games", target: 3, reward: 25 },
     { id: "games_4", kind: "games", target: 4, reward: 35 },
     { id: "featured_5", kind: "featured", target: 5, reward: 30 },
+    // Round 18: a reading quest in the variety slot, so reading comes up
+    // every few days even for a child who only ever opens the maths.
+    { id: "read_6", kind: "read", target: 6, reward: 30 },
   ],
 ];
 
 export const QUEST_MAP = Object.fromEntries(QUEST_SLOTS.flat().map((q) => [q.id, q]));
 
-/** The two timed games - the "speed" quest counts points earned in either. */
-export const SPEED_GAMES = new Set(["bliksem", "jacht"]);
+/** The timed and arcade games - the "speed" quest counts points earned in any of them. */
+export const SPEED_GAMES = new Set(["bliksem", "jacht", "vlieg", "sprong"]);
 
 /**
  * Games that can be "today's featured game": the ones where one correct
@@ -68,6 +71,9 @@ export const FEATURED_POOL = [
   "verhoudingen",
   "getallen",
   "logica",
+  "lezen",
+  "woorden",
+  "spelling",
 ];
 
 export const CHEST_COINS = 40;
@@ -116,6 +122,8 @@ function progressFor(quest) {
       return daily.featured;
     case "games":
       return daily.games.length;
+    case "read":
+      return daily.read ?? 0;
     default:
       return 0;
   }
@@ -151,6 +159,7 @@ export function recordQuestProgress({ gameKey, isCorrect, pointsAwarded }, now =
   if (isCorrect) daily.correct += 1;
   if (isCorrect && gameKey === featuredGame(today)) daily.featured += 1;
   if (SPEED_GAMES.has(gameKey)) daily.speed += pointsAwarded;
+  if (isCorrect && READING_GAMES.has(gameKey)) daily.read = (daily.read ?? 0) + 1;
   if (!daily.games.includes(gameKey)) daily.games.push(gameKey);
   // state.streaks only climbs on paying answers (addScore()), so the best of
   // it today is a fair "in a row" measure under the same rule.

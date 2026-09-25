@@ -1,7 +1,11 @@
 /**
  * Tafel Monster - multiplication, missing factors, division and word problems.
- * Ported from pages/01_Tafel_Monster.py; the level curve and the question mix
- * are unchanged.
+ * Ported from pages/01_Tafel_Monster.py; levels 0-6 are unchanged.
+ *
+ * Level 7 (round 18, groep 8 "Legende") is mental arithmetic with big
+ * numbers - squares of 11-25, a three-digit number times a one-digit one,
+ * and the matching long divisions - the "splits het getal" strategy groep 8
+ * uses for everything it cannot know by heart.
  */
 import { t } from "../i18n.js";
 import { choice, coinFlip, randInt } from "../rng.js";
@@ -27,6 +31,7 @@ export function generate(level) {
     // Challenging multi-digit arithmetic for champions: [12..35] × [12..25]
     [a, b] = coinFlip() ? [randInt(12, 35), randInt(12, 25)] : [randInt(20, 50), randInt(11, 20)];
   }
+  if (level >= 7) return legendProblem(a, b);
 
   const product = a * b;
 
@@ -90,6 +95,41 @@ export function generate(level) {
 }
 
 /**
+ * Level 7: the groep 8 mix. Every answer is still a whole positive number.
+ * `a`/`b` are the monster-level factors, used by the missing-factor and word
+ * questions that level 7 keeps from level 6.
+ */
+function legendProblem(a, b) {
+  const qType = choice(["square", "big_mult", "big_division", "three_factor", "missing_factor", "word"]);
+  if (qType === "square") {
+    const n = randInt(11, 25);
+    return { text: t("tafel.q_square", { n }), answer: n * n, a: n, b: n, product: n * n, qType, knownFactor: null, big: true };
+  }
+  if (qType === "big_mult") {
+    const big = randInt(101, 999);
+    const small = randInt(3, 9);
+    return { text: t("tafel.q_mult", { a: big, b: small }), answer: big * small, a: big, b: small, product: big * small, qType, knownFactor: null, big: true };
+  }
+  if (qType === "big_division") {
+    const divisor = randInt(3, 9);
+    const quotient = randInt(25, 150);
+    const product = divisor * quotient;
+    return { text: t("tafel.q_division", { product, a: divisor }), answer: quotient, a: divisor, b: quotient, product, qType, knownFactor: divisor, big: true };
+  }
+  if (qType === "three_factor") {
+    const f1 = choice([4, 5, 8, 12, 15]);
+    const f2 = randInt(11, 40);
+    const f3 = choice([5, 10, 20, 25, 50]);
+    return { text: t("tafel.q_three_factor", { a: f1, b: f2, c: f3 }), answer: f1 * f2 * f3, a: f1, b: f2, c: f3, product: f1 * f2 * f3, qType, knownFactor: f1 };
+  }
+  const product = a * b;
+  if (qType === "missing_factor") {
+    return { text: t("tafel.q_missing_b", { a, product }), answer: b, a, b, product, qType, knownFactor: a, big: true };
+  }
+  return { text: t(choice([...WORD_TEMPLATES, "tafel.word_monster"]), { a, b }), answer: product, a, b, product, qType: "word", knownFactor: null, big: true };
+}
+
+/**
  * The visual hint, kept honest: for a missing-factor or division question an
  * accurate a x b grid would let a child read the answer straight off by
  * counting a side - that is the answer, not a hint. Those get a skip-counting
@@ -98,7 +138,11 @@ export function generate(level) {
  */
 function hintNode(problem) {
   const body = el("div");
-  if (problem.qType === "three_factor") {
+  if (problem.big) {
+    // Level 7's numbers are far too big for a dot grid; the hint is the
+    // strategy instead of a picture.
+    body.append(el("p", { text: t("tafel.hint_big") }));
+  } else if (problem.qType === "three_factor") {
     body.append(
       el("p", {
         text: t("tafel.hint_three_factor", {
