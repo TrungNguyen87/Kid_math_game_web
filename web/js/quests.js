@@ -53,7 +53,7 @@ export const QUEST_SLOTS = [
 export const QUEST_MAP = Object.fromEntries(QUEST_SLOTS.flat().map((q) => [q.id, q]));
 
 /** The timed and arcade games - the "speed" quest counts points earned in any of them. */
-export const SPEED_GAMES = new Set(["bliksem", "jacht", "vlieg", "sprong"]);
+export const SPEED_GAMES = new Set(["bliksem", "jacht", "vlieg", "sprong", "toren", "kart"]);
 
 /**
  * Games that can be "today's featured game": the ones where one correct
@@ -74,6 +74,8 @@ export const FEATURED_POOL = [
   "lezen",
   "woorden",
   "spelling",
+  // Round 19: every visitor at the park gate is one question.
+  "park",
 ];
 
 export const CHEST_COINS = 40;

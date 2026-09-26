@@ -5,6 +5,171 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 19 - five new games, the star road, and an invitation to climb wherever a child practises)
+
+The request: more kinds of interactive games like round 18's arcade games -
+something in the spirit of Roblox and Mario games, arcade, puzzle and
+strategy games - with micro-learning inside; make children feel encouraged
+while they play; and keep logging the easy levels a child has finished so
+they don't keep replaying them, in a way that makes a higher level feel like
+the thing to go for.
+
+**Five new games** (22 in all; every one has levels 0-7, goes through
+`settleAnswer()`, the level-replay guard, quests, badges and the mastery log)
+
+- 🌋 **Lavatoren / Lava Tower** (arcade, in the spirit of the "the floor is
+  lava" obstacle towers): three brick platforms per floor, each with an
+  answer; tap the right one to jump up a floor. A wrong platform crumbles
+  and costs *time*, never a life; the rising lava costs lives. Checkpoints
+  every 3 floors cool the lava, floor 12 is the summit. The lava's speed is a
+  reading budget per floor: 16 s at level 0 down to 7 s at level 7.
+- 🏎️ **Turbokart / Turbo Kart** (arcade, a kart racer): a pseudo-3D road,
+  boost pads with answers across it (right = turbo, wrong = mud), bananas
+  from level 1, a star power-up for three right in a row, and three
+  computer karts. No lives: the finishing place reads how the run went
+  (everything right wins at every level; mostly wrong finishes last).
+- 🧩 **Rekendoku / Mathdoku** (puzzle, a cage logic puzzle): 3×3 up to 6×6,
+  + first, then −, × and :. **Every puzzle has exactly one solution** (the
+  generator runs a solver and pins a cell wherever two solutions differ), so
+  "show a cell" can never contradict a child's own valid answer. The 💡 tip
+  lists every set of numbers that fits the selected cage - the micro-lesson.
+  A clean solve masters the level.
+- ♟️ **Tafeltactiek / Times Tactics** (strategy, the classroom "product
+  game" against the computer): move one of two clips on the factor strips,
+  answer the product, claim that square; three or four in a row wins. The
+  computer plays mostly at random at level 0, blocks from level 1 and looks a
+  move ahead from level 4. A wrong answer claims nothing.
+- 🎡 **Pretparkbaas / Park Tycoon** (a tycoon, like the block-world ones): a
+  theme park that stays the child's own. Eight visitors a day, each a money
+  question (change, family tickets, rides per hour, discounts, profit, VAT,
+  payback time); a wrong answer shows the sum worked out with its own
+  numbers. Park money builds twelve attractions, each raising what every
+  later happy visitor pays. Entrance rises with the level, bigger blueprints
+  open only after a good day (6/8) at a higher level, and a mastered level
+  pays half: in this game climbing is literally how the park grows. Park
+  money is never the shop's coins.
+
+**Sterrenpad / The Star Road** (`starroad.js`, `#/sterrenpad`)
+
+- **Stars come only from mastering levels, and more for higher ones**: 1
+  for levels 0-1, 2 for 2-3, 3 for 4-5, 4 for groep 8's level 6. They are
+  counted from the set of mastered levels, so replaying, sliding down and
+  climbing back, or picking a level by hand can never add one.
+- An 18-tier road: bonus coins (a gift, never score) and **12 rewards that
+  cannot be bought** - 5 characters, 5 stickers and the *Noorderlicht /
+  Northern Lights* colour theme, in a new "🌟 Star Road" tier. Each tier is
+  claimed once with a tap.
+- The page: stars so far and the next reward, **where the next stars are**
+  (per game, the most valuable level first), the road, and a per-game log of
+  the mastered levels behind every star. On the home page a Star Road card
+  (glowing when a reward waits); the next-challenge card now says what
+  mastering its level is worth (⭐⭐⭐). The level-up card and a toast say
+  how many stars a mastery earned and when a tier became claimable.
+
+**An invitation to climb, where the child is looking**
+
+- `ui.js climbInvite()`: on a mastered level, "this level pays nothing any
+  more; level N pays again, plus X bonus coins and Y ⭐ when you master it"
+  with one tap up. It appears **under the answer** after a practice answer
+  in every question game (after 3 practice answers it gets a little more
+  insistent), and on **every results screen**: the four arcade games,
+  Bliksemronde, Getallenjacht, Code Kraker and the three new games. The
+  level picker's nudge now names the stars too.
+
+**Everything else**
+
+- A new menu group, *Puzzel & strategie / Puzzles & strategy*.
+- The arcade engine takes a tap position and per-game keys (lanes,
+  steering), a game without lives, extra HUD items and a result line.
+- `gameflow.js adaptAfterGame()`: win levels up (and masters), draw stays,
+  two losses in a row at the same level step down.
+- `state.js`: `feats` (one-off achievements), `park`, `passClaimed`, saved
+  with the profile; older profiles start them fresh.
+- 8 more badges (31 → 39): 25 and 100 stars, and a feat in each new game.
+  The new arcade games count for the speed quest; a park visitor can be the
+  featured game's question.
+- Uitleg: puzzles and strategy, money maths, the star road; the arcade
+  topic covers the new games.
+- Six new hero illustrations. 247 new translation keys per language
+  (1087 → 1334). `web/sw.js` `PRECACHE`: 7 new files (68).
+- README: the new games and systems, updated counts.
+
+Tests:
+
+- **`test_arcade.mjs`** (+13): Lavatoren - an autopilot that spends 60% of
+  the reading budget reaches the summit at every level in both modes
+  without being caught; checkpoints at 3, 6, 9; a wrong platform costs no
+  life; taps during a jump are ignored; never answering ends the run; a tap
+  maps to the platform under it. Turbokart - all right wins at every level
+  in both modes, all wrong finishes last, every gate answered once,
+  bananas spin you out unless you carry a star, boost/mud/steering.
+- **`test_puzzles.mjs`** (19): Rekendoku - one solution at every level,
+  cages cover the grid and are connected, only the level's operations,
+  targets match, the tip lists exactly what fits, the wall overlay;
+  Tafeltactiek - full boards, legal moves, a wrong answer claims nothing,
+  lines in four directions without wrap-around, every match ends, the
+  computer takes wins and (in a position found by search where only the
+  rule does it) blocks; Pretparkbaas - every visitor question in both
+  languages, money formatting, attractions, income, building, saving.
+- **`test_starroad.mjs`** (14): star values, not farmable, higher is
+  faster, the road's tiers and rewards, not for sale, claimed once, old
+  profiles, where the next stars are, `adaptAfterGame`, feats and badges.
+- **`smoke.mjs`**: 29 routes; the climb invitation under a practice answer;
+  star-road rewards in the shop; the four arcade playfields fit at 360x640,
+  390x844 and 844x390; a Lavatoren jump is one answer; a Turbokart gate is
+  answered and the place shows; two Rekendoku puzzles read off the screen
+  and solved (levels 0 and 1 mastered), one solved with help (level
+  stays); the star road at 2 stars pays its first tier once and remembers
+  it after a reload; Tafeltactiek right/wrong answers and the computer's
+  move; the park builds and plays a perfect day (+€5 per visitor, level 0
+  mastered); leaving an online race stops it (see Fixed).
+- **`pages-sim.mjs`**: 29 routes under the Pages sub-path.
+
+Verified: `npm test` 213/213 (167 before); `npm run lint`; `node --check` on
+all 60 files under `web/js`; `npm run check:precache` 68/68; `npm run
+test:smoke` clean in all eight runs since the race fix (the last three on a
+freshly started `node server.js` with the final code); `npm run
+test:pages`; the workflow's `BUILD_ID` stamp and `check_precache.py` on a
+scratch copy; a sweep of all 29 routes as a seeded player in NL (desktop,
+light) and EN (phone, dark) with every expander open. Proved to fail without
+the fix, then restored: the tier claim guard, two-losses-to-step-down, star
+rewards not for sale, the Rekendoku uniqueness loop, the park's half pay,
+the computer's block rule, the tower's checkpoint, and (smoke) the climb
+invitation and the race leak below.
+
+### Fixed (round 19)
+
+- **Leaving an online race kept it running, invisibly, in whatever game the
+  child played next.** `RaceClient.stop()` closed the WebSocket while the
+  room code was still set, and the socket's close handler falls back to
+  polling whenever a room code is set - so every stop started a poller that
+  nobody stopped. The page, already gone, went on logging each round of the
+  race as a wrong answer in the parent's log, resetting the streak and
+  playing the "wrong" sound. Measured with the old code: 4 polls and 4
+  phantom answers in the 3.5 s after leaving; now 0 and 0. Online races only
+  run self-hosted, so the Pages site never had it. Found because a new smoke
+  check ("one jump = one answer") kept counting two.
+
+None of the following reached a child - each was in this round's own code or
+tests and was fixed before committing:
+
+- A Lavatoren tap was mapped to the thirds of the canvas, but the platforms
+  sit between walls of different widths: the left edge of the right
+  platform counted as the middle one. It now maps to the nearest platform
+  (caught by a Node test).
+- The smoke test's first "wait for the answer" used `page.waitForFunction`
+  with an `async` predicate, which resolves at once (the Promise is
+  truthy): two checks passed or failed by luck. They now poll from Node.
+- The first "the computer blocks" test passed with the block rule removed -
+  the general scoring blocked anyway in that position. A search found a
+  position where only the rule blocks; the test now fails without it.
+- Rekendoku's cage walls were thick cell borders: doubled between cages
+  and wedged at the corners. They are one SVG overlay now. Tafeltactiek's
+  ten factor buttons were 24px wide on a 360px phone; they wrap onto two
+  rows (63px).
+- The Star Road card pulsed by scaling forever; it glows instead (calmer,
+  and a test can click it).
+
 ### Added (round 18 - groep 8 levels, reading games, arcade games, learning bites, and a level passport)
 
 The request: more levels and more kinds of play, up to **groep 8** of the

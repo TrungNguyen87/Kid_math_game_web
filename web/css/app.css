@@ -3841,3 +3841,787 @@ button.kmg-chip:hover {
 .kmg-mastery-panel {
   margin: 1.25rem 0;
 }
+
+/* ==========================================================================
+   Round 19: the climb invitation, the star road, Lavatoren and Turbokart,
+   Rekendoku, Tafeltactiek and Pretparkbaas.
+   ========================================================================== */
+
+/* --- the climb invitation --------------------------------------------------- */
+/* Under a practice answer and on every results screen: "this level is
+   mastered, the next one pays - go". Green like the picker's nudge. */
+
+.kmg-climb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.8rem 0;
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--green-soft), var(--surface) 80%);
+  border: 2px solid var(--green);
+  font-weight: 600;
+  animation: kmgNudgeIn 0.4s ease-out both;
+}
+.kmg-climb.is-urgent {
+  border-color: var(--orange);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface) 80%);
+  animation: kmgNudgeIn 0.4s ease-out both, kmgPulse 1.4s ease-in-out 0.4s 3;
+}
+.kmg-climb-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.kmg-climb-text {
+  flex: 1 1 14rem;
+}
+.kmg-climb-btn {
+  white-space: nowrap;
+}
+
+/* --- star road: home card, challenge chip, shop -------------------------------- */
+
+.kmg-starroad-card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1rem 0;
+  color: var(--text);
+  text-decoration: none;
+  border-color: var(--amber);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface) 70%);
+}
+.kmg-starroad-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+/* A reward waiting: a soft glow, not a bounce - the card is big, and a
+   child reading the rest of the page should not have it jumping about. */
+.kmg-starroad-card.is-ready {
+  border-color: var(--orange);
+  animation: kmgGlow 1.8s ease-in-out infinite alternate;
+}
+.kmg-starroad-card-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.kmg-starroad-card-main {
+  flex: 1;
+  min-width: 0;
+}
+.kmg-starroad-card-ready {
+  border-color: var(--orange);
+  background: var(--orange);
+  color: #fff;
+}
+.kmg-challenge-stars {
+  margin-top: 0.35rem;
+}
+.kmg-tier-star {
+  background: linear-gradient(90deg, #ffd54f, #ffb300);
+  border-color: #f57f17;
+  color: #3e2723;
+}
+.kmg-reward-starlink {
+  display: block;
+  color: var(--orange-dark);
+  font-weight: 700;
+}
+
+/* --- star road: the page ----------------------------------------------------- */
+
+.kmg-starroad-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1rem;
+}
+.kmg-chip.is-muted {
+  opacity: 0.75;
+  font-style: italic;
+}
+.kmg-starroad-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+  border-color: var(--amber);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface) 70%);
+}
+.kmg-starroad-total {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.kmg-starroad-bigstar {
+  font-size: 3rem;
+  line-height: 1;
+  animation: kmgFloat 2.4s ease-in-out infinite alternate;
+}
+.kmg-starroad-count {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--orange-dark);
+}
+.kmg-starroad-next {
+  flex: 1 1 16rem;
+}
+.kmg-starroad-next p {
+  margin: 0 0 0.4rem;
+}
+.kmg-starroad-ready {
+  font-weight: 800;
+  color: var(--orange-dark);
+}
+.kmg-starroad-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.kmg-starroad-source {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+.kmg-starroad-source:hover {
+  transform: translateY(-2px);
+}
+.kmg-starroad-source-icon {
+  font-size: 1.6rem;
+}
+.kmg-starroad-source-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.kmg-starroad-source-text span {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+.kmg-starroad-source-stars {
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* The road: a dotted path down the middle with the tiers hanging off it,
+   left and right in turn. On a phone everything sits on one side. */
+.kmg-starroad-track {
+  position: relative;
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0.25rem 0;
+}
+.kmg-starroad-track::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 1.6rem;
+  border-left: 4px dotted var(--amber);
+}
+.kmg-starroad-tier {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.5rem 0;
+}
+.kmg-starroad-node {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3.3rem;
+  height: 3.3rem;
+  border-radius: 50%;
+  background: var(--surface-2);
+  border: 3px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.kmg-starroad-prize {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.kmg-starroad-prize-emoji {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.kmg-starroad-prize-name {
+  flex: 1 1 8rem;
+  font-weight: 700;
+}
+.kmg-starroad-tag {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.kmg-starroad-tier.is-claimed .kmg-starroad-node {
+  background: var(--green);
+  border-color: var(--green-dark);
+  color: #fff;
+}
+.kmg-starroad-tier.is-claimed .kmg-starroad-prize {
+  opacity: 0.8;
+}
+.kmg-starroad-tier.is-ready .kmg-starroad-node {
+  background: linear-gradient(135deg, #ffd54f, #ffb300);
+  border-color: #f57f17;
+  color: #3e2723;
+  animation: kmgPulse 1.2s ease-in-out infinite alternate;
+}
+.kmg-starroad-tier.is-ready .kmg-starroad-prize {
+  border-color: var(--amber);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface) 70%);
+}
+.kmg-starroad-tier.is-locked .kmg-starroad-prize-emoji {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+@media (min-width: 720px) {
+  .kmg-starroad-track::before {
+    left: 50%;
+  }
+  .kmg-starroad-tier {
+    width: 50%;
+    padding-right: 1.65rem;
+    flex-direction: row-reverse;
+  }
+  .kmg-starroad-tier .kmg-starroad-node {
+    margin-right: -3.3rem;
+  }
+  .kmg-starroad-tier.is-right {
+    margin-left: 50%;
+    padding: 0 0 0 1.65rem;
+    flex-direction: row;
+  }
+  .kmg-starroad-tier.is-right .kmg-starroad-node {
+    margin: 0 0 0 -3.3rem;
+  }
+}
+.kmg-starroad-history td:last-child {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* --- arcade: extra HUD item and the result line ---------------------------------- */
+
+.kmg-arcade-stat-extra {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+}
+.kmg-arcade-result {
+  margin-bottom: 0.75rem;
+}
+
+/* --- Rekendoku ------------------------------------------------------------------- */
+
+.kmg-doku-goal {
+  margin: 0 0 0.6rem;
+  font-weight: 600;
+}
+.kmg-doku-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.9rem;
+}
+.kmg-doku-board {
+  --kmg-doku-n: 4;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--kmg-doku-n), 1fr);
+  width: min(100%, calc(var(--kmg-doku-n) * 4.6rem));
+  border: 3px solid var(--text);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.kmg-doku-cell {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  /* Thin grid lines on the right and bottom of every cell; the cage walls
+     are an SVG laid over the top (.kmg-doku-walls). */
+  box-shadow: inset -1px -1px 0 var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.kmg-doku-walls {
+  position: absolute;
+  inset: 0;
+  color: var(--text);
+  pointer-events: none;
+}
+.kmg-doku-walls svg {
+  display: block;
+}
+.kmg-doku-cell.is-cage {
+  background: var(--amber-soft);
+}
+.kmg-doku-cell.is-line {
+  background: var(--surface-2);
+}
+.kmg-doku-cell.is-line.is-cage {
+  background: var(--amber-soft);
+}
+.kmg-doku-cell.is-selected {
+  background: var(--amber);
+  box-shadow: inset 0 0 0 3px var(--orange-dark);
+}
+.kmg-doku-cell.is-given .kmg-doku-value {
+  color: var(--text-soft);
+}
+.kmg-doku-cell.is-conflict .kmg-doku-value {
+  color: var(--red);
+}
+.kmg-doku-cell.is-conflict {
+  box-shadow: inset 0 0 0 3px var(--red);
+}
+.kmg-doku-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: clamp(0.6rem, 2.6vw, 0.82rem);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--orange-dark);
+  pointer-events: none;
+}
+.kmg-doku-label.is-ok {
+  color: var(--green-dark);
+}
+.kmg-doku-label.is-bad {
+  color: var(--red);
+}
+.kmg-doku-value {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding-top: 0.5em;
+  font-size: clamp(1.1rem, 5.5vw, 1.9rem);
+  font-weight: 800;
+}
+.kmg-doku-pad {
+  --kmg-doku-keys: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--kmg-doku-keys), 1fr);
+  gap: 0.4rem;
+  max-width: 28rem;
+  margin: 0 auto 0.8rem;
+}
+.kmg-doku-key {
+  min-height: 3rem;
+}
+.kmg-doku-tip {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 0.8rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--amber-soft);
+  border: 2px solid var(--amber);
+  font-weight: 600;
+  animation: kmgNudgeIn 0.3s ease-out both;
+}
+.kmg-doku-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-doku-cell.is-selected {
+    background: #6d5a1c;
+  }
+}
+
+/* --- Tafeltactiek ------------------------------------------------------------------ */
+
+.kmg-tactic-score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+.kmg-tactic-vs {
+  font-weight: 800;
+  color: var(--text-soft);
+}
+.kmg-tactic-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.8rem;
+}
+.kmg-tactic-board {
+  --kmg-tactic-cols: 6;
+  display: grid;
+  grid-template-columns: repeat(var(--kmg-tactic-cols), 1fr);
+  gap: 4px;
+  width: min(100%, calc(var(--kmg-tactic-cols) * 4.2rem));
+  padding: 6px;
+  border-radius: var(--radius);
+  background: #8d6e63;
+  box-shadow: var(--shadow-lg);
+}
+.kmg-tactic-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: #fff8e1;
+  color: #3e2723;
+  font-weight: 800;
+  font-size: clamp(0.85rem, 3.6vw, 1.2rem);
+}
+.kmg-tactic-cell.is-mine {
+  background: var(--orange);
+  color: #fff;
+}
+.kmg-tactic-cell.is-theirs {
+  background: #7e57c2;
+  color: #fff;
+}
+.kmg-tactic-cell.is-last {
+  animation: kmgPop 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+.kmg-tactic-cell.is-win {
+  box-shadow: 0 0 0 3px #ffd54f, 0 0 14px #ffd54f;
+  animation: kmgPulse 0.9s ease-in-out infinite alternate;
+}
+.kmg-tactic-num {
+  position: relative;
+  z-index: 1;
+}
+.kmg-tactic-token {
+  position: absolute;
+  right: 2px;
+  bottom: 0;
+  font-size: 0.9em;
+  line-height: 1;
+}
+.kmg-tactic-clips {
+  margin-bottom: 0.8rem;
+}
+.kmg-tactic-clipsnow {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+  text-align: center;
+}
+.kmg-tactic-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.kmg-tactic-strip-label {
+  flex: none;
+  width: 3.6rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+.kmg-tactic-factors {
+  --kmg-tactic-factors: 9;
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--kmg-tactic-factors), 1fr);
+  gap: 3px;
+}
+.kmg-tactic-factor {
+  min-height: 2.6rem;
+  padding: 0;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.kmg-tactic-factor:not([disabled]):hover {
+  border-color: var(--orange);
+}
+.kmg-tactic-factor[disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+/* The clip sits on its number: not a button you can press, but plainly marked. */
+.kmg-tactic-factor.has-clip,
+.kmg-tactic-factor.has-clip[disabled] {
+  opacity: 1;
+  background: var(--amber);
+  border-color: var(--orange-dark);
+  color: #3e2723;
+  box-shadow: inset 0 -4px 0 var(--orange-dark);
+}
+@media (max-width: 520px) {
+  .kmg-tactic-strip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+    margin-bottom: 0.6rem;
+  }
+  .kmg-tactic-strip-label {
+    width: auto;
+  }
+  .kmg-tactic-factors {
+    grid-template-columns: repeat(var(--kmg-tactic-narrow, 5), 1fr);
+    gap: 4px;
+  }
+}
+.kmg-tactic-question {
+  margin-bottom: 0.8rem;
+  text-align: center;
+  border-color: var(--orange);
+  animation: kmgNudgeIn 0.3s ease-out both;
+}
+.kmg-tactic-question-text {
+  margin: 0 0 0.6rem;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+.kmg-tactic-cancel {
+  margin-top: 0.5rem;
+}
+.kmg-tactic-status {
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+/* --- Pretparkbaas ------------------------------------------------------------------- */
+
+.kmg-park-sign {
+  margin-bottom: 0.8rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius);
+  border: 3px solid #8d6e63;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0) 0 18px, rgba(255, 255, 255, 0.35) 18px 36px),
+    linear-gradient(135deg, #ffcc80, #ffab91);
+  color: #3e2723;
+  box-shadow: var(--shadow);
+}
+.kmg-park-sign-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem 1rem;
+}
+.kmg-park-name {
+  font-size: 1.15rem;
+}
+.kmg-park-stars {
+  letter-spacing: 0.08em;
+}
+.kmg-park-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.kmg-park-facts .kmg-chip {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(93, 64, 55, 0.3);
+  color: #3e2723;
+}
+.kmg-park-cash {
+  font-weight: 800;
+  font-size: 1.05rem;
+  margin-right: 0.25rem;
+}
+.kmg-park-actions {
+  justify-content: center;
+}
+.kmg-park-heading {
+  margin-bottom: 0.2rem;
+}
+.kmg-park-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.2rem, 1fr));
+  gap: 0.6rem;
+  margin: 0.6rem 0 1.25rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #c8e6c9, #a5d6a7);
+  box-shadow: inset 0 0 0 3px rgba(46, 125, 50, 0.3);
+}
+.kmg-park-plot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.6rem 0.4rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.55);
+  border: 2px dashed rgba(46, 125, 50, 0.5);
+  color: #1b3a1d;
+  text-align: center;
+}
+.kmg-park-plot.is-built {
+  background: rgba(255, 255, 255, 0.92);
+  border: 2px solid #2e7d32;
+}
+.kmg-park-plot.is-buildable {
+  border-color: var(--orange);
+  background: rgba(255, 248, 225, 0.95);
+}
+.kmg-park-plot.is-locked {
+  opacity: 0.7;
+}
+.kmg-park-emoji {
+  display: inline-block;
+  font-size: 2.3rem;
+  line-height: 1.1;
+}
+.kmg-park-emoji.is-ghost {
+  filter: grayscale(0.85);
+  opacity: 0.6;
+}
+.kmg-park-plot-name {
+  font-weight: 800;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+.kmg-park-plot-meta,
+.kmg-park-plot-payback {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.kmg-park-plot-payback {
+  color: #33691e;
+}
+.kmg-park-build {
+  margin-top: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  min-height: 0;
+}
+.kmg-park-anim-spin {
+  animation: kmgParkSpin 6s linear infinite;
+}
+.kmg-park-anim-bob {
+  animation: kmgFloat 1.8s ease-in-out infinite alternate;
+}
+.kmg-park-anim-sway {
+  animation: kmgParkSway 2.2s ease-in-out infinite alternate;
+}
+.kmg-park-anim-pulse {
+  animation: kmgPulse 1.6s ease-in-out infinite alternate;
+}
+@keyframes kmgParkSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes kmgParkSway {
+  from {
+    transform: translateX(-4px) rotate(-4deg);
+  }
+  to {
+    transform: translateX(4px) rotate(4deg);
+  }
+}
+.kmg-park-dayhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin-bottom: 0.6rem;
+}
+.kmg-park-queue {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.1rem;
+  font-size: 1.1rem;
+  overflow: hidden;
+}
+.kmg-park-queue span {
+  animation: kmgParkSway 1.2s ease-in-out infinite alternate;
+}
+.kmg-park-queue span:nth-child(2n) {
+  animation-delay: 0.3s;
+}
+.kmg-park-question {
+  margin-bottom: 0.7rem;
+}
+.kmg-park-visitor {
+  font-size: 2rem;
+}
+.kmg-park-why {
+  font-weight: 700;
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-park-map {
+    background: linear-gradient(180deg, #2e4a30, #24402a);
+  }
+  .kmg-park-plot {
+    background: rgba(0, 0, 0, 0.25);
+    color: #e8f5e9;
+  }
+  .kmg-park-plot.is-built,
+  .kmg-park-plot.is-buildable {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .kmg-park-plot-payback {
+    color: #c5e1a5;
+  }
+}
+
+/* --- the star road's own colour theme: Noorderlicht / Northern Lights ------------- */
+
+:root[data-theme="aurora"] {
+  --orange: #00897b;
+  --orange-dark: #4527a0;
+  --amber: #ff4081;
+  --wash-a: rgba(0, 191, 165, 0.2);
+  --wash-b: rgba(124, 77, 255, 0.16);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="aurora"] {
+    --bg: #f1fbf9;
+    --surface-2: #e4f5f2;
+    --border: #c3e6e0;
+    --amber-soft: #fde7ef;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="aurora"] {
+    --orange-dark: #b388ff;
+    --bg: #0f1c22;
+    --surface: #16272f;
+    --surface-2: #1d3440;
+    --border: #2f4f5c;
+    --amber-soft: #3a1f2e;
+  }
+}

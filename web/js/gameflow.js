@@ -12,6 +12,7 @@ import { checkNewBadges } from "./badges.js";
 import { checkBuddyGrowth } from "./buddy.js";
 import { chestReady, recordQuestProgress } from "./quests.js";
 import { goalJustBecameReady } from "./rewards.js";
+import { STAR_TIERS, starsForLevel, totalStars } from "./starroad.js";
 import { logAttempt } from "./log.js";
 import { t } from "./i18n.js";
 import {
@@ -180,19 +181,27 @@ export function questLabel(quest) {
 
 /**
  * The level-up card, plus - the first time a level is mastered - the one-off
- * mastery bonus and a nudge about what the new level pays. Shared by the
- * per-answer path and adaptAfterRound().
+ * mastery bonus, the stars it put on the star road (round 19), and a toast
+ * when that reached a new reward there. Shared by the per-answer path,
+ * adaptAfterRound() and adaptAfterGame().
  */
 function celebrateLevelUp(gameKey, bonus) {
   const newLevel = getLevel(gameKey);
+  // A first mastery is exactly when clearLevel() paid a bonus; the level
+  // mastered is the one just left behind.
+  const stars = bonus > 0 ? starsForLevel(newLevel - 1) : 0;
   const subtitle = bonus > 0
-    ? `${levelLabel(newLevel)} · ${t("mastery.bonus_line", { coins: bonus })}`
+    ? `${levelLabel(newLevel)} · ${t("mastery.bonus_line", { coins: bonus })} · ${t("starroad.earned_line", { stars })}`
     : levelLabel(newLevel);
   levelUpOverlay(t("common.level_up", { level: newLevel }), subtitle, newLevel >= GROEP8_LEVEL ? "🎓" : "⭐");
   sound.playLevelUp();
   bigCelebration();
   if (bonus > 0) {
     toast(t("mastery.toast", { level: newLevel - 1, coins: bonus }), "🏅", 4800);
+    const now = totalStars();
+    if (STAR_TIERS.some((tier) => tier.stars > now - stars && tier.stars <= now)) {
+      toast(t("starroad.tier_ready_toast"), "🌟", 6000);
+    }
   }
 }
 
@@ -224,6 +233,40 @@ export function adaptAfterRound(gameKey, correct, total, { upRatio = 0.8, downRa
     toast(t("common.level_down", { level: getLevel(gameKey) }), "💪");
     saveCurrentProfile();
     return { leveledUp: false, leveledDown: true };
+  }
+  return { leveledUp: false, leveledDown: false };
+}
+
+// Per game: the level the last finished match or puzzle was played at, and
+// how many of those in a row were lost there. Session-scoped, like the
+// answer streaks in state.js.
+const lossRuns = new Map();
+
+/**
+ * Level a puzzle or strategy game (round 19) after one finished puzzle,
+ * match or day: a win levels up (and masters the level, exactly like a
+ * streak does), a draw stays, and two losses in a row at the same level
+ * step down. One lost match on its own never costs a level - a close game
+ * against the computer is still a good game.
+ *
+ * @param {string} gameKey
+ * @param {"win"|"draw"|"loss"} outcome
+ * @returns {{leveledUp: boolean, leveledDown: boolean, masteryBonus?: number}}
+ */
+export function adaptAfterGame(gameKey, outcome) {
+  const level = getLevel(gameKey);
+  const run = lossRuns.get(gameKey);
+  const losses = run && run.level === level ? run.losses : 0;
+  if (outcome === "win") {
+    lossRuns.delete(gameKey);
+    return adaptAfterRound(gameKey, 1, 1);
+  }
+  if (outcome === "loss") {
+    if (losses + 1 >= 2) {
+      lossRuns.delete(gameKey);
+      return adaptAfterRound(gameKey, 0, 1);
+    }
+    lossRuns.set(gameKey, { level, losses: losses + 1 });
   }
   return { leveledUp: false, leveledDown: false };
 }

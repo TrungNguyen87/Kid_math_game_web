@@ -19,7 +19,7 @@ import { el, clear, raw } from "../dom.js";
 import { markdown } from "../markdown.js";
 import { addScore, awardablePoints, getLevel } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
-import { expander, gameShell, recordedCaption } from "../ui.js";
+import { climbInvite, expander, gameShell, recordedCaption } from "../ui.js";
 import { bigCelebration } from "../fx.js";
 import * as sound from "../sound.js";
 
@@ -308,6 +308,8 @@ export function render(container) {
 
     return el("div", {}, [
       banner,
+      // Round 19: on an already-mastered level, say where the coins are.
+      climbInvite(GAME_KEY, () => startCode()),
       el("button.kmg-btn.kmg-btn-primary.kmg-btn-big", {
         type: "button",
         text: t("code.new_code_button"),

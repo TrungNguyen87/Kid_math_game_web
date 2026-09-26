@@ -1149,6 +1149,182 @@ export function leerhapjesIllustration() {
   </svg>`;
 }
 
+/** 🌋 Lavatoren: a hero on a brick tower, lava bubbling below */
+export function torenIllustration() {
+  const id = uid("tor");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lavatoren">
+    ${animWrap(id, `
+      @keyframes ${id}_hop { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-14px); } }
+      #${id} .hero { animation: ${id}_hop 1.3s ease-in-out infinite; }
+      @keyframes ${id}_lava { 0% { transform: translateY(0px); } 100% { transform: translateY(-5px); } }
+      #${id} .lava { animation: ${id}_lava 1.6s ease-in-out infinite alternate; }
+    `)}
+    <rect x="0" y="0" width="160" height="160" rx="18" fill="#3f2a6b" opacity="0.15"/>
+    <g>
+      <rect x="18" y="104" width="44" height="12" rx="3" fill="#42a5f5" stroke="#1565c0" stroke-width="2.5"/>
+      <rect x="92" y="72" width="44" height="12" rx="3" fill="#ab47bc" stroke="#6a1b9a" stroke-width="2.5"/>
+      <rect x="40" y="40" width="44" height="12" rx="3" fill="#26a69a" stroke="#00695c" stroke-width="2.5"/>
+      <circle cx="26" cy="102" r="3" fill="#42a5f5" stroke="#1565c0" stroke-width="1.5"/><circle cx="40" cy="102" r="3" fill="#42a5f5" stroke="#1565c0" stroke-width="1.5"/><circle cx="54" cy="102" r="3" fill="#42a5f5" stroke="#1565c0" stroke-width="1.5"/>
+      <line x1="126" y1="72" x2="126" y2="50" stroke="#eceff1" stroke-width="3"/>
+      <path d="M 126,50 L 110,55 L 126,60 Z" fill="#43a047"/>
+      <text x="62" y="30" text-anchor="middle" font-size="18">🏆</text>
+    </g>
+    <g class="hero" style="transform-origin:40px 100px;">
+      <rect x="32" y="80" width="16" height="16" rx="5" fill="#ff7043" stroke="#e64a19" stroke-width="2"/>
+      <circle cx="40" cy="72" r="9" fill="#ffe0b2" stroke="#6d4c41" stroke-width="2"/>
+      <circle cx="37" cy="71" r="1.5" fill="#3e2723"/><circle cx="43" cy="71" r="1.5" fill="#3e2723"/>
+      <rect x="34" y="96" width="5" height="8" fill="#37474f"/><rect x="41" y="96" width="5" height="8" fill="#37474f"/>
+    </g>
+    <g class="lava">
+      <path d="M 0,138 Q 20,128 40,138 T 80,138 T 120,138 T 160,138 L 160,170 L 0,170 Z" fill="#ff7043"/>
+      <path d="M 0,146 Q 20,138 40,146 T 80,146 T 120,146 T 160,146 L 160,170 L 0,170 Z" fill="#e53935"/>
+      <circle cx="30" cy="150" r="4" fill="#ffca28"/><circle cx="104" cy="152" r="3" fill="#ffca28"/>
+    </g>
+  </svg>`;
+}
+
+/** 🏎️ Turbokart: a kart racing down a road towards a chequered flag */
+export function kartIllustration() {
+  const id = uid("krt");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Turbokart">
+    ${animWrap(id, `
+      @keyframes ${id}_zoom { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+      #${id} .kart { animation: ${id}_zoom 0.6s ease-in-out infinite; }
+      @keyframes ${id}_flame { 0% { transform: scaleY(0.7); } 100% { transform: scaleY(1.2); } }
+      #${id} .flame { animation: ${id}_flame 0.15s linear infinite alternate; transform-origin: 80px 130px; }
+    `)}
+    <path d="M 60,40 L 100,40 L 150,160 L 10,160 Z" fill="#757575"/>
+    <path d="M 55,40 L 60,40 L 10,160 L 0,160 Z" fill="#e53935"/>
+    <path d="M 100,40 L 105,40 L 160,160 L 150,160 Z" fill="#e53935"/>
+    <path d="M 79,50 L 81,50 L 83,72 L 77,72 Z" fill="#fff" opacity="0.8"/>
+    <path d="M 78,84 L 82,84 L 84,104 L 76,104 Z" fill="#fff" opacity="0.8"/>
+    <g>
+      <rect x="60" y="22" width="40" height="18" fill="#212121"/>
+      <rect x="60" y="22" width="10" height="9" fill="#fafafa"/><rect x="80" y="22" width="10" height="9" fill="#fafafa"/>
+      <rect x="70" y="31" width="10" height="9" fill="#fafafa"/><rect x="90" y="31" width="10" height="9" fill="#fafafa"/>
+      <rect x="56" y="14" width="4" height="30" fill="#8d6e63"/><rect x="100" y="14" width="4" height="30" fill="#8d6e63"/>
+    </g>
+    <g class="flame"><path d="M 68,132 L 72,150 L 76,132 Z" fill="#ff9100"/><path d="M 84,132 L 88,150 L 92,132 Z" fill="#ff9100"/></g>
+    <g class="kart">
+      <rect x="46" y="112" width="14" height="20" rx="4" fill="#212121"/>
+      <rect x="100" y="112" width="14" height="20" rx="4" fill="#212121"/>
+      <rect x="54" y="104" width="52" height="28" rx="9" fill="#ff7043" stroke="#e64a19" stroke-width="2.5"/>
+      <circle cx="80" cy="96" r="11" fill="#ffe0b2" stroke="#6d4c41" stroke-width="2"/>
+      <path d="M 69,92 Q 80,80 91,92 Z" fill="#1e88e5"/>
+      <circle cx="76" cy="97" r="1.6" fill="#3e2723"/><circle cx="84" cy="97" r="1.6" fill="#3e2723"/>
+      <text x="80" y="125" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="sans-serif">1</text>
+    </g>
+    <text x="130" y="36" text-anchor="middle" font-size="20" class="anim-sparkle" style="transform-origin:130px 30px;">⭐</text>
+  </svg>`;
+}
+
+/** 🧩 Rekendoku: a small cage puzzle with a pencil */
+export function dokuIllustration() {
+  const id = uid("dok");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Rekendoku">
+    ${animWrap(id, "")}
+    <g class="anim-float" style="transform-origin:78px 80px;">
+      <rect x="22" y="22" width="112" height="112" rx="8" fill="#ffffff" stroke="#5d4037" stroke-width="4"/>
+      <g stroke="#bcaaa4" stroke-width="1.5">
+        <line x1="50" y1="22" x2="50" y2="134"/><line x1="78" y1="22" x2="78" y2="134"/><line x1="106" y1="22" x2="106" y2="134"/>
+        <line x1="22" y1="50" x2="134" y2="50"/><line x1="22" y1="78" x2="134" y2="78"/><line x1="22" y1="106" x2="134" y2="106"/>
+      </g>
+      <g stroke="#5d4037" stroke-width="4" stroke-linecap="round">
+        <line x1="78" y1="22" x2="78" y2="50"/><line x1="22" y1="78" x2="78" y2="78"/><line x1="106" y1="50" x2="106" y2="106"/>
+        <line x1="50" y1="106" x2="106" y2="106"/><line x1="78" y1="50" x2="134" y2="50"/>
+      </g>
+      <g font-family="sans-serif" font-weight="800" fill="#e64a19" font-size="9">
+        <text x="26" y="32">7+</text><text x="82" y="32">2−</text><text x="26" y="88">12×</text><text x="110" y="60">3:</text>
+      </g>
+      <g font-family="sans-serif" font-weight="900" fill="#3e2723" font-size="18" text-anchor="middle">
+        <text x="36" y="43">3</text><text x="64" y="43">4</text><text x="92" y="43">1</text><text x="120" y="43">2</text>
+        <text x="36" y="99" class="anim-pulse" style="transform-origin:36px 93px;" fill="#2e7d32">4</text>
+      </g>
+      <rect x="22" y="78" width="28" height="28" fill="#fff59d" opacity="0.5"/>
+    </g>
+    <g class="anim-wiggle" style="transform-origin:128px 130px;">
+      <rect x="118" y="96" width="10" height="40" rx="2" fill="#ffb300" stroke="#e65100" stroke-width="2" transform="rotate(35 123 116)"/>
+    </g>
+  </svg>`;
+}
+
+/** ♟️ Tafeltactiek: a board of products with two clips and a line of four */
+export function tactiekIllustration() {
+  const id = uid("tac");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tafeltactiek">
+    ${animWrap(id, "")}
+    <rect x="18" y="16" width="124" height="96" rx="10" fill="#fff8e1" stroke="#8d6e63" stroke-width="3"/>
+    <g font-family="sans-serif" font-weight="800" font-size="11" fill="#5d4037" text-anchor="middle">
+      ${[[12, 14, 15, 16], [18, 20, 21, 24], [25, 27, 28, 30]]
+        .map((row, r) => row.map((n, c) => `<text x="${38 + c * 28}" y="${40 + r * 28}">${n}</text>`).join(""))
+        .join("")}
+    </g>
+    <g class="anim-pulse" style="transform-origin:80px 64px;">
+      <circle cx="38" cy="36" r="11" fill="#ff7043" opacity="0.35"/><circle cx="66" cy="64" r="11" fill="#ff7043" opacity="0.35"/>
+      <circle cx="94" cy="92" r="11" fill="#ff7043" opacity="0.35"/>
+    </g>
+    <circle cx="122" cy="36" r="11" fill="#7e57c2" opacity="0.35"/><circle cx="94" cy="36" r="11" fill="#7e57c2" opacity="0.35"/>
+    <rect x="18" y="122" width="124" height="22" rx="8" fill="#eceff1" stroke="#90a4ae" stroke-width="2"/>
+    <g font-family="sans-serif" font-weight="800" font-size="11" fill="#455a64" text-anchor="middle">
+      ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n, i) => `<text x="${28 + i * 13}" y="137">${n}</text>`).join("")}
+    </g>
+    <g class="anim-bob" style="transform-origin:67px 120px;"><path d="M 63,112 L 71,112 L 71,124 Q 67,130 63,124 Z" fill="#ffb300" stroke="#e65100" stroke-width="1.5"/></g>
+    <g class="anim-bob" style="transform-origin:106px 120px;"><path d="M 102,112 L 110,112 L 110,124 Q 106,130 102,124 Z" fill="#26a69a" stroke="#00695c" stroke-width="1.5"/></g>
+    <text x="140" y="112" font-size="16">🤖</text>
+  </svg>`;
+}
+
+/** 🎡 Pretparkbaas: a Ferris wheel turning over a little park */
+export function parkIllustration() {
+  const id = uid("prk");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pretparkbaas">
+    ${animWrap(id, "")}
+    <rect x="0" y="118" width="160" height="42" rx="6" fill="#81c784"/>
+    <path d="M 0,128 Q 80,116 160,128" fill="none" stroke="#fff59d" stroke-width="6" stroke-linecap="round"/>
+    <line x1="70" y1="112" x2="60" y2="122" stroke="#6d4c41" stroke-width="4"/><line x1="70" y1="112" x2="80" y2="122" stroke="#6d4c41" stroke-width="4"/>
+    <g class="anim-spin-slow" style="transform-origin:70px 64px;">
+      <circle cx="70" cy="64" r="46" fill="none" stroke="#ab47bc" stroke-width="4"/>
+      <circle cx="70" cy="64" r="6" fill="#6a1b9a"/>
+      ${[0, 45, 90, 135, 180, 225, 270, 315]
+        .map((a) => {
+          const x = 70 + 46 * Math.cos((a * Math.PI) / 180);
+          const y = 64 + 46 * Math.sin((a * Math.PI) / 180);
+          const colors = ["#ef5350", "#ffca28", "#42a5f5", "#66bb6a"];
+          return `<line x1="70" y1="64" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#ce93d8" stroke-width="2"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${colors[(a / 45) % 4]}" stroke="#5d4037" stroke-width="1.5"/>`;
+        })
+        .join("")}
+    </g>
+    <g class="anim-float" style="transform-origin:130px 100px;">
+      <path d="M 116,118 L 130,86 L 144,118 Z" fill="#ef5350" stroke="#b71c1c" stroke-width="2"/>
+      <path d="M 123,118 L 130,98 L 137,118 Z" fill="#fff"/>
+      <line x1="130" y1="86" x2="130" y2="76" stroke="#5d4037" stroke-width="2"/><path d="M 130,76 L 140,79 L 130,82 Z" fill="#ffca28"/>
+    </g>
+    <text x="20" y="146" font-size="16">🍭</text><text x="100" y="152" font-size="14">🧒</text>
+    <text x="124" y="30" font-size="18" class="anim-sparkle" style="transform-origin:132px 24px;">💰</text>
+  </svg>`;
+}
+
+/** 🌟 Sterrenpad: a winding road of stars up to a gift */
+export function sterrenpadIllustration() {
+  const id = uid("str");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sterrenpad">
+    ${animWrap(id, "")}
+    <path d="M 20,150 C 70,140 20,110 80,100 S 140,70 90,50 S 60,24 120,18" fill="none" stroke="#ffe082" stroke-width="12" stroke-linecap="round"/>
+    <path d="M 20,150 C 70,140 20,110 80,100 S 140,70 90,50 S 60,24 120,18" fill="none" stroke="#ffb300" stroke-width="2" stroke-dasharray="4 7"/>
+    ${[
+      [30, 146],
+      [58, 116],
+      [104, 90],
+      [98, 54],
+      [80, 34],
+    ]
+      .map(([x, y], i) => `<text x="${x}" y="${y}" text-anchor="middle" font-size="${14 + i * 2}" class="anim-sparkle" style="transform-origin:${x}px ${y - 6}px; animation-delay:${i * 0.25}s">⭐</text>`)
+      .join("")}
+    <g class="anim-bob" style="transform-origin:124px 20px;"><text x="126" y="28" text-anchor="middle" font-size="26">🎁</text></g>
+    <g class="anim-float" style="transform-origin:50px 128px;"><text x="46" y="136" text-anchor="middle" font-size="22">🧗</text></g>
+  </svg>`;
+}
+
 /** Map of gameKey -> illustration generator function */
 const ILLUSTRATIONS = {
   tafel: tafelIllustration,
@@ -1168,6 +1344,12 @@ const ILLUSTRATIONS = {
   spelling: spellingIllustration,
   vlieg: vliegIllustration,
   sprong: sprongIllustration,
+  toren: torenIllustration,
+  kart: kartIllustration,
+  doku: dokuIllustration,
+  tactiek: tactiekIllustration,
+  park: parkIllustration,
+  sterrenpad: sterrenpadIllustration,
   leerhapjes: leerhapjesIllustration,
   compete: competeIllustration,
   uitleg: uitlegIllustration,

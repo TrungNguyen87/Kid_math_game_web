@@ -79,7 +79,8 @@ test("every game runs 0-7, and the difficulty labels name levels 6 and 7 as groe
 });
 
 test("the new games are real, levelled games: in GAME_KEYS, with a name, title and intro in both languages", () => {
-  for (const game of ["lezen", "woorden", "spelling", "vlieg", "sprong"]) {
+  // Round 19 added two arcade games and three puzzle/strategy games.
+  for (const game of ["lezen", "woorden", "spelling", "vlieg", "sprong", "toren", "kart", "doku", "tactiek", "park"]) {
     assert.ok(state.GAME_KEYS.includes(game), game);
     for (const lang of ["nl", "en"]) {
       for (const key of [`game.${game}.name`, `${game}.title`, `${game}.tagline`, `${game}.intro`, `nav.${game}`]) {
@@ -88,7 +89,8 @@ test("the new games are real, levelled games: in GAME_KEYS, with a name, title a
     }
   }
   assert.deepEqual([...state.READING_GAMES].sort(), ["lezen", "spelling", "woorden"]);
-  assert.deepEqual([...state.ARCADE_GAMES].sort(), ["sprong", "vlieg"]);
+  assert.deepEqual([...state.ARCADE_GAMES].sort(), ["kart", "sprong", "toren", "vlieg"]);
+  assert.deepEqual([...state.PUZZLE_GAMES].sort(), ["doku", "park", "tactiek"]);
 });
 
 // ---------------------------------------------------------------------------

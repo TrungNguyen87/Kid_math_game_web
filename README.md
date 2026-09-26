@@ -1,9 +1,10 @@
 # Reken- & Leesspellen voor Groep 6, 7 & 8
 
-Seventeen maths, reading and arcade games for Dutch primary-school children
-aged roughly 9–12 (groep 6, 7 and 8), in Dutch and English, with eight
-difficulty levels each — the top two at groep 8 level — plus one-minute
-learning bites and a dashboard for parents.
+Twenty-two maths, reading, arcade, puzzle and strategy games for Dutch
+primary-school children aged roughly 9–12 (groep 6, 7 and 8), in Dutch and
+English, with eight difficulty levels each — the top two at groep 8 level —
+plus one-minute learning bites, a star road of rewards for climbing, and a
+dashboard for parents.
 
 **Play:** https://trungnguyen87.github.io/Kid_math_game_web/
 *(after the one-time setup in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §4)*
@@ -34,8 +35,13 @@ opened. Nothing a child types or answers ever leaves their device.
 | 🌪️ | **Spellingstorm** | Spelling: from *hond/hont* to d/t, ’t kofschip and *gebeurd/gebeurt* (English: homophones and tricky words) |
 | 🐦 | **Fladdervogel** | Arcade: tap to fly through the gap with the right answer (sums or words) |
 | 🦸 | **Sprongheld** | Arcade: a runner who jumps into the block with the right answer (sums or words) |
+| 🌋 | **Lavatoren** | Arcade: an obstacle tower — jump onto the platform with the right answer before the lava catches up |
+| 🏎️ | **Turbokart** | Arcade: a kart race — steer over the boost pad with the right answer, dodge bananas, beat three rivals |
+| 🧩 | **Rekendoku** | Puzzle: a cage logic puzzle (3×3 to 6×6) solved with +, −, × and :, with a 💡 tip that lists what fits a cage |
+| ♟️ | **Tafeltactiek** | Strategy: a times-table board game against the computer — move a clip, claim the product, four in a row |
+| 🎡 | **Pretparkbaas** | Tycoon: build a theme park that stays yours, with money maths from change to payback time |
 
-Plus **🍪 Leerhapjes**, 24 one-minute lessons with a three-question check and a
+Plus **🌟 Sterrenpad**, the star road (see below); **🍪 Leerhapjes**, 24 one-minute lessons with a three-question check and a
 card album; **📖 Uitleg Concepten**, a reference a child can open mid-game; and
 **📊 Ouder Dashboard** — accuracy per game, questions per day, the levels
 mastered and when, the full log and a CSV export.
@@ -48,9 +54,10 @@ after two wrong ones, and a child can also just tap the level they want.
 
 ## Why keep coming back
 
-Every correct answer pays coins for the **reward shop**: 53 characters, 48
-stickers, 19 special gifts and 7 colour themes that recolour the whole app —
-a few of them only for children who reach groep 8's level 6 or 7.
+Every correct answer pays coins for the **reward shop**: 58 characters, 53
+stickers, 19 special gifts and 8 colour themes that recolour the whole app —
+a few of them only for children who reach groep 8's level 6 or 7, and twelve
+only on the star road.
 Tap 🎯 on an item to make it your savings goal; the sidebar then shows how
 close you are.
 
@@ -61,7 +68,13 @@ On top of that:
 - **Three daily quests** (a bit of effort, a bit of skill, a bit of variety),
   each paying bonus coins. Finish all three and the day's **treasure chest**
   opens: more coins plus one of 12 treasures that can never be bought.
-- A **days-in-a-row** streak and **31 badges**.
+- A **days-in-a-row** streak and **39 badges**.
+- **The star road (Sterrenpad)**: mastering a level earns stars — one for
+  the easy levels, up to four at groep 8 — and a road of rewards is claimed
+  with them, twelve of which can never be bought. Replaying a mastered level
+  earns no stars, so the fastest way along the road is always up. Wherever a
+  child practises a mastered level (under the answer, on every results
+  screen) the game offers the level above in one tap.
 - **A level passport**: every level mastered is a stamp. Mastering a level
   pays a one-off bonus, and sitting on a mastered level shows a friendly
   "your next level is waiting" nudge with a one-tap way up. The home page's
@@ -69,8 +82,9 @@ On top of that:
 - A **words read** counter, a daily reading quest, and a bite of the day.
 
 None of it can be farmed: a mastered level pays no coins (practice is always
-allowed), its bonus pays once, a learning bite pays once, and quest progress
-only counts answers that actually earned points.
+allowed), its bonus and its stars come once, a learning bite pays once, quest
+progress only counts answers that actually earned points, and a star-road
+reward is claimed once.
 
 ## How it is built
 

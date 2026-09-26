@@ -22,9 +22,9 @@
 import { getLanguage, t } from "./i18n.js";
 import { el, clear, append } from "./dom.js";
 import { sample, shuffle } from "./rng.js";
-import { addScore, awardablePoints, getLevel, saveCurrentProfile, state } from "./state.js";
-import { adaptAfterRound, settleAnswer } from "./gameflow.js";
-import { gameShell, recordedCaption, statRow } from "./ui.js";
+import { addScore, awardablePoints, getLevel, recordFeat, saveCurrentProfile, state } from "./state.js";
+import { adaptAfterRound, announceNewBadges, settleAnswer } from "./gameflow.js";
+import { climbInvite, gameShell, recordedCaption, statRow } from "./ui.js";
 import { equippedAvatarEmoji } from "./rewards.js";
 import { bigCelebration, confetti, floatPoints } from "./fx.js";
 import { generateProblem as mathProblem } from "./games/bliksem.js";
@@ -124,8 +124,19 @@ export function fitText(ctx, text, x, y, maxWidth, size = 22, min = 11) {
   ctx.fillText(text, x, y);
 }
 
+/** The flap/jump keys every arcade game understands. */
+function defaultKeyInput(key) {
+  return key === " " || key === "ArrowUp" || key === "w" || key === "Enter" ? {} : null;
+}
+
 /**
  * Build an arcade game page.
+ *
+ * The input handed to step() each frame is `{ action, tap, lane, steer }`:
+ * `action` is true on any tap or game key this frame, `tap` is where the
+ * canvas was touched (in the world's own coordinates), and `lane` / `steer`
+ * come from a game's own keys (spec.keyInput). A game reads what it needs;
+ * Fladdervogel and Sprongheld only ever look at `action`.
  *
  * @param {object} spec
  * @param {string} spec.gameKey
@@ -133,11 +144,19 @@ export function fitText(ctx, text, x, y, maxWidth, size = 22, min = 11) {
  * @param {number} spec.width   logical canvas width
  * @param {number} spec.height  logical canvas height
  * @param {Function} spec.createWorld ({ level, nextQuestion, hero }) => world
- * @param {Function} spec.step        (world, dt, { action }) => events[]
+ * @param {Function} spec.step        (world, dt, input) => events[]
  * @param {Function} spec.draw        (ctx, world, colors) => void
+ * @param {Function} [spec.keyInput]  (key) => partial input, or null to ignore the key
+ * @param {boolean} [spec.lives=true] false for a game without lives (a race)
+ * @param {Function} [spec.hudExtra]  (world) => extra HUD strings, shown first
+ * @param {Function} [spec.result]    (world, {correct, asked}) => {icon, key,
+ *   vars, feat} | null - the game's own line on the results screen, and the
+ *   one-off feat (state.recordFeat) it earned, if any
  */
 export function arcadeGame(spec) {
   const { gameKey, emoji, width, height, createWorld, step, draw } = spec;
+  const keyInput = spec.keyInput ?? defaultKeyInput;
+  const hasLives = spec.lives !== false;
 
   return function render(container) {
     let phase = "idle"; // idle | running | finished
@@ -145,7 +164,8 @@ export function arcadeGame(spec) {
     let world = null;
     let rafId = null;
     let lastTime = 0;
-    let pendingAction = false;
+    let pendingInput = null;
+    let runResult = null;
     let paused = false;
     let hudVersion = -1;
     let colors = null;
@@ -254,29 +274,35 @@ export function arcadeGame(spec) {
 
     // --- input ----------------------------------------------------------------
 
-    function act() {
+    function act(input = {}) {
       if (phase !== "running") return;
       if (paused) {
         paused = false;
         lastTime = performance.now();
         return;
       }
-      pendingAction = true;
+      pendingInput = { ...(pendingInput ?? {}), ...input, action: true };
     }
 
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       canvas.focus({ preventScroll: true });
-      act();
+      // Where the tap landed, in the world's own coordinates - the lava
+      // tower needs to know which platform was touched, the kart which side.
+      const rect = canvas.getBoundingClientRect();
+      const tap = rect.width
+        ? { x: ((event.clientX - rect.left) / rect.width) * width, y: ((event.clientY - rect.top) / rect.height) * height }
+        : null;
+      act(tap ? { tap } : {});
     });
     const onKey = (event) => {
       if (phase !== "running") return;
-      if (event.key === " " || event.key === "ArrowUp" || event.key === "w" || event.key === "Enter") {
-        // Space would otherwise scroll the page away from the game.
-        if (event.target instanceof HTMLInputElement) return;
-        event.preventDefault();
-        act();
-      }
+      const input = keyInput(event.key);
+      if (!input) return;
+      // Space and the arrows would otherwise scroll the page away from the game.
+      if (event.target instanceof HTMLInputElement) return;
+      event.preventDefault();
+      act(input);
     };
     document.addEventListener("keydown", onKey);
     const onVisibility = () => {
@@ -303,8 +329,8 @@ export function arcadeGame(spec) {
       const dt = Math.min(0.034, Math.max(0, (now - lastTime) / 1000));
       lastTime = now;
       if (!paused) {
-        const events = step(world, dt, { action: pendingAction });
-        pendingAction = false;
+        const events = step(world, dt, pendingInput ?? { action: false });
+        pendingInput = null;
         for (const event of events) handleEvent(event);
       }
       if (phase !== "running") return;
@@ -319,7 +345,9 @@ export function arcadeGame(spec) {
       combo = 0;
       runPoints = 0;
       newRecord = false;
+      runResult = null;
       paused = false;
+      pendingInput = null;
       colors = themeColors();
       const lang = getLanguage();
       world = createWorld({
@@ -327,6 +355,7 @@ export function arcadeGame(spec) {
         nextQuestion: () => arcadeQuestion(runLevel, mode, lang),
         hero: heroEmoji(),
         readyText: t(`${gameKey}.tap_to_start`),
+        lang,
       });
       phase = "running";
       lastCssWidth = 0;
@@ -346,6 +375,13 @@ export function arcadeGame(spec) {
       else if (event.type === "crash") sound.playIncorrect();
       else if (event.type === "action") sound.playTap();
       else if (event.type === "over") finishRun();
+      // Round 19: a checkpoint or a power-up is a small cheer; reaching the
+      // summit or the finish line a big one.
+      else if (event.type === "checkpoint" || event.type === "powerup") sound.playBadge();
+      else if (event.type === "summit" || event.type === "finish") {
+        sound.playFanfare();
+        bigCelebration();
+      }
     }
 
     function scoreAnswer({ correct: isCorrect, question, picked }) {
@@ -391,6 +427,14 @@ export function arcadeGame(spec) {
         state.arcadeBest = correct;
         saveCurrentProfile();
       }
+      // The game's own verdict (reached the summit, finished first) and the
+      // one-off feat that goes with it, before the level decision so a
+      // badge it unlocks is celebrated with the run.
+      runResult = spec.result?.(world, { correct, asked }) ?? null;
+      if (runResult?.feat && recordFeat(runResult.feat)) {
+        announceNewBadges();
+        saveCurrentProfile();
+      }
       sound.playTimeUp();
       // One level decision per run, like the timed games.
       adaptAfterRound(gameKey, correct, asked);
@@ -413,10 +457,15 @@ export function arcadeGame(spec) {
         el("span.kmg-question-text", { text: q ? q.text : t("arcade.get_ready") }),
       );
       clear(hudStats);
-      const hearts = "❤️".repeat(world.lives) + "🤍".repeat(Math.max(0, LIVES - world.lives));
       const multiplier = COMBO_STEPS[Math.min(combo, COMBO_STEPS.length - 1)];
+      for (const extra of spec.hudExtra?.(world) ?? []) {
+        hudStats.append(el("span.kmg-arcade-stat.kmg-arcade-stat-extra", { text: extra }));
+      }
+      if (hasLives) {
+        const hearts = "❤️".repeat(Math.max(0, world.lives)) + "🤍".repeat(Math.max(0, LIVES - world.lives));
+        hudStats.append(el("span.kmg-arcade-lives", { text: hearts, title: t("arcade.lives") }));
+      }
       hudStats.append(
-        el("span.kmg-arcade-lives", { text: hearts, title: t("arcade.lives") }),
         el("span.kmg-arcade-stat", { text: `✅ ${correct}/${QUESTIONS_PER_RUN}` }),
         el("span.kmg-arcade-stat", { text: `x${multiplier}` }),
         el("span.kmg-arcade-stat", { text: `🌟 ${runPoints}` }),
@@ -498,6 +547,14 @@ export function arcadeGame(spec) {
     function paintFinished() {
       const accuracy = asked ? Math.round((100 * correct) / asked) : 0;
       stage.append(el("h2", { text: t("arcade.run_over") }));
+      if (runResult) {
+        stage.append(
+          el(`div.kmg-banner.${runResult.good ? "kmg-banner-ok" : "kmg-banner-info"}.kmg-arcade-result`, {}, [
+            el("span.kmg-banner-icon", { text: runResult.icon }),
+            el("span.kmg-banner-body", { text: t(runResult.key, runResult.vars) }),
+          ]),
+        );
+      }
       if (newRecord) {
         bigCelebration();
         stage.append(
@@ -523,11 +580,17 @@ export function arcadeGame(spec) {
               ? ["👍", "arcade.praise_mid", false]
               : ["💪", "arcade.praise_low", false];
       if (celebrate) confetti({ count: 50 });
-      stage.append(
+      append(
+        stage,
         el(`div.kmg-banner.${celebrate ? "kmg-banner-ok" : "kmg-banner-info"}`, {}, [
           el("span.kmg-banner-icon", { text: icon }),
           el("span.kmg-banner-body", { text: t(key) }),
         ]),
+        // On an already-mastered level the run paid nothing: say where it would.
+        climbInvite(gameKey, () => {
+          phase = "idle";
+          paint();
+        }),
         el("div.kmg-actions", {}, [
           el("button.kmg-btn.kmg-btn-primary", {
             type: "button",

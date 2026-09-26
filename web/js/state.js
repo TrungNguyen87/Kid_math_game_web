@@ -55,12 +55,21 @@ export const GAME_KEYS = [
   // games, the gameplay is a flying/jumping game.
   "vlieg",
   "sprong",
+  "toren",
+  "kart",
+  // Puzzles and strategy (round 19): a logic puzzle, a board game against
+  // the computer, and a theme park to build.
+  "doku",
+  "tactiek",
+  "park",
 ];
 
 /** The reading and language games - they feed the reading counters and quest. */
 export const READING_GAMES = new Set(["lezen", "woorden", "spelling"]);
 /** The arcade games - one run is a round, like the timed games. */
-export const ARCADE_GAMES = new Set(["vlieg", "sprong"]);
+export const ARCADE_GAMES = new Set(["vlieg", "sprong", "toren", "kart"]);
+/** The puzzle and strategy games (round 19) - one puzzle, match or day is a round. */
+export const PUZZLE_GAMES = new Set(["doku", "tactiek", "park"]);
 
 /**
  * Bonus coins for mastering a level for the first time - see clearLevel().
@@ -144,6 +153,15 @@ function freshPlayStreak() {
   return { last: null, count: 0, best: 0 };
 }
 
+/**
+ * The theme park a child builds in Pretparkbaas (round 19): park cash (its
+ * own money - never the shop's coins), the attractions built, and a few
+ * counters for the park sign. Kept per player, like everything else.
+ */
+export function freshPark() {
+  return { cash: 0, built: [], days: 0, visitors: 0, bestDay: 0, topLevel: 0 };
+}
+
 function randomId() {
   return Math.random().toString(16).slice(2, 10);
 }
@@ -210,6 +228,12 @@ export const state = {
   readCorrect: 0,
   arcadeBest: 0,
   bites: {},
+  // Round 19. One-off achievements in the new games (reaching the top of
+  // the lava tower, winning a kart race, ...) that badges look at; the
+  // theme park; and the star-road tiers already claimed (starroad.js).
+  feats: new Set(),
+  park: freshPark(),
+  passClaimed: [],
   // Device preference, not tied to a player.
   soundEnabled: prefs.soundEnabled !== false,
 };
@@ -254,6 +278,9 @@ export function saveCurrentProfile() {
     readCorrect: state.readCorrect,
     arcadeBest: state.arcadeBest,
     bites: JSON.parse(JSON.stringify(state.bites)),
+    feats: [...state.feats].sort(),
+    park: { ...state.park, built: [...state.park.built] },
+    passClaimed: [...state.passClaimed].sort((a, b) => a - b),
     updatedAt: new Date().toISOString(),
   };
   writeJson(PROFILES_KEY, profiles);
@@ -291,6 +318,9 @@ function resetPlayerFields() {
   state.readCorrect = 0;
   state.arcadeBest = 0;
   state.bites = {};
+  state.feats = new Set();
+  state.park = freshPark();
+  state.passClaimed = [];
 }
 
 /** Restore a saved profile into the live state. Returns true if one existed. */
@@ -345,6 +375,15 @@ export function applyProfile(name) {
   state.readCorrect = profile.readCorrect || 0;
   state.arcadeBest = profile.arcadeBest || 0;
   state.bites = profile.bites && typeof profile.bites === "object" ? JSON.parse(JSON.stringify(profile.bites)) : {};
+  // Round 19 fields; a profile saved before then starts them fresh.
+  state.feats = new Set(Array.isArray(profile.feats) ? profile.feats : []);
+  const park = profile.park && typeof profile.park === "object" ? profile.park : {};
+  state.park = {
+    ...freshPark(),
+    ...park,
+    built: Array.isArray(park.built) ? park.built.filter((id) => typeof id === "string") : [],
+  };
+  state.passClaimed = Array.isArray(profile.passClaimed) ? profile.passClaimed.filter(Number.isInteger) : [];
   emitChange();
   return true;
 }
@@ -548,6 +587,18 @@ export function nextPayingLevel(gameKey, level = getLevel(gameKey)) {
 /** How many levels have been mastered, across every game. */
 export function masteredLevelCount() {
   return Object.values(state.clearedLevels).reduce((sum, levels) => sum + levels.size, 0);
+}
+
+/**
+ * Record a one-off achievement (round 19) - "reached the top of the lava
+ * tower", "won a kart race". Returns true the first time only, so a caller
+ * can celebrate it once.
+ */
+export function recordFeat(id) {
+  if (state.feats.has(id)) return false;
+  state.feats.add(id);
+  emitChange();
+  return true;
 }
 
 /** Add to the "words read" counter (reading games and micro-lessons). */

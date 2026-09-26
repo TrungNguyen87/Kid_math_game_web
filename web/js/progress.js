@@ -12,6 +12,7 @@ import {
   ARCADE_GAMES,
   GAME_KEYS,
   GROEP8_LEVEL,
+  PUZZLE_GAMES,
   READING_GAMES,
   canEarnAtLevel,
   getLevel,
@@ -27,8 +28,9 @@ import {
  *      nearest level that still pays.
  *   2. "groep8" - a game at the old top (level 5) that has never been to
  *      groep 8: the new levels are waiting.
- *   3. "new" - a game never tried, reading and arcade games first (they are
- *      the new ones, and reading is what this round wants more of).
+ *   3. "new" - a game never tried: reading first (reading is what round 18
+ *      wanted more of), then the arcade games, then the puzzle and strategy
+ *      games (round 19), then anything else.
  *   4. "lowest" - otherwise, the tried game with the lowest level.
  * @returns {{kind: string, game: string, level: number}}
  */
@@ -48,7 +50,10 @@ export function nextChallenge() {
   }
   const untried = GAME_KEYS.filter((game) => !state.gamesTried.has(game));
   const firstNew =
-    untried.find((game) => READING_GAMES.has(game)) ?? untried.find((game) => ARCADE_GAMES.has(game)) ?? untried[0];
+    untried.find((game) => READING_GAMES.has(game)) ??
+    untried.find((game) => ARCADE_GAMES.has(game)) ??
+    untried.find((game) => PUZZLE_GAMES.has(game)) ??
+    untried[0];
   if (firstNew) return { kind: "new", game: firstNew, level: getLevel(firstNew) };
   const lowest = [...GAME_KEYS].sort((a, b) => getLevel(a) - getLevel(b))[0];
   return { kind: "lowest", game: lowest, level: getLevel(lowest) };

@@ -9,6 +9,203 @@ rediscover them.
 
 ---
 
+## Session 18 — 26 September 2026
+
+**Branch:** `claude/interactive-games-progression-nyygu8`
+
+### Asked
+
+1. Read the changelog and memory first.
+2. More kinds of interactive games like round 18's arcade games: "some
+   Roblox games if possible", "Mario games?", arcade, puzzle, strategy -
+   something creative, possibly with micro-learning.
+3. Make the player feel more encouraged while playing.
+4. Log the easy levels a child has finished so they don't keep playing
+   them, in a way that makes a higher level feel like the thing to go for.
+5. Test everything before deploying so the GitHub deploy runs smoothly;
+   save the changelog and memory before committing.
+
+### Decided: "in the spirit of", never the brand
+
+Session 7's rule (original characters, not licensed ones) applies to games
+too. Roblox is a platform whose best-known genres are the obstacle tower
+("obby") and the tycoon, so those became **Lavatoren** (a floor-is-lava
+climb) and **Pretparkbaas** (a theme park tycoon); "Mario" became
+**Turbokart** (Sprongheld already is the platformer). Puzzle and strategy
+became **Rekendoku** (a cage logic puzzle) and **Tafeltactiek** (the
+classroom product game against the computer). Every name is our own.
+
+### Decided: the maths is the mechanic, and a wrong answer teaches
+
+The micro-learning is inside each game rather than bolted on:
+
+- **Rekendoku's 💡 tip** lists every set of numbers that fits the selected
+  cage ("12× in two cells with 1-4: 3 × 4") - number bonds and factor pairs,
+  exactly when the child needs them.
+- **Tafeltactiek's strategy is division**: to take the square you want you
+  work out which factor gets you there (24, other clip on 6 → move to 4).
+- **Pretparkbaas explains a wrong answer with the numbers of that question**
+  ("€10 − €6 = €4"), and from level 5 every attraction card shows its
+  payback time - the thing the level-7 questions ask about.
+- **The arcade games give reading time, not reflex tests**: Lavatoren's lava
+  rises one floor per "reading budget" (16 s at level 0, 7 s at level 7) and
+  a wrong platform costs time, never a life (round 18's rule: losing a life
+  for a wrong answer punishes slow reading). Turbokart's place is a summary
+  of the answers: the rivals' speeds (1.06, 1.02, 0.96 × base) were tuned by
+  simulation so all right wins at every level, ~75% is mostly 2nd, ~50%
+  mostly 3rd, all wrong last.
+
+### Decided: puzzles are unique, strategy games level on results
+
+- **Every Rekendoku has exactly one solution.** A random cage puzzle often
+  has several; the "show a cell" help would then contradict a child who had
+  found a different, equally valid answer. The generator runs a backtracking
+  solver and, while two solutions exist, turns a cell where they differ into
+  a given. Worst case under 11 ms at 6×6.
+- **A puzzle, a match or a park day is a round**, levelled by
+  `gameflow.js adaptAfterGame()`: a win masters the level exactly like a
+  streak does (so the replay guard, bonus, log and stars all apply), a draw
+  stays, and it takes *two losses in a row at the same level* to step down.
+  One close loss to the computer is still a good game. Rekendoku: a clean
+  solve is a win, a solve with help a draw, giving up a loss.
+- **Tafeltactiek's computer** was tuned by simulating thousands of matches
+  against three child strategies. A casual player (blocks obvious threats)
+  wins ~77% at level 0 and ~15% at level 7; a thoughtful one still wins
+  about half at level 7.
+
+### Decided: "log the easy levels" = the star road, plus the invitation where the child looks
+
+Round 18 already logged mastered levels, paid a one-off bonus and nudged in
+the level picker. What it lacked was a *collection that grows faster higher
+up*, and a nudge a child on a phone can actually see.
+
+- **Stars come only from mastering a level, and the higher the level the
+  more** (1, 1, 2, 2, 3, 3, 4). They are **computed from
+  `state.clearedLevels`**, not counted in a field: that set only gains a
+  level on a real, streak-earned level-up and never gains one twice, so
+  there is nothing to farm - replays, slide-down-and-back and manual picks
+  all leave the stars where they were. The top level (7) is never
+  "mastered" and gives none; reaching it is its own reward.
+- **The road's rewards cannot be bought** (a new `star` tier, `starRoad` on
+  the reward, `lockReason` "stars", `notForSale()`); coins on the road are a
+  gift, never score. Twelve items, including a colour theme.
+- **An existing profile finds its earned tiers waiting** (stars come from
+  the mastery it already has) - a nice surprise rather than a problem.
+- **The climb invitation** (`ui.js climbInvite()`) sits under the answer
+  after a practice answer and on every results screen. On a phone the
+  picker's nudge is scrolled away by the time a child has answered; this is
+  where they are looking. It names the next paying level, its bonus coins
+  and its stars, and moves the game there in one tap.
+- **In the park, climbing is how the park grows**: entrance rises with the
+  level, blueprints open after a good day at a higher level, and a mastered
+  level pays half. That is the replay guard expressed as game design.
+
+### Found along the way
+
+- **A real, pre-existing bug in Race Mode.** A new smoke check ("one
+  Lavatoren jump = one answer") kept counting two. The attempt log showed
+  the second: *Racewedstrijd*, the same unanswered question, once a second,
+  long after the smoke test had left the online race. `RaceClient.stop()`
+  closed the WebSocket with the room code still set, and the socket's close
+  handler falls back to polling whenever a room code is set - so every
+  `stop()` started a poller nobody stopped. The dead page went on logging
+  each round as a wrong answer, resetting the streak and playing the
+  "wrong" sound in whatever the child played next. The same leak explains a
+  one-off "request failed: /api/rooms" seen in the offline check. Fixed
+  (code cleared first, handlers detached, a `stopped` flag); a smoke check
+  measures 3.5 s after leaving: old code 4 polls + 4 phantom answers, fixed
+  0 + 0. Online races only run self-hosted, so the Pages site never had it.
+- **I chased the wrong cause first, twice.** I assumed a background tab
+  throttling animation frames (closed a leaked page, brought the main page
+  to the front - it got *worse*), and I assumed a slow frame loop. Neither
+  was true: measuring showed ~60 fps and a world running in real time. What
+  finally worked was exposing the world state for one debug run and reading
+  the attempt log. **Measure before fixing a flake.**
+- **`page.waitForFunction(async () => ...)` resolves immediately** - the
+  returned Promise is truthy. Two of my new checks passed or failed by luck
+  until I replaced them with polling from Node. Use a sync predicate or poll
+  from the test side.
+- **A test that passes without its rule is not testing the rule.** The first
+  "computer blocks your line" test passed with the block rule deleted: in
+  that position the general scoring blocks anyway. A search over random
+  positions found one where only the rule blocks; that one is pinned now,
+  and fails without the rule.
+- **Lavatoren's tap mapping was wrong**: thirds of the canvas, but the
+  platforms sit between walls of different widths, so the right platform's
+  left edge counted as the middle one. A Node test on the platform edges
+  caught it; taps now go to the nearest platform.
+- **Phone layout, measured**: Tafeltactiek's ten factors were 24px wide at
+  360px (now two rows, 63px); Rekendoku's cage walls as thick cell borders
+  doubled and left wedges at corners (now one SVG overlay - and the smoke
+  test reads cages from `data-cage` instead of border classes).
+- **An infinite scale pulse makes an element "not stable" for Playwright**
+  and is restless for a child on a big card; the ready Star Road card glows
+  instead.
+- A smoke check can be vacuous by chance: the park day first "passed" with
+  0 of 8 visitors happy (+€0 = 0 × €5). The test now answers the three
+  level-0 question kinds (their Dutch wording) for a real 8/8.
+- `test_mastery.mjs` pinned the arcade set to Fladdervogel and Sprongheld;
+  updated as the deliberate change it is, and it now pins the puzzle set too.
+
+### Verification
+
+- `npm test`: 213/213 (167 before; +13 arcade, +19 puzzles, +14 star road).
+- Revert-to-fail, per CLAUDE.md, each failing for the right reason and
+  passing once restored: the tier claim guard, two-losses-to-step-down,
+  star-road rewards not for sale, Rekendoku's uniqueness loop, the park's
+  half pay on a mastered level, the computer's block rule (after fixing the
+  vacuous test), the tower's checkpoint; the tap mapping failed for real
+  first. Smoke: the climb invitation check and the race-leak check.
+- `npm run lint`; `node --check` on all 60 files under `web/js`;
+  `npm run check:precache` 68/68.
+- `npm start` + `npm run test:smoke`: 29 routes and every scenario, clean
+  in all eight runs since the race fix - the last three on a freshly
+  started server with the final code.
+- `npm run test:pages`: 29 routes under `/Kid_math_game_web/`, stamped
+  cache, offline reload.
+- The workflow's two steps (`sed` BUILD_ID stamp, `check_precache.py`) on a
+  scratch copy of `web/` and `tools/`: pass, 68 files. The live workflow's
+  last five runs (through this morning's round-18 deploy) all succeeded.
+- A sweep of all 29 routes as a seeded "veteran" player (mastered levels,
+  a built park, feats, claimed tiers) in NL desktop light and EN phone dark,
+  every expander open: no `null`/`undefined`/`NaN`, no key, no `{placeholder}`,
+  no sideways scroll.
+- Screenshots checked by eye: all five games at 390x844, the arcade games
+  at 844x390 and 1280x900, the biggest boards at 360x640, the star road in
+  EN dark, home and park at desktop, the climb invitation on a result.
+
+### Still open
+
+- **Numbers without telemetry**, as every round: the reading budgets
+  (16 → 7 s), the kart rivals (1.06/1.02/0.96), star values and the 18
+  tiers (top at 200 of 352 possible), park prices, incomes and the €4 + 2
+  per level entrance, and the computer's strength per level. The
+  simulations prove reachability and a sensible curve, not how it feels to
+  a nine-year-old - watch a child play Tafeltactiek at level 4-5 (a casual
+  player wins ~30-40% there) before tuning.
+- **The park questions are a first draft by a non-teacher**, like the
+  reading texts; each has a checked answer, but the level-by-level money
+  line (change → discount → VAT → payback) deserves a teacher's eye.
+- **The ultra 3D Champion is further away again**: every one of 22 games
+  at level 7, and every other reward - which now includes the twelve
+  star-road rewards (200 stars). In honest play, reaching level 7 everywhere
+  masters 0-6 everywhere (352 stars), so it is consistent, just far.
+- **Deploy day re-rolls one featured game**: `FEATURED_POOL` went from 12 to
+  13 (the park), so `hash % 13` can name a different featured game than a
+  child saw that morning. Completed quests stay completed.
+- **Race Mode's server** still runs a room's rounds after the host leaves
+  until the race ends; only the client side was the bug. Telling the server
+  "I left" would end it sooner.
+- The new arcade games draw the hero's head as an emoji, like Sprongheld
+  (session 17's note about devices without a colour emoji font applies).
+- The smoke's park check depends on the Dutch wording of the three level-0
+  question kinds; a copy change there needs the test's little parser too.
+- Tafeltactiek: the child always moves first; there is no rule-level
+  balancing of first-move advantage beyond the computer's strength.
+- Still carried over: the GitHub Actions Node 20 deprecation warning.
+
+---
+
 ## Session 17 — 25 September 2026
 
 **Branch:** `claude/game-levels-gameplay-expansion-68mtch`

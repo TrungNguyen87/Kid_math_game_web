@@ -168,7 +168,7 @@ export function render(container) {
     const buyable = !unlocked && canUnlock(def.id);
     const isGoal = state.goalReward === def.id && !unlocked;
     const card = el(
-      `div.kmg-reward-card${unlocked ? ".is-unlocked" : ".is-locked"}${buyable ? ".is-buyable" : ""}${equipped ? ".is-equipped" : ""}${def.threeD ? ".is-3d" : ""}${isGoal ? ".is-goal" : ""}${def.chestOnly ? ".is-treasure" : ""}`,
+      `div.kmg-reward-card${unlocked ? ".is-unlocked" : ".is-locked"}${buyable ? ".is-buyable" : ""}${equipped ? ".is-equipped" : ""}${def.threeD ? ".is-3d" : ""}${isGoal ? ".is-goal" : ""}${def.chestOnly ? ".is-treasure" : ""}${def.starRoad != null ? ".is-starroad" : ""}`,
       { dataset: { reward: def.id } },
     );
 
@@ -212,6 +212,15 @@ export function render(container) {
       card.append(el("span.kmg-reward-tag", { text: t("rewards.unlocked_label") }));
     } else if (reason === "chest") {
       card.append(el("p.kmg-reward-lockmsg", { text: `🧰 ${t("rewards.lock_reason_chest")}` }));
+    } else if (reason === "stars") {
+      // Round 19: earned on the star road, never bought - say how many
+      // stars it waits for, and link to where stars come from.
+      card.append(
+        el("a.kmg-reward-lockmsg.kmg-reward-starlink", {
+          href: "#/sterrenpad",
+          text: `🌟 ${t("rewards.lock_reason_stars", { stars: def.starRoad })}`,
+        }),
+      );
     } else if (reason === "mastery") {
       card.append(el("p.kmg-reward-lockmsg", { text: `🔒 ${t("rewards.lock_reason_mastery")}` }));
     } else if (reason === "level") {

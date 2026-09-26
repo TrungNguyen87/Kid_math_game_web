@@ -24,6 +24,7 @@ import {
   state,
 } from "../state.js";
 import { levelPassport, nextChallenge } from "../progress.js";
+import { STAR_TIERS, claimableCount, nextLockedTier, starsForLevel, totalStars } from "../starroad.js";
 import { BITES } from "../bites-data.js";
 import { BITE_COINS, biteOfTheDay, biteStars, collectedCount } from "../bites.js";
 import { BADGE_DEFS, BADGE_EMOJI } from "../badges.js";
@@ -51,6 +52,7 @@ export function render(container) {
   const buddyHost = el("div.kmg-adventure-cell");
   const questHost = el("div.kmg-adventure-cell");
   const goalHost = el("div");
+  const starHost = el("div");
   const challengeHost = el("div.kmg-challenge-host");
   const statsHost = el("div.kmg-homestats");
   const passportHost = el("div");
@@ -90,6 +92,7 @@ export function render(container) {
     paintBuddy();
     paintQuests();
     paintGoal();
+    paintStarRoad();
     paintChallenge();
     paintStats();
     paintTiles();
@@ -295,6 +298,34 @@ export function render(container) {
     );
   }
 
+  // --- the star road (round 19) ----------------------------------------------
+  // Stars only come from mastering levels, more for higher ones; the card
+  // shows how far the next reward is, and pulses when one is waiting.
+
+  function paintStarRoad() {
+    clear(starHost);
+    const stars = totalStars();
+    const next = nextLockedTier(stars);
+    const ready = claimableCount(stars);
+    const previous = [...STAR_TIERS].reverse().find((tier) => tier.stars <= stars)?.stars ?? 0;
+    const pct = next ? Math.round((100 * (stars - previous)) / (next.stars - previous)) : 100;
+    starHost.append(
+      el(`a.kmg-card.kmg-starroad-card${ready ? ".is-ready" : ""}`, { href: "#/sterrenpad", onClick: () => sound.playTap() }, [
+        el("span.kmg-starroad-card-icon", { text: ready ? "🎁" : "🌟", "aria-hidden": "true" }),
+        el("div.kmg-starroad-card-main", {}, [
+          el("div.kmg-goal-head", {}, [
+            el("strong", { text: t("starroad.card_heading", { stars }) }),
+            ready ? el("span.kmg-chip.kmg-starroad-card-ready", { text: t("starroad.ready_count", { count: ready }) }) : null,
+          ]),
+          el("div.kmg-progress-bar", {}, [el("div.kmg-progress-fill", { style: { width: `${pct}%` } })]),
+          el("span.kmg-caption", {
+            text: next ? t("starroad.card_next", { more: next.stars - stars }) : t("starroad.road_done"),
+          }),
+        ]),
+      ]),
+    );
+  }
+
   // --- next challenge (round 18) --------------------------------------------
   // The friendly half of the level-replay guard: when a child is sitting on
   // a level they have already mastered, or has a new level or game waiting,
@@ -307,12 +338,15 @@ export function render(container) {
     if (!entry) return;
     const game = t(`game.${challenge.game}.name`);
     const icons = { climb: "🧗", groep8: "🎓", new: "✨", lowest: "🚀" };
+    // What mastering the suggested level is worth on the star road (round 19).
+    const worth = challenge.level < getMaxLevel(challenge.game) ? starsForLevel(challenge.level) : 0;
     challengeHost.append(
       el(`div.kmg-card.kmg-challenge.is-${challenge.kind}`, {}, [
         el("span.kmg-challenge-icon", { text: icons[challenge.kind], "aria-hidden": "true" }),
         el("div.kmg-challenge-main", {}, [
           el("strong", { text: t("home.challenge_heading") }),
           el("p", { text: t(`home.challenge_${challenge.kind}`, { game, level: challenge.level }) }),
+          worth ? el("span.kmg-chip.kmg-challenge-stars", { text: t("starroad.worth", { stars: "⭐".repeat(worth) }) }) : null,
         ]),
         el("a.kmg-btn.kmg-btn-primary.kmg-challenge-btn", {
           href: `#/${entry.path}`,
@@ -521,6 +555,7 @@ export function render(container) {
     // chest, and what the child is saving up for.
     el("div.kmg-adventure", {}, [buddyHost, questHost]),
     goalHost,
+    starHost,
     challengeHost,
     statsHost,
 
