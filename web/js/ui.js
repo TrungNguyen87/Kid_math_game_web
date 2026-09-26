@@ -30,6 +30,7 @@ import {
   state,
 } from "./state.js";
 import { getLevels, levelLabel } from "./ui-bits.js";
+import { starsForLevel } from "./starroad.js";
 import { getGameIllustration } from "./illustrations.js";
 import * as sound from "./sound.js";
 
@@ -122,7 +123,7 @@ export function levelPicker(gameKey, onChange) {
     const next = canEarnAtLevel(gameKey, current) ? null : nextPayingLevel(gameKey, current);
     nudge.hidden = next == null;
     if (next == null) return;
-    const bonusLine = next < max ? ` ${t("mastery.nudge_bonus", { coins: masteryBonus(next) })}` : "";
+    const bonusLine = next < max ? ` ${t("mastery.nudge_bonus", { coins: masteryBonus(next), stars: starsForLevel(next) })}` : "";
     nudge.append(
       el("span.kmg-practice-nudge-icon", { text: "🏅", "aria-hidden": "true" }),
       el("span.kmg-practice-nudge-text", {
@@ -152,6 +153,48 @@ export function levelPicker(gameKey, onChange) {
   wrap.refresh = paint;
   paint();
   return wrap;
+}
+
+/**
+ * The invitation to climb (round 19): shown where a child's eyes already are
+ * - under a practice answer, on a finished run's results - whenever the level
+ * they are on is already mastered. It names the next level that still pays,
+ * what mastering it is worth (bonus coins and star-road stars), and moves
+ * the game there in one tap. The level picker's nudge says the same at the
+ * top of the page, but on a phone that is scrolled out of sight by the time
+ * a child has answered.
+ *
+ * @param {string} gameKey
+ * @param {Function} [onGo]  called with the new level after the tap
+ * @param {{practised?: number}} [options]  practice answers given at this
+ *   level so far; from three on, the invitation gets a little more insistent
+ * @returns {Element|null} null when the current level still pays
+ */
+export function climbInvite(gameKey, onGo, { practised = 0 } = {}) {
+  const current = getLevel(gameKey);
+  if (canEarnAtLevel(gameKey, current)) return null;
+  const next = nextPayingLevel(gameKey, current);
+  if (next == null) return null;
+  const top = next >= getMaxLevel(gameKey);
+  const text = top
+    ? t("climb.text_top", { level: current, next })
+    : t("climb.text", { level: current, next, coins: masteryBonus(next), stars: starsForLevel(next) });
+  return el(`div.kmg-climb${practised >= 3 ? ".is-urgent" : ""}`, { role: "status" }, [
+    el("span.kmg-climb-icon", { text: practised >= 3 ? "🚀" : "🧗", "aria-hidden": "true" }),
+    el("span.kmg-climb-text", {}, [
+      practised >= 3 ? el("strong", { text: `${t("climb.ready_heading")} ` }) : null,
+      text,
+    ]),
+    el("button.kmg-btn.kmg-btn-primary.kmg-climb-btn", {
+      type: "button",
+      text: t("mastery.nudge_button", { level: next }),
+      onClick: () => {
+        setLevel(gameKey, next);
+        sound.playTap();
+        onGo?.(next);
+      },
+    }),
+  ]);
 }
 
 /**

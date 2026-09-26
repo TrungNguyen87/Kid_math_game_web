@@ -6,7 +6,8 @@
  * weeks rather than in one sitting: coming back day after day, daily quests
  * and chests, the collection, the buddy, and lifetime points. Round 18
  * added ten more for groep 8 (levels 6 and 7), mastering levels, reading,
- * the arcade games and the learning bites.
+ * the arcade games and the learning bites. Round 19 added eight: the star
+ * road, and one feat in each of the five new games.
  *
  * checkNewBadges() is called once per answered question, after that
  * question's score/level/streak updates have landed, and returns whatever
@@ -15,6 +16,7 @@
 import { GAME_KEYS, GROEP8_LEVEL, MASTER_LEVEL, MAX_LEVEL, getLevel, masteredLevelCount, state } from "./state.js";
 import { buddyStageIndex } from "./buddy.js";
 import { BITES } from "./bites-data.js";
+import { totalStars } from "./starroad.js";
 
 const playedAllGames = () => GAME_KEYS.every((k) => state.gamesTried.has(k));
 // "Level 5" and "Reken Meester" were earned at level 5 when 5 was the top;
@@ -62,6 +64,17 @@ export const BADGE_DEFS = [
   ["arcade10", "🕹️", () => state.arcadeBest >= 10],
   ["bites5", "🍪", () => bitesCollected() >= 5],
   ["bites_all", "🧠", () => bitesCollected() >= BITES.length],
+  // Round 19: the star road, and one for each new game - each a feat the
+  // game records once (state.recordFeat), so a badge can never be earned by
+  // replaying something easy.
+  ["stars25", "🌟", () => totalStars() >= 25],
+  ["stars100", "✨", () => totalStars() >= 100],
+  ["toren_top", "🌋", () => state.feats.has("toren_top")],
+  ["kart_first", "🏎️", () => state.feats.has("kart_first")],
+  ["doku_big", "🧩", () => state.feats.has("doku_big")],
+  ["tactiek_win", "♟️", () => state.feats.has("tactiek_win_hard")],
+  ["park_6", "🎡", () => state.feats.has("park_6")],
+  ["park_all", "🎢", () => state.feats.has("park_all")],
 ];
 
 export const BADGE_IDS = BADGE_DEFS.map((b) => b[0]);

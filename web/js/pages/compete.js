@@ -106,6 +106,7 @@ class RaceClient {
     this.playerId = null;
     this.polling = null;
     this.lastEventId = 0;
+    this.stopped = false;
   }
 
   connect(onOpen, onError) {
@@ -147,7 +148,7 @@ class RaceClient {
   }
 
   startPolling() {
-    if (this.polling) return;
+    if (this.polling || this.stopped) return;
     this.polling = setInterval(async () => {
       if (!this.roomCode) return;
       try {
@@ -155,6 +156,7 @@ class RaceClient {
         if (!res.ok) return;
         const data = await res.json();
         for (const ev of data.events || []) {
+          if (this.stopped) return;
           this.lastEventId = Math.max(this.lastEventId, ev.id);
           this.onEvent(ev.data);
         }
@@ -164,10 +166,27 @@ class RaceClient {
     }, 800);
   }
 
+  /**
+   * Stop for good (the page is being left). The room code goes first, and
+   * the socket's handlers are detached before it is closed: its onclose
+   * handler falls back to polling while a room code is set, so closing it
+   * with the code still there used to start a fresh poller nobody would
+   * ever stop - and the page, already gone, kept logging every round of
+   * the race as a wrong answer, with the "wrong" sound, in whatever game
+   * the child had moved on to (round 19).
+   */
   stop() {
+    this.stopped = true;
+    this.roomCode = null;
     if (this.polling) clearInterval(this.polling);
-    if (this.ws) this.ws.close();
     this.polling = null;
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      this.ws.close();
+    }
     this.ws = null;
   }
 }

@@ -50,7 +50,7 @@ const LEGENDARY = 1500;
 const MYTHIC = 3000; // the "special anime-style hero" tier
 const ULTRA = 8000; // exactly one item lives here - see requiresMastery
 
-export const TIER_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic", "ultra"];
+export const TIER_ORDER = ["common", "uncommon", "rare", "epic", "legendary", "mythic", "ultra", "star"];
 
 // { id, category, tier, emoji, nameKey, cost, minLevel, requiresMastery } -
 // cost 0 means always unlocked. category "avatar" items can be equipped
@@ -255,6 +255,27 @@ export const REWARD_DEFS = [
   { id: "treasure_dino", category: "treasure", tier: "epic", emoji: "🦕", nameKey: "rewards.treasure_dino", cost: null, chestOnly: true },
   { id: "treasure_statue", category: "treasure", tier: "epic", emoji: "🗿", nameKey: "rewards.treasure_statue", cost: null, chestOnly: true },
   { id: "treasure_planet", category: "treasure", tier: "legendary", emoji: "🪐", nameKey: "rewards.treasure_planet", cost: null, chestOnly: true },
+
+  // ==========================================================================
+  // Star road (round 19) - never for sale either. Each is claimed from the
+  // star road (starroad.js) once enough stars are collected, and stars only
+  // come from mastering levels, the higher the more. `starRoad` is the star
+  // count of the tier it sits on, so the shop can say how far away it is.
+  // They keep their own category (a character can be equipped, the theme
+  // recolours the app) and share the "star" tier.
+  // ==========================================================================
+  { id: "sticker_moonlight", category: "sticker", tier: "star", emoji: "🌙", nameKey: "rewards.sticker_moonlight", cost: null, starRoad: 4 },
+  { id: "avatar_star_hedgehog", category: "avatar", tier: "star", emoji: "🦔", nameKey: "rewards.avatar_star_hedgehog", cost: null, starRoad: 10 },
+  { id: "sticker_star_ribbon", category: "sticker", tier: "star", emoji: "🎗️", nameKey: "rewards.sticker_star_ribbon", cost: null, starRoad: 14 },
+  { id: "theme_aurora", category: "theme", tier: "star", emoji: "🌌", nameKey: "rewards.theme_aurora", cost: null, starRoad: 23, theme: "aurora", swatch: ["#00bfa5", "#7c4dff", "#ff4081"] },
+  { id: "avatar_star_eagle", category: "avatar", tier: "star", emoji: "🦅", nameKey: "rewards.avatar_star_eagle", cost: null, starRoad: 29 },
+  { id: "sticker_summit", category: "sticker", tier: "star", emoji: "🏔️", nameKey: "rewards.sticker_summit", cost: null, starRoad: 44 },
+  { id: "avatar_star_wolf", category: "avatar", tier: "star", emoji: "🐺✨", nameKey: "rewards.avatar_star_wolf", cost: null, starRoad: 53 },
+  { id: "sticker_star_cup", category: "sticker", tier: "star", emoji: "🏆🌟", nameKey: "rewards.sticker_star_cup", cost: null, starRoad: 75 },
+  { id: "avatar_star_wizard", category: "avatar", tier: "star", emoji: "🧙✨", nameKey: "rewards.avatar_star_wizard", cost: null, starRoad: 90 },
+  { id: "sticker_star_crown", category: "sticker", tier: "star", emoji: "👑🌟", nameKey: "rewards.sticker_star_crown", cost: null, starRoad: 135 },
+  { id: "avatar_star_dragon", category: "avatar", tier: "star", emoji: "🐲🌟", nameKey: "rewards.avatar_star_dragon", cost: null, starRoad: 165 },
+  { id: "avatar_star_unicorn", category: "avatar", tier: "star", emoji: "🦄🌟", nameKey: "rewards.avatar_star_unicorn", cost: null, starRoad: 200 },
 ];
 
 /** Categories whose items can be *equipped*, and the state field holding the choice. */
@@ -263,6 +284,12 @@ const DEFAULT_THEME_ID = "theme_classic";
 
 export const REWARD_MAP = Object.fromEntries(REWARD_DEFS.map((r) => [r.id, r]));
 
+/** Treasures and star-road rewards have no price: they are found or earned, never bought. */
+export function notForSale(id) {
+  const def = REWARD_MAP[id];
+  return !def || !!def.chestOnly || def.starRoad != null;
+}
+
 export function isUnlocked(id) {
   const def = REWARD_MAP[id];
   return !!def && (def.cost === 0 || state.unlockedRewards.has(id));
@@ -270,7 +297,7 @@ export function isUnlocked(id) {
 
 export function canAfford(id) {
   const def = REWARD_MAP[id];
-  return !!def && !def.chestOnly && state.coins >= def.cost;
+  return !!def && !notForSale(id) && state.coins >= def.cost;
 }
 
 /** Has the child reached the level this item asks for? */
@@ -294,7 +321,7 @@ export function meetsCollectionRequirement(id) {
 export function canUnlock(id) {
   return (
     !!REWARD_MAP[id] &&
-    !REWARD_MAP[id].chestOnly &&
+    !notForSale(id) &&
     !isUnlocked(id) &&
     meetsLevelRequirement(id) &&
     meetsMasteryRequirement(id) &&
@@ -308,12 +335,14 @@ export function canUnlock(id) {
  * amount of saved coins fixes come first, so the shop shows the real
  * blocker instead of "too expensive" on something that was never for sale
  * yet anyway.
- * @returns {"chest"|"mastery"|"level"|"coins"|null} null means already
- *   unlocked; "chest" means it can only be found in a daily treasure chest.
+ * @returns {"chest"|"stars"|"mastery"|"level"|"coins"|null} null means
+ *   already unlocked; "chest" means it can only be found in a daily treasure
+ *   chest, "stars" that it waits on the star road (starroad.js).
  */
 export function lockReason(id) {
   if (isUnlocked(id)) return null;
   if (REWARD_MAP[id]?.chestOnly) return "chest";
+  if (REWARD_MAP[id]?.starRoad != null) return "stars";
   if (!meetsMasteryRequirement(id) || !meetsCollectionRequirement(id)) return "mastery";
   if (!meetsLevelRequirement(id)) return "level";
   return "coins";
@@ -400,8 +429,7 @@ export function applyTheme(doc = globalThis.document) {
 
 /** Whether `id` can be a goal: a real, still-locked item that is for sale. */
 export function canBeGoal(id) {
-  const def = REWARD_MAP[id];
-  return !!def && !def.chestOnly && !isUnlocked(id);
+  return !!REWARD_MAP[id] && !notForSale(id) && !isUnlocked(id);
 }
 
 /** Pin `id` as the goal, or unpin it if it already is. Returns the new goal id. */

@@ -56,6 +56,12 @@ const ROUTES = [
   "spelling",
   "fladdervogel",
   "sprongheld",
+  "lavatoren",
+  "turbokart",
+  "rekendoku",
+  "tafeltactiek",
+  "pretparkbaas",
+  "sterrenpad",
   "compete",
   "rewards",
   "uitleg",
@@ -245,6 +251,16 @@ if (await lockedMythicCard.count()) {
   note("rewards:shop", "expected at least one locked mythic-tier card in the shop");
 }
 
+// Round 19: star-road rewards are earned, never bought - a link to the star
+// road instead of a price, on every one of them.
+const starCards = page.locator(".kmg-reward-card.is-starroad");
+const starCount = await starCards.count();
+if (starCount < 10) note("rewards:shop", `expected the star-road rewards in the shop, found ${starCount}`);
+if (await starCards.locator(".kmg-reward-btn").count()) note("rewards:shop", "a star-road reward has a buy button");
+if ((await starCards.locator(".kmg-reward-starlink").count()) !== starCount) {
+  note("rewards:shop", "every locked star-road reward should link to the star road");
+}
+
 // Switching back to the default character must move the "equipped" tag.
 const switchButton = page.locator("#kmg-rewards-avatar .kmg-reward-card.is-unlocked .kmg-reward-btn").first();
 if (await switchButton.count()) {
@@ -311,6 +327,11 @@ if (!Number.isFinite(ra) || !Number.isFinite(rb)) {
   if ((await readDaily()) !== dailyBeforeReplay) {
     note("rewards:level-replay", "a replay answer that paid nothing still moved today's quest progress");
   }
+  // Round 19: the invitation up appears right under the practice answer,
+  // where a child on a phone is looking - not only in the picker at the top.
+  const invite = await page.locator(".kmg-climb-host .kmg-climb").textContent().catch(() => null);
+  if (!invite) note("rewards:level-replay", "no climb invitation under a practice answer on a mastered level");
+  else if (!/2/.test(invite) || !/⭐/.test(invite)) note("rewards:level-replay", `the invitation should name level 2 and its stars: "${invite}"`);
   console.log(`  level replay: coins stayed at ${coinsBeforeReplay} after a correct answer back at level 0`);
 }
 
@@ -726,6 +747,31 @@ if (!codeVisible) {
 }
 console.log(`  compete online: join code ${codeVisible ? "shown and joined" : "MISSING"}`);
 
+// Leaving an online race must stop it. RaceClient.stop() used to close the
+// socket while the room code was still set, and the socket's close handler
+// then started a fresh poller that nobody stopped: the page, already gone,
+// kept logging every round of the race as a wrong answer (with the "wrong"
+// sound) in whatever the child played next. Found in round 19, when those
+// phantom answers made a new game's "one jump = one answer" check fail.
+currentRoute = "compete:leave";
+{
+  await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(500);
+  const logged = () => page.evaluate(async () => (await import("./js/log.js")).allAttempts().length);
+  const before = await logged();
+  const polls = [];
+  const onRequest = (request) => {
+    if (/\/api\/rooms\//.test(request.url())) polls.push(request.url());
+  };
+  page.on("request", onRequest);
+  await page.waitForTimeout(3500);
+  page.off("request", onRequest);
+  const after = await logged();
+  if (after !== before) note(currentRoute, `${after - before} answer(s) were logged after leaving the online race`);
+  if (polls.length) note(currentRoute, `the race kept polling the server after it was left: ${polls.length} request(s)`);
+  console.log(`  compete left: ${polls.length} polls and ${after - before} answers logged in 3.5 s afterwards`);
+}
+
 // --- mobile layout ---------------------------------------------------------
 
 currentRoute = "mobile";
@@ -771,6 +817,7 @@ await phone
   .catch((error) => note("mobile", `could not tap the first control: ${error.message.split("\n")[0]}`));
 
 if (shotDir) await phone.screenshot({ path: path.join(shotDir, "mobile-breuken.png") });
+await phone.close();
 
 // --- round 17: buddy, daily quests + chest, treasures, themes, goal ---------
 // On a phone-sized page, because that is where the new home cards and the
@@ -948,7 +995,7 @@ currentRoute = "arcade:phone";
     await fitCtx.addInitScript(() => localStorage.setItem("kmg.arcade.mode", "words"));
     const fp = await fitCtx.newPage();
     fp.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
-    for (const route of ["fladdervogel", "sprongheld"]) {
+    for (const route of ["fladdervogel", "sprongheld", "lavatoren", "turbokart"]) {
       await fp.goto(`${baseUrl}/#/${route}`, { waitUntil: "networkidle" });
       await fp.locator('.kmg-levelbtn[data-level="7"]').click();
       await fp.locator(".kmg-arcade .kmg-btn-big").click();
@@ -990,7 +1037,7 @@ currentRoute = "arcade:phone";
     .then(() => true)
     .catch(() => false);
   if (!over) note(currentRoute, "Fladdervogel never ended after the bird fell three times");
-  console.log(`  arcade: playfield fits at 360x640, 390x844 and 844x390; fladdervogel run ${over ? "ended on its own" : "DID NOT END"}`);
+  console.log(`  arcade: 4 games' playfields fit at 360x640, 390x844 and 844x390; fladdervogel run ${over ? "ended on its own" : "DID NOT END"}`);
   await ctx.close();
 }
 
@@ -1068,6 +1115,272 @@ currentRoute = "leerhapjes";
   const stats = await p.locator(".kmg-homestat").allTextContents();
   if (!stats.some((text) => /1\/24/.test(text))) note(currentRoute, `the home page should count 1/24 bites: ${JSON.stringify(stats)}`);
   console.log(`  leerhapjes: ${score}, +${coins1 - coins0} coins, gold card kept after reload, repeat paid 0`);
+  await ctx.close();
+}
+
+// --- round 19: the new arcade games play, log answers and report a result ----
+
+currentRoute = "round19:arcade";
+{
+  const readAnswered = () => page.evaluate(async () => (await import("./js/state.js")).state.questionsAnswered);
+  // Poll from here, not with page.waitForFunction(async ...): that treats the
+  // returned Promise as truthy and resolves at once, which made the first
+  // version of these checks pass or fail by luck.
+  const answeredMoreThan = async (n, timeout) => {
+    for (const end = Date.now() + timeout; Date.now() < end; await page.waitForTimeout(100)) {
+      if ((await readAnswered()) > n) return true;
+    }
+    return false;
+  };
+  // Lavatoren: a tap on the middle platform answers the first floor's question.
+  await page.goto(`${baseUrl}/#/lavatoren`, { waitUntil: "networkidle" });
+  await page.locator(".kmg-arcade .kmg-btn-big").click();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(300);
+  const before = await readAnswered();
+  await page.keyboard.press("2");
+  // The jump is half a second of game time; on a busy machine the frame clamp
+  // stretches that, so wait for the landing rather than a fixed time.
+  await answeredMoreThan(before, 4000);
+  await page.waitForTimeout(300);
+  const jumpAnswers = (await readAnswered()) - before;
+  if (jumpAnswers !== 1) {
+    note(currentRoute, `jumping onto a Lavatoren platform should answer exactly one question, answered ${jumpAnswers}`);
+  }
+  const towerQuestion = (await page.locator(".kmg-arcade-question .kmg-question-text").textContent())?.trim();
+  if (!towerQuestion || /undefined|NaN/.test(towerQuestion)) note(currentRoute, `bad Lavatoren question: "${towerQuestion}"`);
+  await page.locator(".kmg-arcade .kmg-btn-ghost").click(); // Stop
+  await page.waitForSelector(".kmg-arcade-result", { timeout: 4000 }).catch(() => note(currentRoute, "Lavatoren showed no result line"));
+  const towerResult = await page.locator(".kmg-arcade-result").textContent().catch(() => "");
+
+  // Turbokart: drive until the first gate is answered; the HUD shows the place.
+  await page.goto(`${baseUrl}/#/turbokart`, { waitUntil: "networkidle" });
+  await page.locator(".kmg-arcade .kmg-btn-big").click();
+  await page.keyboard.press("Space");
+  const kartBefore = await readAnswered();
+  const gatePassed = await answeredMoreThan(kartBefore, 15000);
+  if (!gatePassed) note(currentRoute, "Turbokart answered no gate in 15 seconds");
+  const place = await page.locator(".kmg-arcade-stat-extra").textContent().catch(() => "");
+  if (!/🏁 [1-4]\/4/.test(place)) note(currentRoute, `Turbokart's HUD should show the place, shows "${place}"`);
+  await page.locator(".kmg-arcade .kmg-btn-ghost").click();
+  await page.waitForSelector(".kmg-arcade-result", { timeout: 4000 }).catch(() => note(currentRoute, "Turbokart showed no result line"));
+  const kartResult = await page.locator(".kmg-arcade-result .kmg-banner-icon").textContent().catch(() => "");
+  if (!/[🥇🥈🥉🏁]/u.test(kartResult)) note(currentRoute, `Turbokart's result should carry a medal, has "${kartResult}"`);
+  console.log(`  lavatoren: one jump = ${jumpAnswers} answer(s), "${towerResult.trim()}"; turbokart: gate answered, ${place.trim()}, result ${kartResult}`);
+}
+
+// --- round 19: puzzles, strategy, the park and the star road, on a phone ------
+// One fresh player: solve two Rekendoku puzzles cleanly (masters levels 0 and
+// 1 = 2 stars), one more with help (stays), claim the first star-road tier;
+// a Tafeltactiek move each way; build in the park and play a day.
+
+currentRoute = "round19:puzzles";
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem("kmg.test.seeded")) return;
+    sessionStorage.setItem("kmg.test.seeded", "1");
+    localStorage.setItem("kmg.profiles", JSON.stringify({ Puzzel: { totalScore: 0, coins: 0 } }));
+    localStorage.setItem("kmg.currentPlayer", "Puzzel");
+  });
+  const p = await ctx.newPage();
+  p.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  p.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+  const game = (key) =>
+    p.evaluate(async (k) => {
+      const s = (await import("./js/state.js")).state;
+      return { level: s.levels[k], cleared: [...(s.clearedLevels[k] ?? [])], coins: s.coins, score: s.totalScore, answered: s.questionsAnswered, park: { ...s.park } };
+    }, key);
+  const sideways = () => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+  // Read the puzzle back off the screen - the cages each cell belongs to,
+  // the clues from the labels - and solve it with the game's own solver.
+  const solveOnScreen = () =>
+    p.evaluate(async () => {
+      const doku = await import("./js/games/doku.js");
+      const cells = [...document.querySelectorAll(".kmg-doku-cell")];
+      const n = Math.round(Math.sqrt(cells.length));
+      const groups = new Map();
+      cells.forEach((cell, i) => {
+        const cage = cell.dataset.cage;
+        if (!groups.has(cage)) groups.set(cage, []);
+        groups.get(cage).push(i);
+      });
+      const cages = [...groups.values()].map((members) => {
+        const cellsRC = members.map((i) => [Math.floor(i / n), i % n]);
+        const first = cells[members[0]];
+        if (first.classList.contains("is-given")) return { cells: cellsRC, op: "=", target: Number(first.textContent) };
+        const label = members.map((i) => cells[i].querySelector(".kmg-doku-label")?.textContent).find(Boolean);
+        const [, target, symbol] = label.match(/^(\d+)(.)$/);
+        return { cells: cellsRC, op: { "+": "+", "−": "-", "×": "×", ":": ":", "÷": ":" }[symbol], target: Number(target) };
+      });
+      const cageOf = Array.from({ length: n }, () => Array(n).fill(-1));
+      cages.forEach((cage, index) => cage.cells.forEach(([r, c]) => (cageOf[r][c] = index)));
+      const solutions = doku.solve({ n, cages, cageOf }, 2);
+      return { n, count: solutions.length, grid: solutions[0] };
+    });
+
+  const fillPuzzle = async () => {
+    const { n, count, grid } = await solveOnScreen();
+    if (count !== 1) note(currentRoute, `the Rekendoku on screen has ${count} solutions`);
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const cell = p.locator(`.kmg-doku-cell[data-r="${r}"][data-c="${c}"]`);
+        if (await cell.evaluate((node) => node.classList.contains("is-given"))) continue;
+        await cell.click();
+        await p.locator(".kmg-doku-key", { hasText: new RegExp(`^${grid[r][c]}$`) }).click();
+      }
+    }
+    return n;
+  };
+
+  await p.goto(`${baseUrl}/#/rekendoku`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-doku-board");
+  if ((await sideways()) > 1) note(currentRoute, `Rekendoku scrolls sideways on a phone by ${await sideways()}px`);
+  // The 💡 tip explains the selected cage.
+  await p.locator(".kmg-doku-cell:not(.is-given)").first().click();
+  await p.locator(".kmg-doku-tipbtn").click();
+  const tip = (await p.locator(".kmg-doku-tip").textContent().catch(() => "")) ?? "";
+  if (!/1 t\/m 3/.test(tip)) note(currentRoute, `the level-0 tip should talk about the numbers 1 to 3: "${tip}"`);
+  const start = await game("doku");
+  const n0 = await fillPuzzle();
+  await p.waitForSelector(".kmg-doku .kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "a correctly filled Rekendoku was not accepted"));
+  let now = await game("doku");
+  if (now.level !== 1 || !now.cleared.includes(0)) note(currentRoute, `a clean solve should master level 0: ${JSON.stringify(now)}`);
+  if (now.answered !== start.answered + 1) note(currentRoute, "a solved puzzle should count as one answered question");
+  if (!(now.score > start.score)) note(currentRoute, "a solved puzzle paid no points");
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "rekendoku-solved.png") });
+
+  await p.locator(".kmg-doku .kmg-btn-big").click(); // new puzzle, level 1
+  await p.waitForSelector(".kmg-doku-board");
+  await fillPuzzle();
+  await p.waitForSelector(".kmg-doku .kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "the level-1 puzzle was not accepted"));
+  now = await game("doku");
+  if (now.level !== 2) note(currentRoute, `a second clean solve should master level 1: ${JSON.stringify(now)}`);
+
+  // With help: show cells until it is solved; the level stays.
+  await p.locator(".kmg-doku .kmg-btn-big").click();
+  await p.waitForSelector(".kmg-doku-board");
+  for (let i = 0; i < 20 && !(await p.locator(".kmg-doku .kmg-banner-ok").count()); i++) await p.locator(".kmg-doku-reveal").click();
+  const helped = (await p.locator(".kmg-doku .kmg-banner-ok").textContent().catch(() => "")) ?? "";
+  if (!/vakje/.test(helped)) note(currentRoute, `a puzzle solved with help should say so: "${helped}"`);
+  if ((await game("doku")).level !== 2) note(currentRoute, "a puzzle solved with help should not change the level");
+  console.log(`  rekendoku: ${n0}×${n0} solved from the screen, levels 0 and 1 mastered, a helped solve stayed on level 2`);
+
+  // The star road: 2 stars, the first tier is ready - and pays once.
+  await p.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+  const card = (await p.locator(".kmg-starroad-card").textContent().catch(() => "")) ?? "";
+  if (!/2 ⭐/.test(card)) note(currentRoute, `the home card should show 2 stars: "${card}"`);
+  if (!(await p.locator(".kmg-starroad-card.is-ready").count())) note(currentRoute, "the home card should say a reward is ready");
+  await p.goto(`${baseUrl}/#/sterrenpad`, { waitUntil: "networkidle" });
+  if ((await p.locator(".kmg-starroad-count").textContent())?.trim() !== "2") note(currentRoute, "the star road should count 2 stars");
+  const coinsBeforeClaim = (await game("doku")).coins;
+  await p.locator(".kmg-starroad-claim").first().click();
+  await p.waitForTimeout(300);
+  const coinsAfterClaim = (await game("doku")).coins;
+  if (coinsAfterClaim !== coinsBeforeClaim + 20) note(currentRoute, `the first tier should pay 20 coins: ${coinsBeforeClaim} -> ${coinsAfterClaim}`);
+  if (await p.locator(".kmg-starroad-claim").count()) note(currentRoute, "a claim button is still showing after claiming the only ready tier");
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-starroad-tier");
+  if (!(await p.locator('.kmg-starroad-tier.is-claimed[data-stars="2"]').count())) note(currentRoute, "the claimed tier was not remembered after a reload");
+  if (await p.locator(".kmg-starroad-claim").count()) note(currentRoute, "the claimed tier could be claimed again after a reload");
+  const history = await p.locator(".kmg-starroad-history tbody tr").allTextContents();
+  if (!history.some((row) => /Rekendoku/.test(row) && /0, 1/.test(row))) note(currentRoute, `the star log should list Rekendoku 0, 1: ${JSON.stringify(history)}`);
+  if ((await sideways()) > 1) note(currentRoute, `the star road scrolls sideways on a phone by ${await sideways()}px`);
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "sterrenpad.png"), fullPage: true });
+  console.log(`  sterrenpad: 2 stars, first tier paid ${coinsAfterClaim - coinsBeforeClaim} coins once, remembered after reload`);
+
+  // Tafeltactiek: a right answer claims the square, the computer answers,
+  // and a wrong answer claims nothing.
+  await p.goto(`${baseUrl}/#/tafeltactiek`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-tactic-board");
+  if ((await sideways()) > 1) note(currentRoute, `Tafeltactiek scrolls sideways on a phone by ${await sideways()}px`);
+  const move = async (right) => {
+    // A factor whose product is already taken shows a note, not a question:
+    // try the next one.
+    const factors = p.locator(".kmg-tactic-factor:not([disabled])");
+    for (let i = 0; i < (await factors.count()) && !(await p.locator(".kmg-tactic-question").count()); i++) {
+      await factors.nth(i).click();
+    }
+    await p.waitForSelector(".kmg-tactic-question", { timeout: 3000 });
+    const [a, b] = ((await p.locator(".kmg-tactic-question-text").textContent()) ?? "").match(/\d+/g).map(Number);
+    const options = await p.locator(".kmg-tactic-option").allTextContents();
+    const pick = right ? String(a * b) : options.find((o) => o !== String(a * b));
+    await p.locator(".kmg-tactic-option", { hasText: new RegExp(`^${pick}$`) }).click();
+  };
+  await move(true);
+  if ((await p.locator(".kmg-tactic-cell.is-mine").count()) !== 1) note(currentRoute, "a right answer should claim exactly one square");
+  const cpuMoved = await p.waitForSelector(".kmg-tactic-cell.is-theirs", { timeout: 4000 }).then(() => true).catch(() => false);
+  if (!cpuMoved) note(currentRoute, "the computer never made its move");
+  await p.waitForSelector(".kmg-tactic-factor:not([disabled])", { timeout: 4000 });
+  await move(false);
+  if ((await p.locator(".kmg-tactic-cell.is-mine").count()) !== 1) note(currentRoute, "a wrong answer should not claim a square");
+  if (!/Net niet/.test((await p.locator(".kmg-tactic-note").textContent().catch(() => "")) ?? "")) note(currentRoute, "a wrong answer should show the right product");
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "tafeltactiek.png") });
+  console.log(`  tafeltactiek: right answer claimed a square, computer moved, wrong answer claimed nothing`);
+
+  // Pretparkbaas: build the sweet stall with seeded park money, then play a
+  // whole day. Park money moves by exactly the income for each happy
+  // visitor, and never touches the shop's coins.
+  await p.evaluate(async () => {
+    const s = await import("./js/state.js");
+    s.state.park.cash = 25;
+    s.saveCurrentProfile();
+  });
+  await p.goto(`${baseUrl}/#/pretparkbaas`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-park-map");
+  if ((await sideways()) > 1) note(currentRoute, `Pretparkbaas scrolls sideways on a phone by ${await sideways()}px`);
+  await p.locator('.kmg-park-plot[data-attraction="candy"] .kmg-park-build').click();
+  await p.waitForTimeout(200);
+  if (!(await p.locator('.kmg-park-plot.is-built[data-attraction="candy"]').count())) note(currentRoute, "building the sweet stall did not put it in the park");
+  const parkStart = await game("park");
+  if (parkStart.park.cash !== 5) note(currentRoute, `building for €20 out of €25 should leave €5, left €${parkStart.park.cash}`);
+  await p.locator(".kmg-park-open").click();
+  // Level 0 asks three kinds of question, easy to read back: tickets
+  // ("3 kinderen ... €4" = 3 × 4), change ("kost €6 ... briefje van €10" =
+  // 10 − 6) and two prices together (3 + 5). Answer them the way a child does.
+  const levelZeroAnswer = (text) => {
+    const [a, b] = (text.match(/\d+/g) ?? []).map(Number);
+    if (/kinderen/.test(text)) return a * b;
+    if (/wisselgeld/.test(text)) return b - a;
+    return a + b;
+  };
+  let happy = 0;
+  for (let visitor = 0; visitor < 8; visitor++) {
+    await p.waitForSelector(".kmg-park-option:not([disabled])", { timeout: 4000 });
+    const question = (await p.locator(".kmg-park-question .kmg-question-text").textContent()) ?? "";
+    const want = `€${levelZeroAnswer(question)}`;
+    const right = p.locator(".kmg-park-option", { hasText: new RegExp(`^${want}$`) });
+    if (await right.count()) await right.click();
+    else {
+      note(currentRoute, `no option ${want} for "${question}"`);
+      await p.locator(".kmg-park-option").first().click();
+    }
+    await p.waitForSelector(".kmg-park .kmg-banner", { timeout: 3000 });
+    if (await p.locator(".kmg-park .kmg-banner-ok").count()) {
+      happy += 1;
+      if (visitor < 7) await p.waitForTimeout(1500); // a happy visitor moves on by itself
+    } else {
+      const why = (await p.locator(".kmg-park-why").textContent()) ?? "";
+      if (!why.trim() || /undefined|NaN|\{/.test(why)) note(currentRoute, `a wrong answer's explanation is broken: "${why}"`);
+      await p.locator(".kmg-park .kmg-actions .kmg-btn-primary").click();
+    }
+  }
+  await p.waitForSelector(".kmg-park .kmg-stats", { timeout: 4000 }).catch(() => note(currentRoute, "the day summary never showed"));
+  const parkEnd = await game("park");
+  // Level 0 entrance €4 + the sweet stall's €1 = €5 per happy visitor.
+  if (parkEnd.park.cash - parkStart.park.cash !== happy * 5) {
+    note(currentRoute, `park money should grow by €5 per happy visitor: ${happy} happy, +€${parkEnd.park.cash - parkStart.park.cash}`);
+  }
+  if (happy !== 8) note(currentRoute, `every level-0 visitor was answered right, but only ${happy} were happy`);
+  if (parkEnd.park.days !== 1) note(currentRoute, `one day played, the park counts ${parkEnd.park.days}`);
+  // 8 of 8 is a perfect day: park level 0 is mastered (a star), the game moves up.
+  if (parkEnd.level !== 1 || !parkEnd.cleared.includes(0)) note(currentRoute, `a perfect park day should master level 0: ${JSON.stringify(parkEnd)}`);
+  if (parkEnd.coins < parkStart.coins) note(currentRoute, "building in the park took shop coins");
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "pretparkbaas-day.png") });
+  console.log(`  pretparkbaas: built the sweet stall, a day with ${happy}/8 happy visitors, +€${parkEnd.park.cash - parkStart.park.cash} park money`);
   await ctx.close();
 }
 

@@ -13,13 +13,14 @@
  *   visuals(problem)         -> SVG strings to show under the question
  *   answer(problem, api)     -> the answer widget and how to grade it
  */
-import { el } from "../dom.js";
+import { el, clear } from "../dom.js";
 import { t } from "../i18n.js";
-import { getLevel, state } from "../state.js";
+import { canEarnAtLevel, getLevel, state } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
 import { randomPraise } from "../ui-bits.js";
 import {
   actionBar,
+  climbInvite,
   gameShell,
   numberField,
   recordedCaption,
@@ -66,6 +67,10 @@ export function typedAnswerGame(config) {
     let problem = null;
     let widget = null;
     let answered = false;
+    // Answers given on an already-mastered level since arriving on it
+    // (round 19) - the climb invitation appears after the first one.
+    let practised = 0;
+    let practisedLevel = null;
 
     const shell = gameShell({
       gameKey,
@@ -84,9 +89,17 @@ export function typedAnswerGame(config) {
       onNext: () => newQuestion(),
     });
     const streak = streakNote();
+    const climbHost = el("div.kmg-climb-host");
 
     shell.slots.actionSlot.append(bar.node);
-    shell.slots.extraSlot.append(streak, recordedCaption());
+    shell.slots.extraSlot.append(climbHost, streak, recordedCaption());
+
+    function paintClimb() {
+      clear(climbHost);
+      if (!practised) return;
+      const invite = climbInvite(gameKey, () => newQuestion(), { practised });
+      if (invite) climbHost.append(invite);
+    }
 
     if (extraTop) shell.slots.extraTop.append(extraTop(() => newQuestion()));
 
@@ -94,6 +107,11 @@ export function typedAnswerGame(config) {
       shell.cancelAdvance();
       answered = false;
       const level = getLevel(gameKey);
+      if (level !== practisedLevel) {
+        practised = 0;
+        practisedLevel = level;
+        clear(climbHost);
+      }
       problem = generate(level);
 
       shell.setQuestion(problem.text, questionEmoji);
@@ -118,6 +136,7 @@ export function typedAnswerGame(config) {
 
       const { isCorrect, studentAnswer, correctAnswerDisplay } = graded;
       answered = true;
+      if (!canEarnAtLevel(gameKey, level)) practised += 1;
       bar.setAnswered(true);
       widget.reveal?.(isCorrect, correctAnswerDisplay);
 
@@ -156,6 +175,13 @@ export function typedAnswerGame(config) {
       }
       streak.refresh();
       shell.picker.refresh();
+      // After a two-wrong level-down the game may now sit on a level it had
+      // mastered; count from there.
+      if (getLevel(gameKey) !== practisedLevel) {
+        practised = 0;
+        practisedLevel = getLevel(gameKey);
+      }
+      paintClimb();
     }
 
     container.append(shell.root);

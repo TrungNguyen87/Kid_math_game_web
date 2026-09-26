@@ -45,7 +45,8 @@ const BUILD_ID = "pagesim00001"; // 12 characters, like ${GITHUB_SHA::12}
 const ROUTES = [
   "home", "leerhapjes", "tafel", "breuken", "meten", "procenten", "algebra", "meetkunde", "verhoudingen",
   "getallen", "bliksemronde", "getallenjacht", "logica", "code", "lezen", "woorden", "spelling",
-  "fladdervogel", "sprongheld", "compete", "rewards", "uitleg", "dashboard",
+  "fladdervogel", "sprongheld", "lavatoren", "turbokart", "rekendoku", "tafeltactiek", "pretparkbaas",
+  "sterrenpad", "compete", "rewards", "uitleg", "dashboard",
 ];
 const TYPES = {
   ".html": "text/html; charset=utf-8",

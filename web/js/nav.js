@@ -17,6 +17,9 @@ export const NAV = [
   // Micro-lessons sit right under Start: the thing to suggest to a child who
   // only has five minutes. Not a levelled game, so no `game` key.
   { path: "leerhapjes", key: "nav.leerhapjes", icon: "🍪", group: "start", load: () => import("./pages/leerhapjes.js") },
+  // The star road (round 19): what mastering levels has earned, and what the
+  // next level up is worth. Not a game either.
+  { path: "sterrenpad", key: "nav.sterrenpad", icon: "🌟", group: "start", load: () => import("./pages/sterrenpad.js") },
 
   // Arithmetic games, in the order a school year meets them.
   { path: "tafel", key: "nav.tafel", icon: "✖️", group: "reken", game: "tafel", load: () => import("./games/tafel.js") },
@@ -43,6 +46,14 @@ export const NAV = [
   // Arcade games (round 18): sums or words, played by flying and jumping.
   { path: "fladdervogel", key: "nav.vlieg", icon: "🐦", group: "arcade", game: "vlieg", load: () => import("./games/vlieg.js") },
   { path: "sprongheld", key: "nav.sprong", icon: "🦸", group: "arcade", game: "sprong", load: () => import("./games/sprong.js") },
+  // Round 19: an obstacle-tower climb and a kart race.
+  { path: "lavatoren", key: "nav.toren", icon: "🌋", group: "arcade", game: "toren", load: () => import("./games/toren.js") },
+  { path: "turbokart", key: "nav.kart", icon: "🏎️", group: "arcade", game: "kart", load: () => import("./games/kart.js") },
+
+  // Puzzles and strategy (round 19): think a few moves ahead.
+  { path: "rekendoku", key: "nav.doku", icon: "🧩", group: "puzzel", game: "doku", load: () => import("./games/doku.js") },
+  { path: "tafeltactiek", key: "nav.tactiek", icon: "♟️", group: "puzzel", game: "tactiek", load: () => import("./games/tactiek.js") },
+  { path: "pretparkbaas", key: "nav.park", icon: "🎡", group: "puzzel", game: "park", load: () => import("./games/park.js") },
 
   // No `game` key on purpose: it is not part of the curriculum (GAME_KEYS),
   // so it does not affect badges or the home page's overall-level bar, and a
@@ -57,7 +68,7 @@ export const NAV = [
 ];
 
 /** Menu sections, in order; "start" has no heading of its own. */
-export const NAV_GROUPS = ["start", "reken", "denk", "taal", "arcade", "more"];
+export const NAV_GROUPS = ["start", "reken", "denk", "taal", "arcade", "puzzel", "more"];
 
 export const DEFAULT_ROUTE = "home";
 

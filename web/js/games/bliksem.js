@@ -19,7 +19,7 @@ import { countdownRingSvg } from "../visuals.js";
 import { el, clear, raw, append } from "../dom.js";
 import { addScore, awardablePoints, getLevel, state } from "../state.js";
 import { adaptAfterRound, settleAnswer } from "../gameflow.js";
-import { gameShell, recordedCaption, statRow } from "../ui.js";
+import { climbInvite, gameShell, recordedCaption, statRow } from "../ui.js";
 import { bigCelebration, confetti, floatPoints } from "../fx.js";
 import * as sound from "../sound.js";
 
@@ -375,6 +375,13 @@ export function render(container) {
     } else {
       stage.append(praise("💪", t("bliksem.praise_low"), false));
     }
+
+    // Round 19: on an already-mastered level, say where the coins are.
+    const invite = climbInvite(GAME_KEY, () => {
+      phase = "idle";
+      paint();
+    });
+    if (invite) stage.append(invite);
 
     stage.append(
       el("div.kmg-actions", {}, [

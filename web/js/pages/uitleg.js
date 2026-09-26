@@ -26,6 +26,10 @@ const TOPICS = [
   ["woorden", "🧙"],
   ["spelling", "🌪️"],
   ["arcade", "🕹️"],
+  // Round 19: the puzzle and strategy games, money maths, and the star road.
+  ["puzzel", "🧩"],
+  ["geld", "💶"],
+  ["sterrenpad", "🌟"],
 ];
 
 export function render(container) {

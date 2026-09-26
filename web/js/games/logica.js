@@ -13,13 +13,14 @@
 import { t } from "../i18n.js";
 import { choice, coinFlip, randInt, sample, shuffle, unique } from "../rng.js";
 import { numberLineSvg, ratioBarSvg } from "../visuals.js";
-import { el, raw } from "../dom.js";
+import { el, clear, raw } from "../dom.js";
 import { markdown } from "../markdown.js";
-import { getLevel } from "../state.js";
+import { canEarnAtLevel, getLevel } from "../state.js";
 import { settleAnswer } from "../gameflow.js";
 import { randomPraise } from "../ui-bits.js";
 import {
   actionBar,
+  climbInvite,
   gameShell,
   numberField,
   recordedCaption,
@@ -401,6 +402,9 @@ export function render(container) {
   let problem = null;
   let widget = null;
   let answered = false;
+  // Answers on an already-mastered level (round 19), as in common.js.
+  let practised = 0;
+  let practisedLevel = null;
 
   const shell = gameShell({
     gameKey: GAME_KEY,
@@ -418,8 +422,20 @@ export function render(container) {
     onNext: () => newQuestion(),
   });
   const streak = streakNote();
+  const climbHost = el("div.kmg-climb-host");
   shell.slots.actionSlot.append(bar.node);
-  shell.slots.extraSlot.append(streak, recordedCaption());
+  shell.slots.extraSlot.append(climbHost, streak, recordedCaption());
+
+  function paintClimb() {
+    clear(climbHost);
+    if (getLevel(GAME_KEY) !== practisedLevel) {
+      practised = 0;
+      practisedLevel = getLevel(GAME_KEY);
+    }
+    if (!practised) return;
+    const invite = climbInvite(GAME_KEY, () => newQuestion(), { practised });
+    if (invite) climbHost.append(invite);
+  }
 
   function buildAnswer() {
     if (problem.kind === "number") {
@@ -465,6 +481,7 @@ export function render(container) {
     shell.cancelAdvance();
     answered = false;
     problem = generate(getLevel(GAME_KEY));
+    if (getLevel(GAME_KEY) !== practisedLevel) paintClimb();
 
     // The deduction question's clue list is markdown; everything else is
     // plain text and must not be re-interpreted as markup.
@@ -490,6 +507,7 @@ export function render(container) {
     widget.reveal(isCorrect);
 
     const level = getLevel(GAME_KEY);
+    if (!canEarnAtLevel(GAME_KEY, level)) practised += 1;
     const points = 5 * (level + 1);
     const { pointsAwarded } = settleAnswer({
       gameKey: GAME_KEY,
@@ -521,6 +539,7 @@ export function render(container) {
     }
     streak.refresh();
     shell.picker.refresh();
+    paintClimb();
   }
 
   container.append(shell.root);

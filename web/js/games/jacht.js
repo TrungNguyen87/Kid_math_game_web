@@ -22,7 +22,7 @@ import { countdownRingSvg } from "../visuals.js";
 import { el, clear, raw, append } from "../dom.js";
 import { addScore, awardablePoints, getLevel } from "../state.js";
 import { adaptAfterRound, settleAnswer } from "../gameflow.js";
-import { gameShell, recordedCaption, statRow } from "../ui.js";
+import { climbInvite, gameShell, recordedCaption, statRow } from "../ui.js";
 import { bigCelebration, floatPoints } from "../fx.js";
 import * as sound from "../sound.js";
 
@@ -373,6 +373,11 @@ export function render(container) {
       mistapped.length
         ? el("p", { text: t("jacht.you_mistapped", { numbers: mistapped.join(", ") }) })
         : null,
+      // Round 19: on an already-mastered level, say where the coins are.
+      climbInvite(GAME_KEY, () => {
+        phase = "idle";
+        paint();
+      }),
       el("div.kmg-actions", {}, [
         el("button.kmg-btn.kmg-btn-primary", {
           type: "button",

@@ -56,6 +56,7 @@ const PRECACHE = [
   "./js/bites-data.js",
   "./js/bites.js",
   "./js/arcade.js",
+  "./js/starroad.js",
 
   "./js/games/common.js",
   "./js/games/tafel.js",
@@ -75,6 +76,11 @@ const PRECACHE = [
   "./js/games/spelling.js",
   "./js/games/vlieg.js",
   "./js/games/sprong.js",
+  "./js/games/toren.js",
+  "./js/games/kart.js",
+  "./js/games/doku.js",
+  "./js/games/tactiek.js",
+  "./js/games/park.js",
 
   "./js/pages/home.js",
   "./js/pages/uitleg.js",
@@ -82,6 +88,7 @@ const PRECACHE = [
   "./js/pages/rewards.js",
   "./js/pages/compete.js",
   "./js/pages/leerhapjes.js",
+  "./js/pages/sterrenpad.js",
 
   "./icons/icon.svg",
   "./icons/icon-maskable.svg",
