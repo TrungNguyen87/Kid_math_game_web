@@ -38,6 +38,7 @@ const headed = args.includes("--headed");
 
 const ROUTES = [
   "home",
+  "leerhapjes",
   "tafel",
   "breuken",
   "meten",
@@ -50,6 +51,11 @@ const ROUTES = [
   "getallenjacht",
   "logica",
   "code",
+  "lezen",
+  "woorden",
+  "spelling",
+  "fladdervogel",
+  "sprongheld",
   "compete",
   "rewards",
   "uitleg",
@@ -115,8 +121,9 @@ await page.waitForSelector(".kmg-question");
 
 const scoreBefore = Number(await page.locator(".kmg-scorebox-value").first().textContent());
 
-// Tafel Monster has seven levels (0-6). The picker used to be a fixed
-// six-column grid, which pushed the "6" onto a row of its own.
+// Every game has eight levels (0-7) since round 18. The picker used to be a
+// fixed six-column grid, which pushed Tafel Monster's old "6" onto a row of
+// its own; it now sets one column per level.
 const levelRows = await page.$$eval(".kmg-levelrow .kmg-levelbtn", (buttons) => new Set(buttons.map((b) => b.offsetTop)).size);
 if (levelRows !== 1) note("tafel:play", `the level picker wraps onto ${levelRows} rows`);
 
@@ -137,7 +144,7 @@ if (!Number.isFinite(a) || !Number.isFinite(b)) {
   note("tafel:play", `could not parse the question: "${questionText}"`);
 } else {
   await page.locator(".kmg-numinput").fill(String(a * b));
-  await page.locator(".kmg-btn-primary").first().click();
+  await page.locator(".kmg-actions .kmg-btn-primary").first().click();
   await page.waitForSelector(".kmg-banner", { timeout: 4000 });
 
   const banner = await page.locator(".kmg-banner").first().getAttribute("class");
@@ -177,7 +184,7 @@ for (let i = 0; i < 6; i++) {
     break;
   }
   await page.locator(".kmg-numinput").fill(String(a * b));
-  await page.locator(".kmg-btn-primary").first().click();
+  await page.locator(".kmg-actions .kmg-btn-primary").first().click();
   const ok = await page
     .waitForSelector(".kmg-banner-ok", { timeout: 4000 })
     .then(() => true)
@@ -279,7 +286,7 @@ if (!Number.isFinite(ra) || !Number.isFinite(rb)) {
   note("rewards:level-replay", `could not parse question "${replayText}"`);
 } else {
   await page.locator(".kmg-numinput").fill(String(ra * rb));
-  await page.locator(".kmg-btn-primary").first().click();
+  await page.locator(".kmg-actions .kmg-btn-primary").first().click();
   await page.waitForSelector(".kmg-banner-ok", { timeout: 4000 });
 
   const bannerText = await page.locator(".kmg-banner-msg").first().textContent();
@@ -307,10 +314,34 @@ if (!Number.isFinite(ra) || !Number.isFinite(rb)) {
   console.log(`  level replay: coins stayed at ${coinsBeforeReplay} after a correct answer back at level 0`);
 }
 
+// --- round 18: the replay is explained, with one tap up to where coins are --
+// Sitting on a mastered level shows a nudge naming the next level that still
+// pays, and the picker marks the mastered levels. The nudge's button must
+// actually move the game there.
+
+currentRoute = "rewards:nudge";
+{
+  const nudgeVisible = await page.locator(".kmg-practice-nudge").isVisible();
+  if (!nudgeVisible) note(currentRoute, "no 'move up' nudge while playing an already-mastered level");
+  const cleared = await page.$$eval(".kmg-levelbtn.is-cleared", (buttons) => buttons.map((b) => b.dataset.level));
+  if (JSON.stringify(cleared) !== JSON.stringify(["0", "1"])) {
+    note(currentRoute, `the picker should mark levels 0 and 1 as mastered, marks ${JSON.stringify(cleared)}`);
+  }
+  if (nudgeVisible) {
+    await page.locator(".kmg-practice-nudge-btn").click();
+    await page.waitForTimeout(250);
+    const current = await page.locator(".kmg-levelbtn.is-current").getAttribute("data-level");
+    if (current !== "2") note(currentRoute, `the nudge should move the game to level 2, it is on ${current}`);
+    if (await page.locator(".kmg-practice-nudge").isVisible()) note(currentRoute, "the nudge stayed up on a level that pays");
+    console.log(`  practice nudge: mastered ${cleared.join(",")}, one tap up to level ${current}`);
+  }
+}
+
 // --- home tiles after a game has been played --------------------------------
 // Every tile of an already-tried game used to end in the literal word "null"
 // (Node.append() stringifies a null child), and Tafel Monster read "Level
 // 6/5" with its bar at 120%, because the tile assumed every game stops at 5.
+// Since round 18 every game counts out of 7.
 
 currentRoute = "home:tiles";
 await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
@@ -319,7 +350,15 @@ const tileTexts = await page.$$eval(".kmg-tile", (tiles) => tiles.map((tile) => 
 const nullTile = tileTexts.find((text) => /null|undefined|NaN/.test(text));
 if (nullTile) note("home:tiles", `a game tile renders junk text: "${nullTile.trim()}"`);
 const tafelMeta = await page.locator('.kmg-tile[href="#/tafel"] .kmg-tile-meta').textContent();
-if (!/\/6\b/.test(tafelMeta)) note("home:tiles", `Tafel Monster's tile should count levels out of 6, shows "${tafelMeta}"`);
+if (!/\/7\b/.test(tafelMeta)) note("home:tiles", `Tafel Monster's tile should count levels out of 7, shows "${tafelMeta}"`);
+// One pip per level, the mastered ones filled: rewards:earn mastered 0 and 1.
+const tafelPips = await page.$$eval('.kmg-tile[href="#/tafel"] .kmg-tile-pip', (pips) => pips.map((p) => p.className));
+if (tafelPips.length !== 8) note("home:tiles", `Tafel Monster's tile should show 8 level pips, shows ${tafelPips.length}`);
+if (tafelPips.filter((c) => c.includes("is-cleared")).length !== 2) {
+  note("home:tiles", `Tafel Monster's tile should show levels 0 and 1 as mastered: ${JSON.stringify(tafelPips)}`);
+}
+if (!(await page.locator(".kmg-challenge").count())) note("home:tiles", "no next-challenge card on the home page");
+if (!(await page.locator(".kmg-passport td.is-cleared").count())) note("home:tiles", "the level passport shows no mastered level");
 console.log(`  home tiles: ${tileTexts.length} tiles, tafel shows "${tafelMeta.trim()}"`);
 
 // --- the answer must be recorded for the parent dashboard ------------------
@@ -333,6 +372,11 @@ const hasRows = await page.locator(".kmg-logtable tbody tr").count();
 if (!hasRows) note("dashboard:data", "the answered question is not in the log table");
 const hasActivityRows = await page.locator(".kmg-activity-table tbody tr").count();
 if (!hasActivityRows) note("dashboard:data", "no rows in the daily activity log table");
+// Round 18: the parent sees which levels are mastered, per game.
+const masteryRows = await page.$$eval(".kmg-mastery-table tbody tr", (rows) => rows.map((r) => r.textContent));
+if (!masteryRows.some((text) => /Tafel/.test(text) && /0, 1/.test(text))) {
+  note("dashboard:data", `the mastery table should list Tafel Monster with levels 0, 1: ${JSON.stringify(masteryRows)}`);
+}
 
 // A refresh must not lose any of it - the whole point of keeping results and
 // activity in localStorage instead of only in page memory.
@@ -364,7 +408,7 @@ await page.waitForTimeout(300);
 
 currentRoute = "bliksem:timer";
 await page.goto(`${baseUrl}/#/bliksemronde`, { waitUntil: "networkidle" });
-await page.locator(".kmg-btn-primary").first().click();
+await page.locator(".kmg-stage .kmg-btn-big").first().click();
 await page.waitForSelector(".kmg-ring", { timeout: 4000 });
 const firstTick = await page.locator(".kmg-ring text").textContent();
 await page.waitForTimeout(1600);
@@ -822,6 +866,208 @@ currentRoute = "progression";
   console.log(
     `  progression: 3 quests, chest ${coinsBeforeChest} -> ${coinsAfterChest} coins + ${treasures} treasure, theme "${themeAfterReload}", goal pinned`,
   );
+  await ctx.close();
+}
+
+// --- round 18: reading games -------------------------------------------------
+// Leesdetective at level 0: a template text whose right answer is the only
+// option that appears in it, so the script can read it the way a child does.
+// Three right answers are three questions about one text, and its words
+// count once.
+
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+currentRoute = "lezen:play";
+{
+  await page.goto(`${baseUrl}/#/lezen`, { waitUntil: "networkidle" });
+  await page.waitForSelector(".kmg-passage");
+  await page.locator('.kmg-levelbtn[data-level="2"]').click();
+  await page.locator('.kmg-levelbtn[data-level="0"]').click();
+  await page.waitForSelector(".kmg-passage-text");
+  const readState = () => page.evaluate(async () => {
+    const s = (await import("./js/state.js")).state;
+    return { words: s.wordsRead, right: s.readCorrect };
+  });
+  const before = await readState();
+  const firstText = await page.locator(".kmg-passage-text").textContent();
+  const expectedWords = await page.evaluate(async (text) => (await import("./js/reading-data.js")).wordCount(text), firstText);
+  if (!(await page.locator(".kmg-skillchip").count())) note(currentRoute, "the text card does not name its reading skill");
+  let answered = 0;
+  for (let i = 0; i < 3; i++) {
+    const passage = await page.locator(".kmg-passage-text").textContent();
+    if (passage !== firstText) note(currentRoute, `question ${i + 1} is about a different text`);
+    const options = await page.locator(".kmg-choice").allTextContents();
+    const right = options.find((o) => new RegExp(`(^|[^\\p{L}])${escapeRegex(o)}([^\\p{L}]|$)`, "u").test(passage));
+    if (!right) {
+      note(currentRoute, `no option appears in the text: ${JSON.stringify(options)} / "${passage}"`);
+      break;
+    }
+    await page.locator(".kmg-choice", { hasText: new RegExp(`^${escapeRegex(right)}$`) }).click();
+    const ok = await page.waitForSelector(".kmg-banner-ok", { timeout: 4000 }).then(() => true).catch(() => false);
+    if (!ok) {
+      note(currentRoute, `"${right}" was not marked right`);
+      break;
+    }
+    answered += 1;
+    await page.waitForTimeout(1400);
+  }
+  const after = await readState();
+  if (after.words - before.words !== expectedWords) {
+    note(currentRoute, `words read should grow by the text's ${expectedWords} words once, grew by ${after.words - before.words}`);
+  }
+  if (after.right - before.right !== answered) note(currentRoute, `reading questions right grew by ${after.right - before.right}, expected ${answered}`);
+  console.log(`  lezen: ${answered} questions about one text, +${after.words - before.words} words read`);
+
+  // Spelling at a groep 8 level: any answer gives feedback, a wrong one the rule.
+  currentRoute = "spelling:play";
+  await page.goto(`${baseUrl}/#/spelling`, { waitUntil: "networkidle" });
+  await page.locator('.kmg-levelbtn[data-level="6"]').click();
+  await page.waitForTimeout(200);
+  if (!/🎓/.test(await page.locator(".kmg-level-badge").textContent())) note(currentRoute, "a groep 8 level is not marked 🎓");
+  await page.locator(".kmg-choice").first().click();
+  await page.waitForSelector(".kmg-banner", { timeout: 4000 }).catch(() => note(currentRoute, "no feedback after answering"));
+  if (await page.locator(".kmg-banner-bad").count()) {
+    const tip = await page.locator(".kmg-banner-tip").textContent();
+    if (!/kofschip/.test(tip ?? "")) note(currentRoute, `a wrong answer at level 6 should explain 't kofschip, says "${tip}"`);
+  }
+}
+
+// --- round 18: arcade games on a phone ------------------------------------------
+// The whole playfield and the question must be on screen at once - a child
+// cannot scroll while steering - and a run must end on its own: never
+// tapping after the start drops the bird three times.
+
+currentRoute = "arcade:phone";
+{
+  // Small phone, ordinary phone and a phone on its side, each with the
+  // longest questions there are (words mode, level 7). Started from the
+  // keyboard: a Playwright click on the canvas would scroll it into view by
+  // itself and hide exactly the overflow this is looking for.
+  for (const [w, h] of [[360, 640], [390, 844], [844, 390]]) {
+    const fitCtx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true });
+    await fitCtx.addInitScript(() => localStorage.setItem("kmg.arcade.mode", "words"));
+    const fp = await fitCtx.newPage();
+    fp.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+    for (const route of ["fladdervogel", "sprongheld"]) {
+      await fp.goto(`${baseUrl}/#/${route}`, { waitUntil: "networkidle" });
+      await fp.locator('.kmg-levelbtn[data-level="7"]').click();
+      await fp.locator(".kmg-arcade .kmg-btn-big").click();
+      await fp.waitForTimeout(150);
+      await fp.keyboard.press("Space");
+      await fp.waitForTimeout(700);
+      const fit = await fp.evaluate(() => {
+        const canvas = document.querySelector(".kmg-arcade-canvas").getBoundingClientRect();
+        const question = document.querySelector(".kmg-arcade-question").getBoundingClientRect();
+        return {
+          top: question.top,
+          bottom: canvas.bottom,
+          vh: innerHeight,
+          sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      if (fit.top < 0 || fit.bottom > fit.vh + 1) {
+        note(currentRoute, `${route} at ${w}x${h}: question and playfield are not on screen together (${Math.round(fit.top)}..${Math.round(fit.bottom)} in ${fit.vh}px)`);
+      }
+      if (fit.sideways > 1) note(currentRoute, `${route} at ${w}x${h} scrolls sideways by ${fit.sideways}px`);
+      if (shotDir) await fp.screenshot({ path: path.join(shotDir, `arcade-${route}-${w}x${h}.png`) });
+    }
+    await fitCtx.close();
+  }
+
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+  const p = await ctx.newPage();
+  p.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  p.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+
+  // Fladdervogel: tap once to start, then let go - three falls end the run.
+  await p.goto(`${baseUrl}/#/fladdervogel`, { waitUntil: "networkidle" });
+  await p.locator(".kmg-arcade .kmg-btn-big").click();
+  await p.locator(".kmg-arcade-canvas").tap();
+  const over = await p
+    .waitForSelector(".kmg-arcade .kmg-stats", { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!over) note(currentRoute, "Fladdervogel never ended after the bird fell three times");
+  console.log(`  arcade: playfield fits at 360x640, 390x844 and 844x390; fladdervogel run ${over ? "ended on its own" : "DID NOT END"}`);
+  await ctx.close();
+}
+
+// Sprongheld on the desktop page: the canvas really animates, stopping shows
+// the results, and leaving mid-run leaves no loop behind.
+currentRoute = "arcade:desktop";
+{
+  await page.goto(`${baseUrl}/#/sprongheld`, { waitUntil: "networkidle" });
+  await page.locator(".kmg-arcade .kmg-btn-big").click();
+  await page.locator(".kmg-arcade-canvas").click();
+  const frameA = await page.locator(".kmg-arcade-canvas").evaluate((c) => c.toDataURL());
+  await page.waitForTimeout(500);
+  const frameB = await page.locator(".kmg-arcade-canvas").evaluate((c) => c.toDataURL());
+  if (frameA === frameB) note(currentRoute, "the Sprongheld canvas did not change in half a second");
+  const question = (await page.locator(".kmg-arcade-question .kmg-question-text").textContent())?.trim();
+  if (!question || /undefined|NaN/.test(question)) note(currentRoute, `bad arcade question: "${question}"`);
+  await page.locator(".kmg-arcade .kmg-btn-ghost").click(); // Stop
+  await page.waitForSelector(".kmg-arcade .kmg-stats", { timeout: 4000 }).catch(() => note(currentRoute, "stopping did not show the results"));
+  // Start a new run and leave in the middle of it.
+  await page.locator(".kmg-arcade .kmg-btn-primary").first().click();
+  await page.locator(".kmg-arcade-canvas").click();
+  await page.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(600);
+  console.log(`  sprongheld: canvas animates, "${question}", stop -> results, leave mid-run clean`);
+}
+
+// --- round 18: a learning bite, answered right, pays once -------------------
+
+currentRoute = "leerhapjes";
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const p = await ctx.newPage();
+  p.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  p.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+  const coins = async () => Number(await p.locator(".kmg-scorebox-coins").first().textContent());
+  const doBite = async () => {
+    await p.locator(".kmg-bite-start").click();
+    await p.locator(".kmg-bite-quiz-start").click();
+    const answers = await p.evaluate(async () => {
+      const b = await import("./js/bites.js");
+      const lang = document.documentElement.lang === "en" ? "en" : "nl";
+      return b.biteOfTheDay()[lang].quiz.map((q) => q.a);
+    });
+    for (const answer of answers) {
+      await p.locator(".kmg-bite-quiz .kmg-choice", { hasText: new RegExp(`^${escapeRegex(answer)}$`) }).click();
+      await p.locator(".kmg-bite-next").click();
+    }
+    await p.waitForSelector(".kmg-bite-result");
+    return (await p.locator(".kmg-bite-result h2").textContent())?.trim();
+  };
+
+  await p.goto(`${baseUrl}/#/leerhapjes`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-bite-daily");
+  const coins0 = await coins();
+  const score = await doBite();
+  const coins1 = await coins();
+  if (!/3/.test(score ?? "")) note(currentRoute, `three right answers should score 3 of 3, shows "${score}"`);
+  // 15 for the card, 5 for gold, 10 for it being the bite of the day.
+  if (coins1 - coins0 !== 30) note(currentRoute, `the first perfect bite of the day should pay 30 coins, paid ${coins1 - coins0}`);
+
+  await p.reload({ waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-bite-grid");
+  const gold = await p.locator(".kmg-bite-card.is-gold").count();
+  if (gold !== 1) note(currentRoute, `the gold card should be in the album after a reload, found ${gold}`);
+
+  // The bite of the day stays the same bite; repeating it pays nothing.
+  const coins2 = await coins();
+  await doBite();
+  if ((await coins()) !== coins2) note(currentRoute, "repeating a collected bite paid coins again");
+
+  await p.goto(`${baseUrl}/#/home`, { waitUntil: "networkidle" });
+  await p.waitForSelector(".kmg-homestat");
+  const stats = await p.locator(".kmg-homestat").allTextContents();
+  if (!stats.some((text) => /1\/24/.test(text))) note(currentRoute, `the home page should count 1/24 bites: ${JSON.stringify(stats)}`);
+  console.log(`  leerhapjes: ${score}, +${coins1 - coins0} coins, gold card kept after reload, repeat paid 0`);
   await ctx.close();
 }
 

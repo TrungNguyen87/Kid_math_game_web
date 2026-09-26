@@ -570,6 +570,38 @@ export function rectangleSvg(w, h, { unit = "", width = 260, height = 180 } = {}
   </svg>`;
 }
 
+/**
+ * A circle with its radius (or diameter) drawn in and labelled - for the
+ * groep 8 circle questions (round 18). The circle draws itself like the
+ * rectangle does, then the radius line appears.
+ */
+export function circleSvg(value, { unit = "", show = "radius", width = 220, height = 200 } = {}) {
+  const id = uid();
+  const cx = width / 2;
+  const cy = height / 2;
+  const r = Math.min(width, height) / 2 - 22;
+  const circumference = 2 * Math.PI * r;
+  const style = animStyle(
+    id,
+    `@keyframes ${id}draw { from { stroke-dashoffset:${f0(circumference)}; } to { stroke-dashoffset:0; } }` +
+      `@keyframes ${id}wash { from { opacity:0; } to { opacity:1; } }` +
+      `.${id}-outline { stroke-dasharray:${f0(circumference)}; animation:${id}draw 0.8s ease-out both; }` +
+      `.${id}-fill, .${id}-lbl { animation:${id}wash 0.4s ease-out 0.6s both; }`,
+    `#${id} * { animation:none !important; opacity:1; stroke-dashoffset:0; }`,
+  );
+  const diameter = show === "diameter";
+  const x1 = diameter ? cx - r : cx;
+  const label = `${value} ${unit}`.trim();
+  return `<svg id="${id}" class="kmg-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${diameter ? "d" : "r"} = ${label}">
+    ${style}
+    <circle class="${id}-fill" cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(r)}" fill="${FILL}" opacity="0.55"/>
+    <circle class="${id}-outline" cx="${f1(cx)}" cy="${f1(cy)}" r="${f1(r)}" fill="none" stroke="${STROKE}" stroke-width="3"/>
+    <line class="${id}-lbl" x1="${f1(x1)}" y1="${f1(cy)}" x2="${f1(cx + r)}" y2="${f1(cy)}" stroke="${ACCENT2}" stroke-width="3" stroke-linecap="round"/>
+    <circle class="${id}-lbl" cx="${f1(cx)}" cy="${f1(cy)}" r="4" fill="${STROKE}"/>
+    <text class="${id}-lbl" x="${f1(diameter ? cx : cx + r / 2)}" y="${f1(cy - 10)}" text-anchor="middle" font-size="15" font-weight="bold" fill="${STROKE}">${diameter ? "d" : "r"} = ${label}</text>
+  </svg>`;
+}
+
 /** A labelled triangle (base + dashed height) for triangle-area questions. */
 export function triangleSvg(base, heightVal, { unit = "", width = 260, height = 180 } = {}) {
   const pad = 40;

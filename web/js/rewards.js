@@ -24,6 +24,8 @@
  *     That is the "only people who can finish everything" item.
  */
 import {
+  GROEP8_LEVEL,
+  MASTER_LEVEL,
   MAX_LEVEL,
   allGamesAtTrueMax,
   emitChange,
@@ -109,16 +111,25 @@ export const REWARD_DEFS = [
   { id: "avatar_ice_queen", category: "avatar", tier: "legendary", emoji: "❄️👸", nameKey: "rewards.avatar_ice_queen", cost: LEGENDARY, minLevel: 4 },
   { id: "avatar_dino_king", category: "avatar", tier: "legendary", emoji: "🦖👑", nameKey: "rewards.avatar_dino_king", cost: LEGENDARY, minLevel: 4 },
 
-  // --- Mythic: original anime-style heroes, needs a maxed game -------------
+  // --- Mythic: original anime-style heroes, needs level 5 in a game ---------
+  // (Level 5 was the top before groep 8 existed; the gate stays at 5 so no
+  // one's saving goal moved when levels 6 and 7 arrived in round 18.)
   // (Real franchise characters like Luffy are trademarked, so these are
   // original archetypes in the same spirit rather than a copy of one.)
-  { id: "avatar_dragon_blade", category: "avatar", tier: "mythic", emoji: "🐉⚔️", nameKey: "rewards.avatar_dragon_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_star_ninja", category: "avatar", tier: "mythic", emoji: "🥷✨", nameKey: "rewards.avatar_star_ninja", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_galaxy_guardian", category: "avatar", tier: "mythic", emoji: "🌌🦸", nameKey: "rewards.avatar_galaxy_guardian", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_tsunami_blade", category: "avatar", tier: "mythic", emoji: "🌊⚔️", nameKey: "rewards.avatar_tsunami_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_frost_wolf", category: "avatar", tier: "mythic", emoji: "❄️🐺", nameKey: "rewards.avatar_frost_wolf", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_sakura_samurai", category: "avatar", tier: "mythic", emoji: "🌸⚔️", nameKey: "rewards.avatar_sakura_samurai", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "avatar_nebula_phoenix", category: "avatar", tier: "mythic", emoji: "🌌🔥", nameKey: "rewards.avatar_nebula_phoenix", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "avatar_dragon_blade", category: "avatar", tier: "mythic", emoji: "🐉⚔️", nameKey: "rewards.avatar_dragon_blade", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_star_ninja", category: "avatar", tier: "mythic", emoji: "🥷✨", nameKey: "rewards.avatar_star_ninja", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_galaxy_guardian", category: "avatar", tier: "mythic", emoji: "🌌🦸", nameKey: "rewards.avatar_galaxy_guardian", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_tsunami_blade", category: "avatar", tier: "mythic", emoji: "🌊⚔️", nameKey: "rewards.avatar_tsunami_blade", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_frost_wolf", category: "avatar", tier: "mythic", emoji: "❄️🐺", nameKey: "rewards.avatar_frost_wolf", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_sakura_samurai", category: "avatar", tier: "mythic", emoji: "🌸⚔️", nameKey: "rewards.avatar_sakura_samurai", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "avatar_nebula_phoenix", category: "avatar", tier: "mythic", emoji: "🌌🔥", nameKey: "rewards.avatar_nebula_phoenix", cost: MYTHIC, minLevel: MASTER_LEVEL },
+
+  // --- Groep 8 (round 18): only for reaching level 6 (Kampioen) or level 7
+  // (Legende) somewhere - the reason to push past the old top of 5. -----
+  { id: "avatar_graduate", category: "avatar", tier: "legendary", emoji: "🧑‍🎓", nameKey: "rewards.avatar_graduate", cost: LEGENDARY, minLevel: GROEP8_LEVEL },
+  { id: "avatar_owl_sage", category: "avatar", tier: "legendary", emoji: "🦉📚", nameKey: "rewards.avatar_owl_sage", cost: LEGENDARY, minLevel: GROEP8_LEVEL },
+  { id: "avatar_crystal_dragon", category: "avatar", tier: "mythic", emoji: "💎🐉", nameKey: "rewards.avatar_crystal_dragon", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "avatar_rocket_legend", category: "avatar", tier: "mythic", emoji: "🚀✨", nameKey: "rewards.avatar_rocket_legend", cost: MYTHIC, minLevel: MAX_LEVEL },
 
   // --- Ultra: the one capstone reward, rendered as a rotating 3D card ------
   { id: "avatar_3d_champion", category: "avatar", tier: "ultra", emoji: "🏆", nameKey: "rewards.avatar_3d_champion", cost: ULTRA, minLevel: MAX_LEVEL, requiresMastery: true, threeD: true },
@@ -172,11 +183,15 @@ export const REWARD_DEFS = [
   { id: "sticker_ufo", category: "sticker", tier: "legendary", emoji: "🛸", nameKey: "rewards.sticker_ufo", cost: LEGENDARY, minLevel: 4 },
   { id: "sticker_castle", category: "sticker", tier: "legendary", emoji: "🏰", nameKey: "rewards.sticker_castle", cost: LEGENDARY, minLevel: 4 },
 
-  { id: "sticker_katana_emblem", category: "sticker", tier: "mythic", emoji: "🗡️✨", nameKey: "rewards.sticker_katana_emblem", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "sticker_golden_scale", category: "sticker", tier: "mythic", emoji: "🐲✨", nameKey: "rewards.sticker_golden_scale", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "sticker_moon_blade", category: "sticker", tier: "mythic", emoji: "🌙⚔️", nameKey: "rewards.sticker_moon_blade", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "sticker_wolf_ember", category: "sticker", tier: "mythic", emoji: "🔥🐺", nameKey: "rewards.sticker_wolf_ember", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "sticker_spirit_fox", category: "sticker", tier: "mythic", emoji: "🦊✨", nameKey: "rewards.sticker_spirit_fox", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "sticker_katana_emblem", category: "sticker", tier: "mythic", emoji: "🗡️✨", nameKey: "rewards.sticker_katana_emblem", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "sticker_golden_scale", category: "sticker", tier: "mythic", emoji: "🐲✨", nameKey: "rewards.sticker_golden_scale", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "sticker_moon_blade", category: "sticker", tier: "mythic", emoji: "🌙⚔️", nameKey: "rewards.sticker_moon_blade", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "sticker_wolf_ember", category: "sticker", tier: "mythic", emoji: "🔥🐺", nameKey: "rewards.sticker_wolf_ember", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "sticker_spirit_fox", category: "sticker", tier: "mythic", emoji: "🦊✨", nameKey: "rewards.sticker_spirit_fox", cost: MYTHIC, minLevel: MASTER_LEVEL },
+
+  // Round 18: a reader's sticker early on, and the groep 8 diploma.
+  { id: "sticker_books", category: "sticker", tier: "uncommon", emoji: "📚", nameKey: "rewards.sticker_books", cost: UNCOMMON, minLevel: 0 },
+  { id: "sticker_diploma", category: "sticker", tier: "legendary", emoji: "📜🎓", nameKey: "rewards.sticker_diploma", cost: LEGENDARY, minLevel: GROEP8_LEVEL },
 
   // ==========================================================================
   // Special gifts - a third collection alongside characters and stickers:
@@ -205,8 +220,9 @@ export const REWARD_DEFS = [
   { id: "gift_trident_of_mastery", category: "gift", tier: "legendary", emoji: "🔱", nameKey: "rewards.gift_trident_of_mastery", cost: LEGENDARY, minLevel: 4 },
   { id: "gift_golden_violin", category: "gift", tier: "legendary", emoji: "🎻", nameKey: "rewards.gift_golden_violin", cost: LEGENDARY, minLevel: 4 },
 
-  { id: "gift_celestial_seal", category: "gift", tier: "mythic", emoji: "🏯✨", nameKey: "rewards.gift_celestial_seal", cost: MYTHIC, minLevel: MAX_LEVEL },
-  { id: "gift_infinity_orb", category: "gift", tier: "mythic", emoji: "♾️✨", nameKey: "rewards.gift_infinity_orb", cost: MYTHIC, minLevel: MAX_LEVEL },
+  { id: "gift_celestial_seal", category: "gift", tier: "mythic", emoji: "🏯✨", nameKey: "rewards.gift_celestial_seal", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "gift_infinity_orb", category: "gift", tier: "mythic", emoji: "♾️✨", nameKey: "rewards.gift_infinity_orb", cost: MYTHIC, minLevel: MASTER_LEVEL },
+  { id: "gift_golden_book", category: "gift", tier: "mythic", emoji: "📖✨", nameKey: "rewards.gift_golden_book", cost: MYTHIC, minLevel: MAX_LEVEL },
 
   // ==========================================================================
   // Colour themes - equip one and the whole app changes colour (the
@@ -219,7 +235,7 @@ export const REWARD_DEFS = [
   { id: "theme_candy", category: "theme", tier: "rare", emoji: "🍭", nameKey: "rewards.theme_candy", cost: RARE, minLevel: 2, theme: "candy", swatch: ["#ec407a", "#4dd0e1"] },
   { id: "theme_space", category: "theme", tier: "epic", emoji: "🚀", nameKey: "rewards.theme_space", cost: EPIC, minLevel: 3, theme: "space", swatch: ["#7e57c2", "#ffca28"] },
   { id: "theme_rainbow", category: "theme", tier: "legendary", emoji: "🌈", nameKey: "rewards.theme_rainbow", cost: LEGENDARY, minLevel: 4, theme: "rainbow", swatch: ["#e53935", "#fdd835", "#43a047", "#1e88e5", "#8e24aa"] },
-  { id: "theme_gold", category: "theme", tier: "mythic", emoji: "👑", nameKey: "rewards.theme_gold", cost: MYTHIC, minLevel: MAX_LEVEL, theme: "gold", swatch: ["#b8860b", "#ffd54f"] },
+  { id: "theme_gold", category: "theme", tier: "mythic", emoji: "👑", nameKey: "rewards.theme_gold", cost: MYTHIC, minLevel: MASTER_LEVEL, theme: "gold", swatch: ["#b8860b", "#ffd54f"] },
 
   // ==========================================================================
   // Treasures - never for sale. `chestOnly` items have no price (cost: null)

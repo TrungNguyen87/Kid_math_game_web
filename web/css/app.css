@@ -3285,3 +3285,559 @@ button.kmg-chip:hover {
 .kmg-buddy-body {
   flex: 1;
 }
+
+/* ==========================================================================
+   Round 18: groep 8 levels, mastery, reading games, arcade games and
+   learning bites.
+   ========================================================================== */
+
+/* --- menu sections ---------------------------------------------------------- */
+
+.kmg-menu-group {
+  margin: 0.55rem 0 0.1rem;
+  padding: 0 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+/* --- level picker: mastered levels, groep 8, and the "move up" nudge ------- */
+
+.kmg-levelbtn {
+  position: relative;
+}
+/* A mastered level keeps its number and gains a small green tick. */
+.kmg-levelbtn.is-cleared:not(.is-current) {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+.kmg-levelbtn.is-cleared::after {
+  content: "✓";
+  position: absolute;
+  top: -0.45rem;
+  right: -0.3rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.05rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.kmg-levelbtn.is-groep8:not(.is-current):not(.is-cleared) {
+  border-style: dashed;
+  border-color: var(--purple);
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-levelbtn.is-cleared:not(.is-current) {
+    color: #a5d6a7;
+  }
+}
+/* Eight levels on one row at phone width: tighter buttons, same targets. */
+@media (max-width: 420px) {
+  .kmg-levelrow {
+    gap: 0.25rem;
+  }
+  .kmg-levelbtn {
+    font-size: 1rem;
+    padding: 0.6rem 0;
+  }
+}
+
+.kmg-practice-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--green-soft);
+  border: 2px solid var(--green);
+  font-weight: 600;
+  animation: kmgNudgeIn 0.4s ease-out both;
+}
+.kmg-practice-nudge[hidden] {
+  display: none;
+}
+.kmg-practice-nudge-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.kmg-practice-nudge-text {
+  flex: 1 1 14rem;
+  font-size: 0.92rem;
+}
+.kmg-practice-nudge-btn {
+  flex: none;
+}
+@keyframes kmgNudgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- reading: the text card ------------------------------------------------ */
+
+/* A 44rem preferred width capped at the column: works in a shrink-to-fit
+   flex item without needing :has(), which older school tablets lack. */
+.kmg-visuals > .kmg-visual {
+  max-width: 100%;
+}
+.kmg-passage {
+  width: 44rem;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 1rem 1.2rem 0.9rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 3px solid var(--border);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.kmg-passage-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.4rem;
+}
+.kmg-passage-title {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+.kmg-passage-count {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  align-self: center;
+}
+.kmg-passage-text {
+  margin: 0 0 0.75rem;
+  font-size: 1.12rem;
+  line-height: 1.7;
+}
+.kmg-skillchip {
+  display: inline-block;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  background: var(--amber-soft);
+  border: 2px solid var(--amber);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Sentence answers (reading games, learning bites): one per row, calmer. */
+.kmg-choices.is-stacked .kmg-choice {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 0.75rem 1rem;
+  min-height: 3.2rem;
+  text-align: left;
+}
+
+/* --- arcade games ---------------------------------------------------------- */
+
+/* Scrolled to the top when a run starts: under the fixed top bar on a phone,
+   right at the top on a laptop. */
+.kmg-arcade {
+  scroll-margin-top: 0.75rem;
+}
+@media (max-width: 900px) {
+  .kmg-arcade {
+    scroll-margin-top: 4.3rem;
+  }
+}
+.kmg-arcade-play {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "q" "s" "c" "f";
+}
+.kmg-arcade-play > .kmg-arcade-question {
+  grid-area: q;
+}
+.kmg-arcade-play > .kmg-arcade-stats {
+  grid-area: s;
+}
+.kmg-arcade-play > .kmg-arcade-canvaswrap {
+  grid-area: c;
+}
+.kmg-arcade-play > .kmg-arcade-foot {
+  grid-area: f;
+}
+.kmg-arcade-question {
+  margin-bottom: 0.5rem;
+  font-size: clamp(0.98rem, 3.6vw, 1.4rem);
+  line-height: 1.25;
+  padding: 0.6rem 0.9rem;
+  /* Room for three lines is always reserved, so a long word question does
+     not push the playfield down mid-run. */
+  min-height: calc(3.75em + 1.2rem);
+}
+.kmg-arcade-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-top: 0.4rem;
+}
+/* A short landscape screen (a phone on its side): the question and stats
+   beside the playfield, which then gets the whole height. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .kmg-arcade-play {
+    grid-template-columns: minmax(10rem, 1fr) auto;
+    grid-template-areas: "q c" "s c" "f c";
+    align-items: start;
+    gap: 0 1rem;
+  }
+  .kmg-arcade-question {
+    min-height: 0;
+  }
+}
+.kmg-arcade-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  align-items: center;
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+.kmg-arcade-lives {
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+.kmg-arcade-stat {
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 0.9rem;
+}
+.kmg-arcade-canvaswrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.kmg-arcade-canvas {
+  display: block;
+  border-radius: var(--radius);
+  border: 3px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  background: #bfe8ff;
+  /* Taps are game input: no double-tap zoom, no text selection, no long-press
+     menu while a child is hammering the screen. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  outline: none;
+}
+.kmg-arcade-canvas:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+.kmg-arcade-hint {
+  margin: 0;
+}
+.kmg-arcade-modes {
+  margin-bottom: 0.75rem;
+}
+
+/* --- learning bites (Leerhapjes) ------------------------------------------- */
+
+.kmg-bites {
+  scroll-margin-top: 4.5rem;
+}
+.kmg-bite-daily {
+  margin: 1rem 0;
+  border-color: var(--amber);
+  background: linear-gradient(135deg, var(--amber-soft), var(--surface) 70%);
+}
+.kmg-bite-daily-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.kmg-bite-daily-body > div {
+  flex: 1 1 12rem;
+}
+.kmg-bite-daily-emoji {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+.kmg-bite-progress {
+  margin: 1rem 0 0.75rem;
+}
+.kmg-bite-filters {
+  margin-bottom: 0.9rem;
+}
+.kmg-bite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.kmg-bite-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.9rem 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 3px dashed var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: center;
+  font: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kmg-bite-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+/* Not collected yet: a faded silhouette of the card, like an empty album slot. */
+.kmg-bite-card:not(.is-collected) .kmg-bite-card-emoji {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+.kmg-bite-card.is-collected {
+  border-style: solid;
+  border-color: var(--green);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.kmg-bite-card.is-gold {
+  border-color: #f9a825;
+  background: linear-gradient(145deg, #fff8e1, #ffecb3);
+  color: #3e2723;
+}
+.kmg-bite-card-emoji {
+  font-size: 2rem;
+  line-height: 1.1;
+}
+.kmg-bite-card-title {
+  font-weight: 800;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+.kmg-bite-card-meta {
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+.kmg-bite-card.is-gold .kmg-bite-card-meta {
+  color: #6d4c41;
+}
+.kmg-bite-card-stars {
+  font-size: 0.95rem;
+}
+.kmg-bite-back {
+  margin-bottom: 0.75rem;
+}
+.kmg-bite-lesson,
+.kmg-bite-quiz,
+.kmg-bite-result {
+  margin-bottom: 1.5rem;
+}
+.kmg-bite-lesson-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.kmg-bite-lesson-head h2 {
+  margin: 0;
+}
+.kmg-bite-lesson-emoji {
+  font-size: 3rem;
+  line-height: 1;
+}
+.kmg-bite-text {
+  font-size: 1.1rem;
+  line-height: 1.65;
+}
+.kmg-bite-example {
+  margin: 0.75rem 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  border-left: 5px solid var(--amber);
+}
+.kmg-bite-quiz .kmg-question {
+  margin: 0.5rem 0 0.75rem;
+}
+.kmg-bite-next {
+  margin-top: 0.75rem;
+}
+.kmg-bite-result {
+  text-align: center;
+}
+.kmg-bite-result .kmg-actions {
+  justify-content: center;
+}
+.kmg-bite-result-emoji {
+  font-size: 3.5rem;
+  line-height: 1.1;
+}
+.kmg-bite-result-stars {
+  font-size: 1.8rem;
+  margin-bottom: 0.4rem;
+}
+.kmg-bite-coins {
+  font-weight: 800;
+  color: var(--green-dark);
+}
+@media (prefers-color-scheme: dark) {
+  .kmg-bite-coins {
+    color: #a5d6a7;
+  }
+}
+
+/* --- home: next challenge, stats, grouped tiles, passport ------------------ */
+
+.kmg-challenge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  margin: 1rem 0;
+  border-color: var(--green);
+  background: linear-gradient(135deg, var(--green-soft), var(--surface) 75%);
+}
+.kmg-challenge.is-groep8 {
+  border-color: var(--purple);
+}
+.kmg-challenge-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.kmg-challenge-main {
+  flex: 1 1 14rem;
+}
+.kmg-challenge-main p {
+  margin: 0.15rem 0 0;
+}
+.kmg-challenge-btn {
+  text-decoration: none;
+}
+.kmg-homestats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.25rem;
+}
+.kmg-homestat {
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.kmg-bite-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1 1 100%;
+  margin: 0.25rem 0 0;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  border-color: var(--amber);
+}
+.kmg-bite-link:hover {
+  box-shadow: var(--shadow-lg);
+}
+.kmg-bite-link-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.kmg-bite-link-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.kmg-bite-link-go {
+  font-size: 1.2rem;
+  color: var(--orange-dark);
+}
+.kmg-tiles-group {
+  margin: 1.1rem 0 0;
+  font-size: 1rem;
+  color: var(--text-soft);
+}
+.kmg-tilegroups .kmg-tiles {
+  margin: 0.5rem 0 0.5rem;
+}
+.kmg-tile-pips {
+  grid-column: 2;
+  display: flex;
+  gap: 0.22rem;
+  margin-top: 0.35rem;
+}
+.kmg-tile-pip {
+  flex: 1;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--border);
+}
+.kmg-tile-pip.is-groep8 {
+  background: repeating-linear-gradient(90deg, var(--border) 0 3px, transparent 3px 5px);
+  outline: 1px solid var(--border);
+}
+.kmg-tile-pip.is-cleared {
+  background: linear-gradient(90deg, var(--orange), var(--amber));
+  outline: none;
+}
+.kmg-tile-pip.is-current {
+  background: var(--surface);
+  outline: 2px solid var(--orange);
+}
+.kmg-passport-wrap {
+  overflow-x: auto;
+}
+.kmg-passport {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 100%;
+}
+.kmg-passport th,
+.kmg-passport td {
+  padding: 0.25rem 0.35rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.kmg-passport tbody th {
+  text-align: left;
+  font-weight: 700;
+}
+.kmg-passport thead th.is-groep8 {
+  color: var(--purple);
+}
+.kmg-passport td.is-open {
+  color: var(--text-soft);
+}
+.kmg-passport td.is-current {
+  background: var(--amber-soft);
+  border-radius: 6px;
+}
+
+/* --- dashboard: mastery ----------------------------------------------------- */
+
+.kmg-mastery-panel {
+  margin: 1.25rem 0;
+}

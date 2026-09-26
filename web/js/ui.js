@@ -18,8 +18,18 @@
  */
 import { el, clear, nextFrame, raw } from "./dom.js";
 import { t, tMd } from "./i18n.js";
-import { MAX_LEVEL, getMaxLevel, getLevel, setLevel, state } from "./state.js";
-import { LEVELS, getLevels, levelLabel } from "./ui-bits.js";
+import {
+  GROEP8_LEVEL,
+  canEarnAtLevel,
+  getLevel,
+  getMaxLevel,
+  isLevelCleared,
+  masteryBonus,
+  nextPayingLevel,
+  setLevel,
+  state,
+} from "./state.js";
+import { getLevels, levelLabel } from "./ui-bits.js";
 import { getGameIllustration } from "./illustrations.js";
 import * as sound from "./sound.js";
 
@@ -54,26 +64,48 @@ export function expander(summaryText, contentNode, { open = false } = {}) {
  * automatic adaptive levelling that already happens after a streak of
  * right/wrong answers - so levelling up is always visible and never only
  * something that happens invisibly in the background.
+ *
+ * Since round 18 it is also where a child sees what they have *mastered*:
+ * every level they have levelled all the way through carries a ✓, and the
+ * groep 8 levels a 🎓. Sitting on a mastered level (after a slip back down,
+ * or picking it again) shows a friendly nudge with a one-tap way up to the
+ * nearest level that still pays - the replay guard explained as an
+ * invitation, not a penalty.
  */
 export function levelPicker(gameKey, onChange) {
   const wrap = el("div.kmg-levelpicker");
   const label = el("div.kmg-levelpicker-label", { text: t("common.choose_level") });
   const max = getMaxLevel(gameKey);
   const levels = getLevels(gameKey);
-  // One column per level, so Tafel Monster's seven levels (0-6) sit on one
-  // row like every other game's six instead of wrapping its "6" onto a line
-  // of its own.
+  // One column per level, so all eight levels (0-7) sit on one row.
   const row = el("div.kmg-levelrow", { style: { "--kmg-levels": String(levels.length) } });
   const badge = el("div.kmg-level-badge");
+  const nudge = el("div.kmg-practice-nudge", { role: "status", hidden: true });
+
+  const goTo = (level) => {
+    // Tapping the already-active level is a no-op: doing the work would
+    // reset the adaptive-difficulty streak counters for no reason.
+    if (getLevel(gameKey) === level) return;
+    setLevel(gameKey, level);
+    sound.playTap();
+    paint(true);
+    onChange?.(level);
+  };
 
   const paint = (animate = false) => {
     const current = getLevel(gameKey);
     [...row.children].forEach((btn) => {
-      const isCurrent = Number(btn.dataset.level) === current;
+      const level = Number(btn.dataset.level);
+      const isCurrent = level === current;
+      const cleared = isLevelCleared(gameKey, level);
       btn.classList.toggle("is-current", isCurrent);
+      btn.classList.toggle("is-cleared", cleared);
       btn.setAttribute("aria-pressed", String(isCurrent));
+      btn.title = cleared ? `${levelLabel(level)} · ${t("mastery.cleared_title")}` : levelLabel(level);
     });
-    badge.textContent = `⭐ ${t("common.level")} ${current}/${max} — ${levelLabel(current)}`;
+    // The groep 8 levels carry a mortarboard instead of the star; their
+    // label already says "(groep 8)".
+    badge.textContent = `${current >= GROEP8_LEVEL ? "🎓" : "⭐"} ${t("common.level")} ${current}/${max} — ${levelLabel(current)}`;
     // The badge pops once when the level actually changed and then sits
     // still: a badge that bounced on every repaint would stop meaning
     // "you levelled up".
@@ -82,29 +114,41 @@ export function levelPicker(gameKey, onChange) {
       void badge.offsetWidth; // restart the animation
       badge.classList.add("kmg-levelup");
     }
+    paintNudge(current);
   };
 
-  for (const level of levels) {
-    row.append(
-      el("button.kmg-levelbtn", {
+  function paintNudge(current) {
+    clear(nudge);
+    const next = canEarnAtLevel(gameKey, current) ? null : nextPayingLevel(gameKey, current);
+    nudge.hidden = next == null;
+    if (next == null) return;
+    const bonusLine = next < max ? ` ${t("mastery.nudge_bonus", { coins: masteryBonus(next) })}` : "";
+    nudge.append(
+      el("span.kmg-practice-nudge-icon", { text: "🏅", "aria-hidden": "true" }),
+      el("span.kmg-practice-nudge-text", {
+        text: `${t("mastery.nudge", { level: current, next })}${bonusLine}`,
+      }),
+      el("button.kmg-btn.kmg-btn-primary.kmg-practice-nudge-btn", {
         type: "button",
-        text: String(level),
-        dataset: { level },
-        title: levelLabel(level),
-        onClick: () => {
-          // Tapping the already-active level is a no-op: doing the work would
-          // reset the adaptive-difficulty streak counters for no reason.
-          if (getLevel(gameKey) === level) return;
-          setLevel(gameKey, level);
-          sound.playTap();
-          paint(true);
-          onChange?.(level);
-        },
+        text: t("mastery.nudge_button", { level: next }),
+        onClick: () => goTo(next),
       }),
     );
   }
 
-  wrap.append(label, row, badge);
+  for (const level of levels) {
+    row.append(
+      el(`button.kmg-levelbtn${level >= GROEP8_LEVEL ? ".is-groep8" : ""}`, {
+        type: "button",
+        text: String(level),
+        dataset: { level },
+        title: levelLabel(level),
+        onClick: () => goTo(level),
+      }),
+    );
+  }
+
+  wrap.append(label, row, badge, nudge);
   wrap.refresh = paint;
   paint();
   return wrap;

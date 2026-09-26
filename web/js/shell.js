@@ -57,7 +57,14 @@ export function buildShell(root) {
   const menu = el("ul.kmg-menu");
   const controls = el("div.kmg-drawer-controls");
 
+  let lastGroup = null;
   for (const entry of NAV) {
+    // A small heading where a new section of the menu starts (round 18 took
+    // the menu past twenty entries).
+    if (entry.group !== lastGroup && entry.group !== "start") {
+      menu.append(el("li.kmg-menu-group", { dataset: { group: entry.group }, text: t(`nav.group_${entry.group}`) }));
+    }
+    lastGroup = entry.group;
     const link = el("a.kmg-menu-link", { href: `#/${entry.path}`, dataset: { path: entry.path } }, [
       el("span.kmg-menu-icon", { text: entry.icon }),
       el("span.kmg-menu-label", { text: t(entry.key) }),
@@ -216,6 +223,9 @@ export function buildShell(root) {
     NAV.forEach((entry) => {
       const link = menu.querySelector(`[data-path="${entry.path}"] .kmg-menu-label`);
       if (link) link.textContent = t(entry.key);
+    });
+    menu.querySelectorAll(".kmg-menu-group").forEach((heading) => {
+      heading.textContent = t(`nav.group_${heading.dataset.group}`);
     });
   }
 

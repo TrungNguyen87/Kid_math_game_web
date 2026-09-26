@@ -7,25 +7,32 @@
  * page from a table of contents into the thing a child actually navigates
  * with - and makes "which ones have I not tried yet" answerable at a glance.
  */
-import { t, tMd } from "../i18n.js";
+import { getLanguage, t, tMd } from "../i18n.js";
 import { el, raw, clear, append } from "../dom.js";
-import { GAME_NAV } from "../nav.js";
+import { GAME_NAV, NAV_GROUPS } from "../nav.js";
 import {
   GAME_KEYS,
+  GROEP8_LEVEL,
   currentPlayStreak,
   getLevel,
   getMaxLevel,
+  isLevelCleared,
+  masteredLevelCount,
   profileNames,
+  setLevel,
   setPlayerName,
   state,
 } from "../state.js";
+import { levelPassport, nextChallenge } from "../progress.js";
+import { BITES } from "../bites-data.js";
+import { BITE_COINS, biteOfTheDay, biteStars, collectedCount } from "../bites.js";
 import { BADGE_DEFS, BADGE_EMOJI } from "../badges.js";
 import { BUDDY_STAGES, buddyInfo } from "../buddy.js";
 import { chestOpenedToday, chestReady, openChest, todaysQuests } from "../quests.js";
 import { REWARD_MAP, goalInfo } from "../rewards.js";
 import { announceNewBadges, questLabel } from "../gameflow.js";
 import { FEEDBACK_EMAIL, feedbackHref, levelLabel } from "../ui-bits.js";
-import { pageHeader } from "../ui.js";
+import { expander, pageHeader } from "../ui.js";
 import { getGameIllustration } from "../illustrations.js";
 import { bigCelebration, confetti, levelUpOverlay, toast } from "../fx.js";
 import * as sound from "../sound.js";
@@ -38,12 +45,15 @@ const pathForGame = (gameKey) => GAME_NAV.find((entry) => entry.game === gameKey
 export function render(container) {
   const root = el("section.kmg-home");
   const nameNotice = el("div.kmg-namenotice");
-  const tiles = el("div.kmg-tiles");
+  const tiles = el("div.kmg-tilegroups");
   const badgeRow = el("div.kmg-badgerow");
   const badgeCount = el("span.kmg-section-count");
   const buddyHost = el("div.kmg-adventure-cell");
   const questHost = el("div.kmg-adventure-cell");
   const goalHost = el("div");
+  const challengeHost = el("div.kmg-challenge-host");
+  const statsHost = el("div.kmg-homestats");
+  const passportHost = el("div");
 
   // --- who is playing -----------------------------------------------------
 
@@ -80,7 +90,10 @@ export function render(container) {
     paintBuddy();
     paintQuests();
     paintGoal();
+    paintChallenge();
+    paintStats();
     paintTiles();
+    paintPassport();
     paintBadges();
   }
 
@@ -282,38 +295,152 @@ export function render(container) {
     );
   }
 
+  // --- next challenge (round 18) --------------------------------------------
+  // The friendly half of the level-replay guard: when a child is sitting on
+  // a level they have already mastered, or has a new level or game waiting,
+  // say so on the home page with one button that goes straight there.
+
+  function paintChallenge() {
+    clear(challengeHost);
+    const challenge = nextChallenge();
+    const entry = GAME_NAV.find((e) => e.game === challenge.game);
+    if (!entry) return;
+    const game = t(`game.${challenge.game}.name`);
+    const icons = { climb: "🧗", groep8: "🎓", new: "✨", lowest: "🚀" };
+    challengeHost.append(
+      el(`div.kmg-card.kmg-challenge.is-${challenge.kind}`, {}, [
+        el("span.kmg-challenge-icon", { text: icons[challenge.kind], "aria-hidden": "true" }),
+        el("div.kmg-challenge-main", {}, [
+          el("strong", { text: t("home.challenge_heading") }),
+          el("p", { text: t(`home.challenge_${challenge.kind}`, { game, level: challenge.level }) }),
+        ]),
+        el("a.kmg-btn.kmg-btn-primary.kmg-challenge-btn", {
+          href: `#/${entry.path}`,
+          text: t("home.challenge_button"),
+          onClick: () => {
+            // "Climb" means: this level is done, the next paying one is
+            // waiting - so open the game on it rather than on the old one.
+            if (challenge.kind === "climb") setLevel(challenge.game, challenge.level);
+            sound.playTap();
+          },
+        }),
+      ]),
+    );
+  }
+
+  // --- reading and mastery at a glance (round 18) ----------------------------
+
+  function paintStats() {
+    clear(statsHost);
+    const bite = biteOfTheDay();
+    const lang = getLanguage();
+    const words = state.wordsRead.toLocaleString(lang === "en" ? "en-GB" : "nl-NL");
+    statsHost.append(
+      el("span.kmg-homestat", { text: `📚 ${t("home.stat_words", { words })}` }),
+      el("span.kmg-homestat", { text: `🏅 ${t("home.stat_mastered", { count: masteredLevelCount() })}` }),
+      el("span.kmg-homestat", { text: `🍪 ${t("home.stat_bites", { have: collectedCount(), total: BITES.length })}` }),
+      el("a.kmg-card.kmg-bite-link", { href: "#/leerhapjes", onClick: () => sound.playTap() }, [
+        el("span.kmg-bite-link-emoji", { text: bite.emoji, "aria-hidden": "true" }),
+        el("span.kmg-bite-link-text", {}, [
+          el("strong", { text: t("home.bite_heading") }),
+          el("span", {
+            text:
+              biteStars(bite.id) > 0
+                ? t("home.bite_review", { title: bite[lang].title })
+                : t("home.bite_text", { title: bite[lang].title, coins: BITE_COINS }),
+          }),
+        ]),
+        el("span.kmg-bite-link-go", { text: "▶", "aria-hidden": "true" }),
+      ]),
+    );
+  }
+
+  // --- the level passport (round 18) -----------------------------------------
+  // Every level a child has mastered, as a stamp. A log of the finished easy
+  // levels that reads as a collection to complete, not a list of things
+  // they are no longer allowed to do.
+
+  function paintPassport() {
+    clear(passportHost);
+    const rows = levelPassport();
+    const table = el("table.kmg-passport");
+    const head = el("tr", {}, [el("th", { text: "" })]);
+    for (let level = 0; level <= getMaxLevel(); level++) {
+      head.append(el(`th${level >= GROEP8_LEVEL ? ".is-groep8" : ""}`, { text: level >= GROEP8_LEVEL ? `${level}🎓` : String(level) }));
+    }
+    table.append(el("thead", {}, [head]));
+    const tbody = el("tbody");
+    for (const row of rows) {
+      const entry = GAME_NAV.find((e) => e.game === row.game);
+      const tr = el("tr", {}, [el("th", { scope: "row", text: `${entry?.icon ?? ""} ${t(`nav.${row.game}`)}` })]);
+      row.cells.forEach((cell, level) => {
+        tr.append(
+          el(`td.is-${cell}`, {
+            text: cell === "cleared" ? "✅" : cell === "current" ? "⭐" : "·",
+            title: `${t("common.level")} ${level}: ${t(`home.passport_${cell}`)}`,
+          }),
+        );
+      });
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    passportHost.append(
+      expander(
+        `🏅 ${t("home.passport_heading", { count: masteredLevelCount() })}`,
+        el("div", {}, [
+          el("p.kmg-caption", { text: t("home.passport_caption") }),
+          el("div.kmg-passport-wrap", {}, [table]),
+        ]),
+      ),
+    );
+  }
+
   // --- game tiles -----------------------------------------------------------
 
   function paintTiles() {
     clear(tiles);
-    for (const entry of GAME_NAV) {
-      const level = getLevel(entry.game);
-      // Tafel Monster goes to level 6; every other game stops at 5.
-      const max = getMaxLevel(entry.game);
-      const tried = state.gamesTried.has(entry.game);
-      const tile = el("a.kmg-tile", {
-        href: `#/${entry.path}`,
-        onClick: () => sound.playTap(),
-      });
-      // append(), not tile.append(): Node.append() prints a null child as the
-      // literal word "null", which is exactly what every tile of an
-      // already-tried game used to show.
-      append(
-        tile,
-        el("span.kmg-tile-icon", { text: entry.icon }),
-        el("span.kmg-tile-body", {}, [
-          el("span.kmg-tile-name", { text: t(`game.${entry.game}.name`) }),
-          el("span.kmg-tile-meta", { text: `${t("common.level")} ${level}/${max} · ${levelLabel(level)}` }),
-        ]),
-        // A filled bar per game, so "how far am I in each" is one glance.
-        el("span.kmg-tile-bar", {}, [
-          el("span.kmg-tile-fill", { style: { width: `${(100 * level) / max}%` } }),
-        ]),
-        tried ? null : el("span.kmg-tile-new", { text: t("home.tile_new") }),
-        level >= max ? el("span.kmg-tile-crown", { text: "👑", title: levelLabel(level) }) : null,
-      );
-      tiles.append(tile);
+    // One section per menu group, so reading and arcade games are not lost
+    // at the end of a long grid.
+    for (const group of NAV_GROUPS) {
+      const entries = GAME_NAV.filter((entry) => entry.group === group);
+      if (!entries.length) continue;
+      tiles.append(el("h3.kmg-tiles-group", { text: t(`nav.group_${group}`) }));
+      const grid = el("div.kmg-tiles");
+      for (const entry of entries) grid.append(tile(entry));
+      tiles.append(grid);
     }
+  }
+
+  function tile(entry) {
+    const level = getLevel(entry.game);
+    const max = getMaxLevel(entry.game);
+    const tried = state.gamesTried.has(entry.game);
+    const node = el("a.kmg-tile", {
+      href: `#/${entry.path}`,
+      onClick: () => sound.playTap(),
+    });
+    // One pip per level: a filled one for every level mastered, a ring for
+    // the level being played now. Progress and the mastery log in one glance.
+    const pips = el("span.kmg-tile-pips", { "aria-hidden": "true" });
+    for (let l = 0; l <= max; l++) {
+      const cls = isLevelCleared(entry.game, l) ? ".is-cleared" : l === level ? ".is-current" : "";
+      pips.append(el(`span.kmg-tile-pip${cls}${l >= GROEP8_LEVEL ? ".is-groep8" : ""}`));
+    }
+    // append(), not node.append(): Node.append() prints a null child as the
+    // literal word "null", which is exactly what every tile of an
+    // already-tried game used to show.
+    append(
+      node,
+      el("span.kmg-tile-icon", { text: entry.icon }),
+      el("span.kmg-tile-body", {}, [
+        el("span.kmg-tile-name", { text: t(`game.${entry.game}.name`) }),
+        el("span.kmg-tile-meta", { text: `${t("common.level")} ${level}/${max} · ${levelLabel(level)}` }),
+      ]),
+      pips,
+      tried ? null : el("span.kmg-tile-new", { text: t("home.tile_new") }),
+      level >= max ? el("span.kmg-tile-crown", { text: "👑", title: levelLabel(level) }) : null,
+    );
+    return node;
   }
 
   // --- badges -------------------------------------------------------------
@@ -340,8 +467,7 @@ export function render(container) {
 
   // --- assembly -----------------------------------------------------------
 
-  // Each game's own maximum, so Tafel Monster's level 6 counts as the 100% it
-  // is rather than pushing the total past it.
+  // Each game's own maximum (getMaxLevel()), never a shared constant.
   const totalLevels = GAME_KEYS.reduce((sum, key) => sum + getLevel(key), 0);
   const maxLevels = GAME_KEYS.reduce((sum, key) => sum + getMaxLevel(key), 0);
   const overallPct = Math.round((100 * totalLevels) / maxLevels);
@@ -395,6 +521,8 @@ export function render(container) {
     // chest, and what the child is saving up for.
     el("div.kmg-adventure", {}, [buddyHost, questHost]),
     goalHost,
+    challengeHost,
+    statsHost,
 
     raw("div.kmg-intro", tMd("home.intro")),
 
@@ -410,6 +538,7 @@ export function render(container) {
 
     el("h2", { text: t("home.games_heading") }),
     tiles,
+    passportHost,
 
     el("div.kmg-section-head", {}, [el("h2", { text: t("home.badges_heading") }), badgeCount]),
     badgeRow,

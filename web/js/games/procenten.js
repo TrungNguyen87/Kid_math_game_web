@@ -2,6 +2,10 @@
  * Procenten Puzzel - percentage/fraction/decimal equivalents, percentage of a
  * number, discounts, and reverse percentages.
  * Ported from pages/04_Procenten_Puzzel.py.
+ *
+ * Levels 6-7 (round 18) are groep 8: "what percentage is this part?", VAT
+ * (btw) on top of a price, percentage increase and decrease, and a year of
+ * interest. Every answer is a whole number.
  */
 import { t } from "../i18n.js";
 import { choice, coinFlip, gcd, randInt, shuffle, unique } from "../rng.js";
@@ -104,6 +108,55 @@ export function generate(level) {
       answer: askNewPrice ? price - discount : discount,
       answerLabel: t("procenten.answer_label_euro"),
       visual: { kind: "pct", value: pct, label: t("procenten.visual_discount", { pct }) },
+    };
+  }
+
+  if (level === 6) {
+    if (coinFlip()) {
+      const pct = choice([5, 10, 15, 20, 25, 30, 40, 60, 75, 80]);
+      const whole = choice([20, 40, 50, 60, 80, 200, 300, 400].filter((w) => (w * pct) % 100 === 0));
+      const part = (whole * pct) / 100;
+      return {
+        mode: "numeric",
+        text: t("procenten.q_part_to_percent", { part, whole }),
+        answer: pct,
+        answerLabel: t("procenten.answer_label_percent"),
+        visual: { kind: "pct", value: pct, label: `${part} / ${whole}` },
+      };
+    }
+    const price = 100 * randInt(1, 9);
+    return {
+      mode: "numeric",
+      text: t("procenten.q_vat", { price }),
+      answer: (price * 121) / 100,
+      answerLabel: t("procenten.answer_label_euro"),
+      visual: { kind: "pct", value: 21, label: t("procenten.visual_vat") },
+    };
+  }
+
+  if (level === 7) {
+    const kind = choice(["increase", "decrease", "interest"]);
+    if (kind === "interest") {
+      const amount = 100 * randInt(2, 20);
+      const pct = randInt(1, 5);
+      return {
+        mode: "numeric",
+        text: t("procenten.q_interest", { amount, pct }),
+        answer: (amount * (100 + pct)) / 100,
+        answerLabel: t("procenten.answer_label_euro"),
+        visual: { kind: "pct", value: pct, label: t("procenten.visual_interest", { pct }) },
+      };
+    }
+    const pct = choice([5, 10, 20, 25, 40, 50]);
+    const from = choice([20, 40, 50, 60, 80, 100, 120, 200, 250, 400].filter((v) => (v * pct) % 100 === 0));
+    const change = (from * pct) / 100;
+    const to = kind === "increase" ? from + change : from - change;
+    return {
+      mode: "numeric",
+      text: t(kind === "increase" ? "procenten.q_increase_pct" : "procenten.q_decrease_pct", { from, to }),
+      answer: pct,
+      answerLabel: t("procenten.answer_label_percent"),
+      visual: { kind: "pct", value: pct, label: `${from} → ${to}` },
     };
   }
 

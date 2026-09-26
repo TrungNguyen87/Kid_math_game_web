@@ -4,18 +4,24 @@
  * utils/badges.py (same thresholds, same display order); round 17 added
  * thirteen more for the things a child can now work towards over days and
  * weeks rather than in one sitting: coming back day after day, daily quests
- * and chests, the collection, the buddy, and lifetime points.
+ * and chests, the collection, the buddy, and lifetime points. Round 18
+ * added ten more for groep 8 (levels 6 and 7), mastering levels, reading,
+ * the arcade games and the learning bites.
  *
  * checkNewBadges() is called once per answered question, after that
  * question's score/level/streak updates have landed, and returns whatever
  * was newly earned so it can be celebrated.
  */
-import { GAME_KEYS, MAX_LEVEL, getLevel, state } from "./state.js";
+import { GAME_KEYS, GROEP8_LEVEL, MASTER_LEVEL, MAX_LEVEL, getLevel, masteredLevelCount, state } from "./state.js";
 import { buddyStageIndex } from "./buddy.js";
+import { BITES } from "./bites-data.js";
 
 const playedAllGames = () => GAME_KEYS.every((k) => state.gamesTried.has(k));
-const anyLevelMaxed = () => GAME_KEYS.some((k) => getLevel(k) >= MAX_LEVEL);
-const allLevelsMaxed = () => GAME_KEYS.every((k) => getLevel(k) >= MAX_LEVEL);
+// "Level 5" and "Reken Meester" were earned at level 5 when 5 was the top;
+// they stay at 5 now that groep 8 goes to 7 (the badge names say "level 5").
+const anyLevelAtLeast = (level) => () => GAME_KEYS.some((k) => getLevel(k) >= level);
+const allLevelsMaxed = () => GAME_KEYS.every((k) => getLevel(k) >= MASTER_LEVEL);
+const bitesCollected = () => Object.values(state.bites).filter((b) => b?.stars > 0).length;
 const allLevelsAtLeast = (level) => () => GAME_KEYS.every((k) => getLevel(k) >= level);
 // `best`, not the current count: a streak that was reached stays earned even
 // after a missed day breaks it.
@@ -30,7 +36,7 @@ export const BADGE_DEFS = [
   ["streak5", "🔥", () => state.streaks >= 5],
   ["streak10", "🔥🔥", () => state.streaks >= 10],
   ["explorer", "🗺️", playedAllGames],
-  ["level5", "⭐", anyLevelMaxed],
+  ["level5", "⭐", anyLevelAtLeast(MASTER_LEVEL)],
   ["mastermind", "👑", allLevelsMaxed],
   ["streak20", "🌋", () => state.streaks >= 20],
   ["days3", "📅", playDaysInARow(3)],
@@ -45,6 +51,17 @@ export const BADGE_DEFS = [
   ["score5000", "🌠", () => state.totalScore >= 5000],
   ["buddy_dragon", "🐉", () => buddyStageIndex(state.totalScore) >= 4],
   ["all_level3", "🌟", allLevelsAtLeast(3)],
+  // Round 18.
+  ["groep8", "🎓", anyLevelAtLeast(GROEP8_LEVEL)],
+  ["legend", "🏆", anyLevelAtLeast(MAX_LEVEL)],
+  ["mastered10", "🏅", () => masteredLevelCount() >= 10],
+  ["mastered40", "🎖️", () => masteredLevelCount() >= 40],
+  ["reader25", "📚", () => state.readCorrect >= 25],
+  ["words1000", "📖", () => state.wordsRead >= 1000],
+  ["words5000", "🦉", () => state.wordsRead >= 5000],
+  ["arcade10", "🕹️", () => state.arcadeBest >= 10],
+  ["bites5", "🍪", () => bitesCollected() >= 5],
+  ["bites_all", "🧠", () => bitesCollected() >= BITES.length],
 ];
 
 export const BADGE_IDS = BADGE_DEFS.map((b) => b[0]);

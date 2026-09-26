@@ -33,6 +33,9 @@ export const LEVEL_RULES = {
   3: [3, 6, 8, true],
   4: [4, 6, 9, true],
   5: [4, 8, 9, true],
+  // Groep 8 (round 18): all nine digits, then a five-digit code.
+  6: [4, 9, 10, true],
+  7: [5, 9, 12, true],
 };
 
 /**

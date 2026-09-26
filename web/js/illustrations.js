@@ -999,6 +999,156 @@ export function rewardsIllustration() {
   </svg>`;
 }
 
+/** 🔍 Leesdetective: an open book with a magnifying glass sweeping over the lines */
+export function lezenIllustration() {
+  const id = uid("lez");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Leesdetective">
+    ${animWrap(id, `
+      @keyframes ${id}_scan { 0% { transform: translate(0px, 0px); } 50% { transform: translate(34px, 14px); } 100% { transform: translate(0px, 0px); } }
+      #${id} .glass { animation: ${id}_scan 4s ease-in-out infinite; }
+    `)}
+    <circle cx="28" cy="30" r="3" fill="#ffd600" class="anim-sparkle" style="transform-origin:28px 30px;"/>
+    <circle cx="134" cy="36" r="3.5" fill="#00e5ff" class="anim-sparkle" style="transform-origin:134px 36px; animation-delay:0.6s;"/>
+    <g class="anim-float" style="transform-origin:80px 100px;">
+      <path d="M 18,52 Q 48,40 78,54 L 78,132 Q 48,118 18,130 Z" fill="#fff8e1" stroke="#6d4c41" stroke-width="3"/>
+      <path d="M 142,52 Q 112,40 82,54 L 82,132 Q 112,118 142,130 Z" fill="#fffde7" stroke="#6d4c41" stroke-width="3"/>
+      <rect x="77" y="52" width="6" height="82" rx="2" fill="#8d6e63"/>
+      <g stroke="#a1887f" stroke-width="3" stroke-linecap="round">
+        <line x1="28" y1="68" x2="68" y2="72"/><line x1="28" y1="80" x2="68" y2="84"/><line x1="28" y1="92" x2="62" y2="96"/><line x1="28" y1="104" x2="68" y2="108"/>
+        <line x1="92" y1="72" x2="132" y2="68"/><line x1="92" y1="84" x2="132" y2="80"/><line x1="92" y1="96" x2="126" y2="92"/><line x1="92" y1="108" x2="132" y2="104"/>
+      </g>
+    </g>
+    <g class="glass">
+      <circle cx="58" cy="78" r="20" fill="rgba(129,212,250,0.35)" stroke="#37474f" stroke-width="5"/>
+      <line x1="72" y1="92" x2="92" y2="112" stroke="#5d4037" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 48,70 Q 52,64 60,64" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </svg>`;
+}
+
+/** 🧙 Woordenschat Wizard: a friendly wizard with letters floating out of a wand */
+export function woordenIllustration() {
+  const id = uid("woo");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Woordenschat Wizard">
+    ${animWrap(id, `
+      @keyframes ${id}_rise { 0% { transform: translateY(8px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(-26px); opacity: 0; } }
+      #${id} .letter { animation: ${id}_rise 2.8s ease-in infinite; }
+    `)}
+    <g class="anim-bob" style="transform-origin:70px 110px;">
+      <path d="M 40,140 L 62,86 L 84,140 Z" fill="#5e35b1" stroke="#311b92" stroke-width="3"/>
+      <circle cx="62" cy="78" r="16" fill="#ffe0b2" stroke="#6d4c41" stroke-width="2.5"/>
+      <path d="M 44,70 L 62,24 L 80,70 Z" fill="#7e57c2" stroke="#311b92" stroke-width="3"/>
+      <circle cx="62" cy="40" r="3" fill="#ffd600"/>
+      <path d="M 50,86 Q 62,112 74,86" fill="#eceff1" stroke="#b0bec5" stroke-width="2"/>
+      <circle cx="56" cy="76" r="2.4" fill="#3e2723"/><circle cx="68" cy="76" r="2.4" fill="#3e2723"/>
+      <line x1="82" y1="104" x2="112" y2="78" stroke="#8d6e63" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="114" cy="76" r="5" fill="#ffd600" class="anim-pulse" style="transform-origin:114px 76px;"/>
+    </g>
+    <g font-family="sans-serif" font-weight="900" font-size="18">
+      <text x="116" y="60" fill="#e91e63" class="letter">A</text>
+      <text x="132" y="50" fill="#03a9f4" class="letter" style="animation-delay:0.9s;">b</text>
+      <text x="104" y="46" fill="#4caf50" class="letter" style="animation-delay:1.8s;">?</text>
+    </g>
+  </svg>`;
+}
+
+/** 🌪️ Spellingstorm: a swirling tornado picking up letter tiles */
+export function spellingIllustration() {
+  const id = uid("spe");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Spellingstorm">
+    ${animWrap(id, `
+      @keyframes ${id}_sway { 0% { transform: skewX(-6deg); } 100% { transform: skewX(6deg); } }
+      #${id} .twister { animation: ${id}_sway 1.6s ease-in-out infinite alternate; }
+      @keyframes ${id}_orbit { 0% { transform: rotate(0deg) translateX(46px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(46px) rotate(-360deg); } }
+      #${id} .tile { animation: ${id}_orbit 5s linear infinite; }
+    `)}
+    <g class="twister" style="transform-origin:80px 140px;">
+      <path d="M 36,30 Q 80,18 124,30 Q 110,52 70,50 Q 102,62 108,74 Q 80,86 62,80 Q 90,94 92,104 Q 78,116 72,112 Q 86,124 82,138" fill="none" stroke="#90a4ae" stroke-width="10" stroke-linecap="round"/>
+      <path d="M 40,32 Q 80,22 120,32" fill="none" stroke="#cfd8dc" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <g style="transform-origin:80px 80px;">
+      <g class="tile" style="transform-origin:80px 80px;"><rect x="70" y="70" width="20" height="20" rx="4" fill="#ffca28" stroke="#f57f17" stroke-width="2"/><text x="80" y="85" text-anchor="middle" font-size="13" font-weight="900" fill="#5d4037" font-family="sans-serif">d</text></g>
+      <g class="tile" style="transform-origin:80px 80px; animation-delay:-1.7s;"><rect x="70" y="70" width="20" height="20" rx="4" fill="#81d4fa" stroke="#0277bd" stroke-width="2"/><text x="80" y="85" text-anchor="middle" font-size="13" font-weight="900" fill="#01579b" font-family="sans-serif">t</text></g>
+      <g class="tile" style="transform-origin:80px 80px; animation-delay:-3.4s;"><rect x="70" y="70" width="20" height="20" rx="4" fill="#a5d6a7" stroke="#2e7d32" stroke-width="2"/><text x="80" y="85" text-anchor="middle" font-size="12" font-weight="900" fill="#1b5e20" font-family="sans-serif">ij</text></g>
+    </g>
+  </svg>`;
+}
+
+/** 🐦 Fladdervogel: a round bird flapping between two green gates */
+export function vliegIllustration() {
+  const id = uid("vli");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fladdervogel">
+    ${animWrap(id, `
+      @keyframes ${id}_flap { 0% { transform: rotate(-25deg); } 100% { transform: rotate(20deg); } }
+      #${id} .wing { animation: ${id}_flap 0.35s ease-in-out infinite alternate; }
+      @keyframes ${id}_hover { 0% { transform: translateY(6px); } 100% { transform: translateY(-8px); } }
+      #${id} .bird { animation: ${id}_hover 1.1s ease-in-out infinite alternate; }
+    `)}
+    <rect x="18" y="12" width="26" height="46" rx="5" fill="#66bb6a" stroke="#1b5e20" stroke-width="3"/>
+    <rect x="18" y="98" width="26" height="50" rx="5" fill="#66bb6a" stroke="#1b5e20" stroke-width="3"/>
+    <rect x="118" y="12" width="26" height="62" rx="5" fill="#66bb6a" stroke="#1b5e20" stroke-width="3"/>
+    <rect x="118" y="114" width="26" height="34" rx="5" fill="#66bb6a" stroke="#1b5e20" stroke-width="3"/>
+    <g class="bird" style="transform-origin:80px 78px;">
+      <ellipse cx="80" cy="78" rx="22" ry="19" fill="#ff7043" stroke="#e64a19" stroke-width="3"/>
+      <ellipse cx="83" cy="86" rx="12" ry="7" fill="#ffccbc"/>
+      <g class="wing" style="transform-origin:72px 78px;"><ellipse cx="66" cy="78" rx="12" ry="7" fill="#ffb300" stroke="#ff8f00" stroke-width="2"/></g>
+      <circle cx="90" cy="71" r="6" fill="#ffffff"/><circle cx="92" cy="71" r="3" fill="#212121"/>
+      <path d="M 100,76 L 114,80 L 100,86 Z" fill="#ffb300" stroke="#ff8f00" stroke-width="1.5"/>
+    </g>
+  </svg>`;
+}
+
+/** 🦸 Sprongheld: a hero jumping up into a glowing question block */
+export function sprongIllustration() {
+  const id = uid("spr");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sprongheld">
+    ${animWrap(id, `
+      @keyframes ${id}_jump { 0%, 100% { transform: translateY(0px); } 45% { transform: translateY(-34px); } }
+      #${id} .hero { animation: ${id}_jump 1.4s ease-in-out infinite; }
+      @keyframes ${id}_bump { 0%, 38%, 60%, 100% { transform: translateY(0px); } 47% { transform: translateY(-7px); } }
+      #${id} .block { animation: ${id}_bump 1.4s ease-in-out infinite; }
+      @keyframes ${id}_coin { 0%, 42% { transform: translateY(0px); opacity: 0; } 50% { opacity: 1; } 80% { transform: translateY(-26px); opacity: 0; } 100% { opacity: 0; } }
+      #${id} .coin { animation: ${id}_coin 1.4s ease-out infinite; }
+    `)}
+    <rect x="0" y="136" width="160" height="24" fill="#a1664a"/>
+    <rect x="0" y="132" width="160" height="7" fill="#66bb6a"/>
+    <circle cx="80" cy="22" r="8" fill="#ffd54f" stroke="#f57f17" stroke-width="2" class="coin"/>
+    <g class="block" style="transform-origin:80px 44px;">
+      <rect x="60" y="30" width="40" height="30" rx="5" fill="#ffb300" stroke="#e65100" stroke-width="3"/>
+      <text x="80" y="53" text-anchor="middle" font-size="20" font-weight="900" fill="#5d4037" font-family="sans-serif">?</text>
+    </g>
+    <g class="hero" style="transform-origin:80px 110px;">
+      <path d="M 66,100 Q 58,118 62,128 L 98,128 Q 102,118 94,100 Z" fill="#e53935" opacity="0.85"/>
+      <rect x="68" y="96" width="24" height="26" rx="7" fill="#1e88e5" stroke="#0d47a1" stroke-width="2.5"/>
+      <circle cx="80" cy="86" r="12" fill="#ffe0b2" stroke="#6d4c41" stroke-width="2"/>
+      <circle cx="76" cy="85" r="1.8" fill="#3e2723"/><circle cx="84" cy="85" r="1.8" fill="#3e2723"/>
+      <path d="M 76,90 Q 80,93 84,90" fill="none" stroke="#3e2723" stroke-width="1.6" stroke-linecap="round"/>
+      <line x1="92" y1="100" x2="100" y2="84" stroke="#1e88e5" stroke-width="6" stroke-linecap="round"/>
+      <rect x="70" y="120" width="7" height="10" rx="2" fill="#37474f"/><rect x="83" y="120" width="7" height="10" rx="2" fill="#37474f"/>
+    </g>
+  </svg>`;
+}
+
+/** 🍪 Leerhapjes: a cookie with a bite out of it, and a little lesson card */
+export function leerhapjesIllustration() {
+  const id = uid("hap");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Leerhapjes">
+    ${animWrap(id, "")}
+    <g class="anim-float-rev" style="transform-origin:112px 60px;">
+      <rect x="88" y="26" width="52" height="66" rx="8" fill="#ffffff" stroke="#8d6e63" stroke-width="3" transform="rotate(8 114 59)"/>
+      <g transform="rotate(8 114 59)" stroke="#bcaaa4" stroke-width="3" stroke-linecap="round">
+        <line x1="98" y1="42" x2="130" y2="42"/><line x1="98" y1="54" x2="126" y2="54"/><line x1="98" y1="66" x2="130" y2="66"/>
+      </g>
+      <text x="118" y="86" text-anchor="middle" font-size="16" transform="rotate(8 114 59)">⭐</text>
+    </g>
+    <g class="anim-bob" style="transform-origin:64px 104px;">
+      <path d="M 64,56 A 44,44 0 1 0 104,90 A 10,10 0 0 1 96,78 A 10,10 0 0 1 86,66 A 10,10 0 0 1 76,58 A 10,10 0 0 1 64,56 Z" fill="#d7a86e" stroke="#8d5a2b" stroke-width="3"/>
+      <circle cx="48" cy="92" r="5" fill="#5d4037"/><circle cx="70" cy="112" r="5" fill="#5d4037"/><circle cx="44" cy="120" r="4" fill="#5d4037"/><circle cx="80" cy="92" r="4" fill="#5d4037"/><circle cx="60" cy="76" r="4" fill="#5d4037"/>
+    </g>
+    <circle cx="24" cy="36" r="3" fill="#ffd600" class="anim-sparkle" style="transform-origin:24px 36px;"/>
+  </svg>`;
+}
+
 /** Map of gameKey -> illustration generator function */
 const ILLUSTRATIONS = {
   tafel: tafelIllustration,
@@ -1013,6 +1163,12 @@ const ILLUSTRATIONS = {
   logica: logicaIllustration,
   code: codeIllustration,
   jacht: jachtIllustration,
+  lezen: lezenIllustration,
+  woorden: woordenIllustration,
+  spelling: spellingIllustration,
+  vlieg: vliegIllustration,
+  sprong: sprongIllustration,
+  leerhapjes: leerhapjesIllustration,
   compete: competeIllustration,
   uitleg: uitlegIllustration,
   dashboard: dashboardIllustration,

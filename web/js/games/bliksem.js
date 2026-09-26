@@ -41,7 +41,10 @@ function operands(level) {
   if (level === 2) return [randInt(2, 10), randInt(2, 10), ["+", "-", "x"]];
   if (level === 3) return [randInt(3, 12), randInt(3, 12), ["+", "-", "x"]];
   if (level === 4) return [randInt(4, 15), randInt(3, 12), ["x", ":", "+"]];
-  return [randInt(6, 20), randInt(3, 15), ["x", ":", "-"]];
+  if (level === 5) return [randInt(6, 20), randInt(3, 15), ["x", ":", "-"]];
+  // Groep 8 (round 18): the tables past 12, and bigger sums and differences.
+  if (level === 6) return [randInt(11, 25), randInt(3, 12), ["x", ":", "+", "-"]];
+  return [randInt(12, 30), randInt(6, 15), ["x", ":", "+", "-"]];
 }
 
 export function generateProblem(level) {

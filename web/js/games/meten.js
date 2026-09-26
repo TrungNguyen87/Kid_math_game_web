@@ -1,6 +1,11 @@
 /**
  * Meten is Weten - unit conversion, time intervals and money.
  * Ported from pages/03_Meten_is_Weten.py.
+ *
+ * Levels 6-7 (round 18) are groep 8: area and volume units (m², dm³, and
+ * "1 dm³ = 1 liter"), decimal amounts of the bigger unit, turning hours and
+ * minutes into minutes and seconds, and the way back from small units to big
+ * ones, which gives a decimal answer.
  */
 import { getLanguage, t } from "../i18n.js";
 import { choice, coinFlip, randInt, range } from "../rng.js";
@@ -17,6 +22,18 @@ const CONVERSIONS = [
   ["l", "ml", 1000],
 ];
 const DECIMAL_STEPS = [0.25, 0.5, 0.75, 1.5, 2.5, 3.5, 4.5];
+
+// Groep 8: area, volume and the smaller liquid units. [big, small, factor]
+export const GROEP8_CONVERSIONS = [
+  ["l", "dl", 10],
+  ["l", "cl", 100],
+  ["m²", "dm²", 100],
+  ["m³", "dm³", 1000],
+  ["dm³", "cm³", 1000],
+  ["km", "m", 1000],
+  ["kg", "g", 1000],
+];
+const GROEP8_STEPS = [0.2, 0.25, 0.4, 0.5, 0.75, 1.2, 1.25, 1.5, 2.4, 2.5, 3.5, 3.75, 4.5];
 
 export function generate(level) {
   const lang = getLanguage();
@@ -90,6 +107,47 @@ export function generate(level) {
     answer = gap;
     answerLabel = t("meten.answer_label_minutes");
     visual = { kind: "clock", startMinutes, endMinutes };
+  } else if (level === 6) {
+    if (coinFlip()) {
+      // A decimal amount of the big unit, answered in the small one.
+      const [big, small, factor] = choice(GROEP8_CONVERSIONS);
+      const usable = GROEP8_STEPS.filter((step) => Number.isInteger(Math.round(step * factor * 1000) / 1000));
+      const val1 = choice(usable);
+      answer = Math.round(val1 * factor);
+      text = t("meten.q_convert", { v1: formatDecimal(val1, lang), u1: big, v2: answer, u2: small });
+    } else {
+      // 1 dm³ = 1 liter: the connection groep 8 is meant to make.
+      const l = randInt(2, 9);
+      const w = randInt(2, 6);
+      const h = randInt(2, 6);
+      text = t("meten.q_litre_box", { l, w, h });
+      answer = l * w * h;
+      visual = { kind: "ratio", parts: [l, w, h], labels: [`${l} dm`, `${w} dm`, `${h} dm`] };
+    }
+    answerLabel = t("meten.answer_label_generic");
+  } else if (level === 7) {
+    const kind = choice(["hours", "seconds", "back"]);
+    if (kind === "hours") {
+      const hours = choice([0.25, 0.5, 0.75, 1.25, 1.5, 1.75, 2.25, 2.5, 3.5]);
+      text = t("meten.q_hours_to_min", { h: formatDecimal(hours, lang) });
+      answer = Math.round(hours * 60);
+      answerLabel = t("meten.answer_label_minutes");
+    } else if (kind === "seconds") {
+      const m = randInt(1, 9);
+      const sec = randInt(1, 59);
+      text = t("meten.q_min_to_sec", { m, s: sec });
+      answer = m * 60 + sec;
+      answerLabel = t("meten.answer_label_seconds");
+    } else {
+      // Small unit back to the big one: 4500 m = 4,5 km. A decimal answer.
+      const [big, small, factor] = choice([...CONVERSIONS.slice(1), ...GROEP8_CONVERSIONS.slice(0, 2)]);
+      const bigValue = choice(GROEP8_STEPS.filter((step) => Number.isInteger(Math.round(step * factor * 1000) / 1000)));
+      const smallValue = Math.round(bigValue * factor);
+      text = t("meten.q_convert", { v1: smallValue, u1: small, v2: formatDecimal(bigValue, lang), u2: big });
+      answer = bigValue;
+      answerKind = "decimal";
+      answerLabel = t("meten.answer_label_decimal");
+    }
   } else {
     answerKind = "euro";
     if (coinFlip()) {
@@ -122,11 +180,13 @@ export function generate(level) {
     answerKind,
     answerLabel,
     visual,
-    decimal: answerKind === "euro",
-    // Money answers are compared with a tolerance rather than by equality:
-    // 0.1 + 0.2 is not 0.3 in binary floating point, in any language.
-    tolerance: answerKind === "euro" ? 0.005 : null,
-    answerDisplay: answerKind === "euro" ? formatEuro(answer, lang) : answer,
+    decimal: answerKind === "euro" || answerKind === "decimal",
+    // Money and decimal answers are compared with a tolerance rather than by
+    // equality: 0.1 + 0.2 is not 0.3 in binary floating point, in any
+    // language.
+    tolerance: answerKind === "int" ? null : 0.005,
+    answerDisplay:
+      answerKind === "euro" ? formatEuro(answer, lang) : answerKind === "decimal" ? formatDecimal(answer, lang) : answer,
   };
 }
 

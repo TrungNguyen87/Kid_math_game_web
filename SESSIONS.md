@@ -9,6 +9,204 @@ rediscover them.
 
 ---
 
+## Session 17 — 25 September 2026
+
+**Branch:** `claude/game-levels-gameplay-expansion-68mtch`
+
+### Asked
+
+1. Read the changelog and memory first.
+2. More levels and more variety, including **groep 8** of the Dutch
+   basisschool - "and do that also for the reading games".
+3. More kinds of interactive games that make children play and read more;
+   something creative, possibly micro-learning. Flappy-bird and Mario-style
+   jumping games were given as examples.
+4. Log the easy levels a child has finished so they don't keep playing them,
+   in a way that makes them *want* to play a higher level.
+5. Test everything so the GitHub deploy runs smoothly; save the changelog
+   and memory before committing.
+
+### Read first: there were no reading games
+
+The request says "also for the reading games", but the app had none - twelve
+maths games only. Read as "build reading games, and give them groep 8 levels
+too", which is also the only reading that makes item 3 ("read more") possible.
+
+### Decided: one level scale, 0-7, for every game
+
+Groep 8 became levels 6 (*Kampioen*) and 7 (*Legende*) in every game, not a
+separate mode or a second set of games: the adaptive levelling, the picker,
+the replay guard and the rewards all work unchanged, and a child in groep 8
+simply keeps climbing. Tafel Monster's old special level 6 disappears into
+the common scale (its "monster" content is now everyone's level 6), so
+`getMaxLevel()` has no special case left - it is kept as a function so the
+next game with its own ceiling is one line, and so nothing slides back to a
+shared constant (session 16's lesson).
+
+**The trap in raising a ceiling is every promise made at the old one.** The
+mythic rewards were gated at `MAX_LEVEL` and the "level 5" and Reken Meester
+badges checked `MAX_LEVEL`. Left alone, raising it to 7 would silently have
+moved a child's mythic savings goal from level 5 to level 7. `MASTER_LEVEL`
+(5) now names the old top, and everything promised there stays there. The
+test `raising the top level moved no existing goal` pins it. The one thing
+that *did* get further away on purpose is the ultra 3D Champion, whose rule
+is "every game at its true max" - that is now 17 games at 7. It is the
+capstone; see Still open.
+
+### Decided: "log the finished levels" = a passport, a nudge and a bonus
+
+Round 15 already stopped a mastered level from paying. What was missing was
+the child being *told*, and being pointed somewhere better. Three pieces:
+
+- **A dated mastery log** (`state.masteryLog`), written in `clearLevel()` -
+  the one place a level is ever marked done, and only on a real,
+  streak-earned level-up (session 14's rule, untouched). Old profiles get the
+  log rebuilt from their cleared levels, undated ("earlier").
+- **A one-off mastery bonus**, 10 + 5 × level coins, paid in `clearLevel()`
+  only when the level is newly added. It rewards climbing, and it cannot be
+  farmed by sliding down two wrong answers and climbing back up: the set can
+  only gain a level once. Proven by the "cannot be farmed" test failing with
+  the one guard line removed. Like quest coins it is a gift, never score, so
+  the buddy stays honest.
+- **Visible everywhere a child looks**: green ✓ on mastered levels in the
+  picker; a nudge on a mastered level ("on level N you earn coins again")
+  with a one-tap button; tile pips; a home-page *next challenge* card
+  (climb > groep 8 > an untried game, reading first > the lowest game); a
+  level passport of stamps; and a mastery panel for parents.
+
+The nudge lives in `levelPicker()`, so every game - including all five new
+ones - got it without a line of game code.
+
+### Decided: reading content is data, and each language gets its own
+
+Reading content (`reading-data.js`) is kept out of `i18n-data.js`: the i18n
+file is interface strings with identical keys; spelling in Dutch (d/t, ei/ij,
+'t kofschip) and English (homophones, silent letters) are different subjects,
+so each language has its own lists. Only the 24 reading texts are parallel
+translations. The spelling tip keys (`spelling.tip_0..7`) deliberately hold
+*different rules* in each language under the same key.
+
+Every reading question names its reading skill and a wrong answer teaches
+that skill - the micro-learning inside the game. The texts grow from 40 to
+~90 words and from "find it in the text" to purpose, argument and
+inference, roughly following the groep 5-8 begrijpend-lezen line.
+
+### Decided: arcade games are levelled games with a canvas on top
+
+Fladdervogel and Sprongheld are in `GAME_KEYS`, pay through
+`awardablePoints()`, go through `settleAnswer()` and adapt once per run via
+`adaptAfterRound()` - so the replay guard, quests, badges and the log all
+apply. **A wrong answer costs no life; crashing does.** Losing a life for a
+wrong answer would punish reading slowly, the opposite of the goal. The world
+of each game is plain data and a pure `step()`, which is what made it
+possible to test "every right answer is reachable" with an autopilot.
+
+### Decided: micro-learning as a card album
+
+Leerhapjes: 24 one-minute lessons (one idea, one example, three questions).
+Collecting cards in an album is the motivation; coins pay once per card,
+once for gold, and +10 for the bite of the day. Not a levelled game on
+purpose - it is the thing to do in five minutes.
+
+### Found along the way
+
+- **The bite of the day moved during the day.** It was picked among the
+  bites not yet collected; collecting any other bite shrank that pool and
+  changed the pick, taking the promised +10 with it. A Node test written for
+  "pays once" failed (20 coins instead of 30) and exposed it. Fixed by picking
+  among the bites open *at the start of the day* (a card keeps its
+  first-collected date for that).
+- **Sprongheld spawned a row above the previous row's slime** when a child
+  bumped a row's first block early. Found reading my own code; the autopilot
+  test then also failed with the old spawn rule, so it was a real gameplay
+  bug, not a cosmetic one.
+- **The arcade canvas overflowed small and landscape phones.** At 390x844 it
+  looked fine; measuring 360x640, 375x667 and 844x390 showed the playfield's
+  bottom off screen with a three-line word question, and the question gone
+  off the top in landscape. The cause was a fixed 170px budget for everything
+  above the canvas. It now measures the room, reserves three lines for the
+  question, and puts the question beside the canvas on a short landscape
+  screen. The smoke test checks all three shapes and fails against the old
+  sizing. **Measure with the keyboard, not a click:** a Playwright click on
+  the canvas scrolls it into view first and hides exactly the overflow being
+  looked for (my first measurements were wrong because of it).
+- **Adding a primary button can hijack a test.** The smoke test clicked
+  `.kmg-btn-primary` `.first()` to check an answer; the new nudge button sits
+  earlier in the DOM, so on a mastered level the test clicked "Go to level 2"
+  instead. Scoped to `.kmg-actions`. Same family as session 16's "a second
+  instance can make an assertion vacuous": I also gave the dashboard's new
+  tables their own class, because reusing `.kmg-logtable` would have made the
+  smoke test's "the answer log has rows" pass even with an empty log.
+- **`pages-sim.mjs` has its own route list.** It kept testing 17 routes
+  while the app had 23; now listed next to a note to keep it in step.
+- **Existing invariant tests caught deliberate changes**, which is the point
+  of running them over all levels: algebra's "only level 5 has two unknowns"
+  and meetkunde's "every answer is a whole number" failed at 7 and 6. They
+  were rewritten to state the new rules precisely (and gained independent
+  checks: substitution into the equation, π recomputed from the picture), not
+  loosened.
+- `choice(pools[level])` in Logica Lab and `LEVEL_RULES[level]` in Code
+  Kraker would have thrown on level 6. Any generator that indexes by level
+  must grow with `MAX_LEVEL`; the generator fuzz over 0-7 is what guards it.
+
+### Verification
+
+- `npm test`: 167/167 (118 before; +19 mastery, +13 reading, +12 arcade, +5
+  in test_logic).
+- Revert-to-fail, per CLAUDE.md: the mastery-bonus guard, the Sprongheld row
+  spacing, the bite of the day, the Getallenjacht prime range and the reading
+  quest guard each failed their test with the fix removed and passed once
+  restored; the smoke arcade-fit check failed against the old sizing (canvas
+  bottom 664px in a 640px screen).
+- `npm run lint`; `node --check` on all 53 files under `web/js`;
+  `npm run check:precache` 61/61.
+- `npm start` + `npm run test:smoke` on a freshly started server: 23 routes
+  and every scenario, old and new.
+- `npm run test:pages`: 23 routes under `/Kid_math_game_web/`, stamped cache,
+  offline reload.
+- The workflow's two real steps (`sed` BUILD_ID stamp, `check_precache.py`)
+  re-run on a scratch copy of `web/` and `tools/`: both pass, 61 files.
+  `deploy-pages.yml` untouched.
+- A sweep of all 23 routes in NL and EN, phone size, dark mode, with a
+  seeded groep 8 player and every expander open: no `null`/`undefined`/`NaN`,
+  no untranslated key, no unfilled placeholder, no sideways scroll.
+- Screenshots checked by eye: home (desktop, phone, EN dark), every new page
+  at phone size, both arcade games running at 360x640, 390x844 and 844x390,
+  a Leerhapje lesson, Tafel's eight-level picker at 390px.
+
+### Still open
+
+- **The content is a first draft by a non-teacher.** 24 texts, 96 spelling
+  and 106 vocabulary items per language, 24 bites: every item has an
+  unambiguous answer by construction and by test, but none has been checked
+  against the Cito/doorstroomtoets level by a groep 8 teacher, and the
+  English lists were not reviewed by a native-speaking teacher. The texts are
+  the most valuable thing to have a teacher read.
+- **Numbers without telemetry**, like every round: the mastery bonus
+  (10 + 5 × level, up to 175 coins per game), bite coins (15/5/10), arcade
+  speeds and gaps. The autopilot proves reachability, not how hard it *feels*
+  to a nine-year-old; watch a child play Sprongheld at level 7 before tuning.
+- **The ultra 3D Champion is much further away**: every one of 17 games at
+  level 7, plus every other reward. Deliberate (it is the capstone), but if
+  a parent says it is unreachable, the rule to revisit is
+  `allGamesAtTrueMax()`.
+- **A child who had maxed a game sees 5/7 now, and its 👑 is gone** until
+  they reach 7. The next-challenge card turns that into "groep 8 levels are
+  waiting", but there is no one-time "new levels!" announcement.
+- **Deploy day re-rolls one daily quest**: the variety slot went from three
+  to four quests, so `hash % 4` can pick a different third quest than a child
+  saw that morning. Completed quests stay recorded; worst case one quest
+  changes once.
+- **Arcade games draw the hero as an emoji** on the canvas. On a device
+  without a colour emoji font it is a box inside the white head circle; the
+  bird in Fladdervogel is drawn with shapes and has no such dependency.
+- Each flap/jump plays the tap sound. Fine at normal volume; if parents find
+  it noisy, `handleEvent("action")` in `arcade.js` is the one line.
+- Still carried over from session 16: the GitHub Actions Node 20 deprecation
+  warning (actions not bumped - no way to confirm the right tags from here).
+
+---
+
 ## Session 16 — 24 September 2026
 
 **Branch:** `claude/polish-expand-features-mienaa`

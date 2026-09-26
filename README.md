@@ -1,7 +1,9 @@
-# Reken Spelletjes voor Groep 6 & 7
+# Reken- & Leesspellen voor Groep 6, 7 & 8
 
-Twelve maths games for Dutch primary-school children aged roughly 9–11, in
-Dutch and English, with six difficulty levels each and a dashboard for parents.
+Seventeen maths, reading and arcade games for Dutch primary-school children
+aged roughly 9–12 (groep 6, 7 and 8), in Dutch and English, with eight
+difficulty levels each — the top two at groep 8 level — plus one-minute
+learning bites and a dashboard for parents.
 
 **Play:** https://trungnguyen87.github.io/Kid_math_game_web/
 *(after the one-time setup in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §4)*
@@ -27,19 +29,28 @@ opened. Nothing a child types or answers ever leaves their device.
 | 🎯 | **Getallenjacht** | Number properties, from the recognition side |
 | 🧠 | **Logica Lab** | Sequences, odd-one-out, deduction, magic squares |
 | 🔐 | **Code Kraker** | Pure elimination reasoning (Mastermind with digits) |
+| 🔍 | **Leesdetective** | Reading comprehension: short texts, three questions each, one reading skill per question |
+| 🧙 | **Woordenschat Wizard** | Vocabulary: opposites, synonyms, words in context, groep 8 idioms and proverbs |
+| 🌪️ | **Spellingstorm** | Spelling: from *hond/hont* to d/t, ’t kofschip and *gebeurd/gebeurt* (English: homophones and tricky words) |
+| 🐦 | **Fladdervogel** | Arcade: tap to fly through the gap with the right answer (sums or words) |
+| 🦸 | **Sprongheld** | Arcade: a runner who jumps into the block with the right answer (sums or words) |
 
-Plus **📖 Uitleg Concepten**, a reference a child can open mid-game, and
-**📊 Ouder Dashboard** — accuracy per game, questions per day, the full log and
-a CSV export.
+Plus **🍪 Leerhapjes**, 24 one-minute lessons with a three-question check and a
+card album; **📖 Uitleg Concepten**, a reference a child can open mid-game; and
+**📊 Ouder Dashboard** — accuracy per game, questions per day, the levels
+mastered and when, the full log and a CSV export.
 
-Every game starts at a gentle warm-up level and gets harder after three correct
-answers in a row, easier after two wrong ones. A child can also just tap the
-level they want.
+Every game has eight levels, 0-7. Levels 6 and 7 (*Kampioen* and *Legende*)
+are groep 8: fractions times fractions, circles, litres, VAT and interest,
+the order of operations, negative numbers, argumentative texts, idioms and
+verb spelling. A game gets harder after three correct answers in a row, easier
+after two wrong ones, and a child can also just tap the level they want.
 
 ## Why keep coming back
 
-Every correct answer pays coins for the **reward shop**: 49 characters, 46
-stickers, 18 special gifts and 7 colour themes that recolour the whole app.
+Every correct answer pays coins for the **reward shop**: 53 characters, 48
+stickers, 19 special gifts and 7 colour themes that recolour the whole app —
+a few of them only for children who reach groep 8's level 6 or 7.
 Tap 🎯 on an item to make it your savings goal; the sidebar then shows how
 close you are.
 
@@ -50,10 +61,16 @@ On top of that:
 - **Three daily quests** (a bit of effort, a bit of skill, a bit of variety),
   each paying bonus coins. Finish all three and the day's **treasure chest**
   opens: more coins plus one of 12 treasures that can never be bought.
-- A **days-in-a-row** streak and **21 badges**.
+- A **days-in-a-row** streak and **31 badges**.
+- **A level passport**: every level mastered is a stamp. Mastering a level
+  pays a one-off bonus, and sitting on a mastered level shows a friendly
+  "your next level is waiting" nudge with a one-tap way up. The home page's
+  **next challenge** card always names the best next step.
+- A **words read** counter, a daily reading quest, and a bite of the day.
 
-None of it can be farmed: an already-cleared level pays no coins, and quest
-progress only counts answers that actually earned points.
+None of it can be farmed: a mastered level pays no coins (practice is always
+allowed), its bonus pays once, a learning bite pays once, and quest progress
+only counts answers that actually earned points.
 
 ## How it is built
 
@@ -89,7 +106,7 @@ python3 -m http.server 8080 --directory web
 ## Tests
 
 ```bash
-npm test                 # Node logic tests: generators, scoring, levels, rewards, quests, i18n parity
+npm test                 # Node logic tests: generators, scoring, levels and mastery, reading content, arcade physics, rewards, quests, i18n parity
 npm run lint             # syntax check of the entry points
 npm run check:precache   # every shipped file is in the service worker's cache list
 npm start &              # then:
@@ -100,7 +117,9 @@ npm run test:pages       # the deploy-stamped site served like GitHub Pages: sub
 The logic tests run each question generator several hundred times per level,
 because the bugs worth catching are the ones that need an unlucky draw: a
 triangle whose third angle comes out negative, a division that does not divide,
-a fraction the child cannot type into a whole-number box.
+a fraction the child cannot type into a whole-number box. The arcade games'
+physics are pure functions, so an autopilot plays a whole run at every level
+in Node to prove every right answer can be reached.
 
 ## Documentation
 
