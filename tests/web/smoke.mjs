@@ -61,6 +61,10 @@ const ROUTES = [
   "rekendoku",
   "tafeltactiek",
   "pretparkbaas",
+  "telduel",
+  "weegpuzzel",
+  "rekenmachine",
+  "getallenbouwer",
   "sterrenpad",
   "compete",
   "rewards",
@@ -1381,6 +1385,387 @@ currentRoute = "round19:puzzles";
   if (parkEnd.coins < parkStart.coins) note(currentRoute, "building in the park took shop coins");
   if (shotDir) await p.screenshot({ path: path.join(shotDir, "pretparkbaas-day.png") });
   console.log(`  pretparkbaas: built the sweet stall, a day with ${happy}/8 happy visitors, +€${parkEnd.park.cash - parkStart.park.cash} park money`);
+  await ctx.close();
+}
+
+// --- round 20: the four thinking games, played from what is on the screen ----
+// A fresh player on a phone. Telduel is won by doing the division the game
+// teaches; a Weegpuzzel is read off its scales and solved by brute force;
+// the broken calculator and the card game are solved by the games' own
+// searches, run on what the page shows; each win masters level 0.
+
+currentRoute = "round20:thinking";
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem("kmg.test.seeded")) return;
+    sessionStorage.setItem("kmg.test.seeded", "1");
+    localStorage.setItem("kmg.profiles", JSON.stringify({ Denker: { totalScore: 0, coins: 0 } }));
+    localStorage.setItem("kmg.currentPlayer", "Denker");
+  });
+  const p = await ctx.newPage();
+  p.on("pageerror", (error) => note(currentRoute, `page error: ${error.message}`));
+  p.on("console", (message) => {
+    if (message.type() === "error") note(currentRoute, `console error: ${message.text()}`);
+  });
+  const game = (key) =>
+    p.evaluate(async (k) => {
+      const s = (await import("./js/state.js")).state;
+      return { level: s.levels[k], cleared: [...(s.clearedLevels[k] ?? [])], coins: s.coins, score: s.totalScore, answered: s.questionsAnswered, feats: [...s.feats] };
+    }, key);
+  const sideways = () => p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const setLevel = async (level) => {
+    await p.locator(`.kmg-levelbtn[data-level="${level}"]`).click();
+    await p.waitForTimeout(250);
+  };
+  const open = async (route) => {
+    currentRoute = `round20:${route}`;
+    await p.goto(`${baseUrl}/#/${route}`, { waitUntil: "networkidle" });
+    await p.waitForSelector(".kmg-levelrow");
+  };
+
+  // ---- Telduel -----------------------------------------------------------
+  await open("telduel");
+  if ((await p.locator(".kmg-duel-stepbtn").count()) !== 3) note(currentRoute, "level 0 should offer the steps +1, +2 and +3 as buttons");
+  if ((await sideways()) > 1) note(currentRoute, `Telduel scrolls sideways on a phone by ${await sideways()}px`);
+
+  /** Play one match the way the game teaches: land on the totals that leave a multiple of (biggest step + 1). */
+  const playDuel = async ({ hintFirst = false } = {}) => {
+    if (hintFirst) {
+      await p.locator(".kmg-duel-hintbtn").click();
+      const text = (await p.locator(".kmg-duel-hinttext").textContent().catch(() => "")) ?? "";
+      if (!/\d/.test(text)) note(currentRoute, `the hint should list safe numbers: "${text}"`);
+      if (!(await p.locator(".kmg-duel-cell.is-safe").count()) && !(await p.locator(".kmg-duel-mark").count())) note(currentRoute, "the hint should mark the safe totals on the track");
+    }
+    for (let turn = 0; turn < 40 && !(await p.locator(".kmg-duel-result").count()); turn++) {
+      const ready = await p
+        .waitForSelector(".kmg-duel-stepbtn:not([disabled]), .kmg-duel-result", { timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!ready) {
+        note(currentRoute, "Telduel never gave the turn back");
+        return;
+      }
+      if (await p.locator(".kmg-duel-result").count()) return;
+      const total = Number(await p.locator(".kmg-duel-now strong").textContent());
+      const target = Number(((await p.locator(".kmg-duel-now small").textContent()) ?? "").replace(/\D/g, ""));
+      const steps = (await p.locator(".kmg-duel-stepbtn").evaluateAll((nodes) => nodes.map((n) => Number(n.dataset.step)))).sort((a, b) => a - b);
+      const gap = Math.max(...steps) + 1;
+      const step = (target - total) % gap || 1;
+      await p.locator(`.kmg-duel-stepbtn[data-step="${step}"]`).click();
+      await p.waitForTimeout(80);
+    }
+  };
+
+  const before = await game("duel");
+  await playDuel();
+  await p.waitForSelector(".kmg-duel-result", { timeout: 5000 });
+  if (!(await p.locator(".kmg-duel-result.kmg-banner-ok").count())) note(currentRoute, "a child who does the division should win Telduel level 0");
+  if (!/rest|gaat precies op/.test((await p.locator(".kmg-duel-explain").textContent()) ?? "")) note(currentRoute, "the result should explain the division");
+  let now = await game("duel");
+  if (now.level !== 1 || !now.cleared.includes(0)) note(currentRoute, `winning Telduel level 0 should master it: ${JSON.stringify(now)}`);
+  if (now.answered !== before.answered + 1) note(currentRoute, "a match should count as one answered question");
+  if (!(now.score > before.score)) note(currentRoute, "a won match paid no points");
+  if (!(await p.locator(".kmg-duel-cell.is-mine").count()) && !(await p.locator(".kmg-duel-history .is-mine").count())) note(currentRoute, "the child's own numbers should be marked");
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "telduel-won.png"), fullPage: true });
+
+  // A win that needed the hint stays on the level.
+  await p.locator(".kmg-duel-again").click();
+  await p.waitForSelector(".kmg-duel-stepbtn");
+  await playDuel({ hintFirst: true });
+  await p.waitForSelector(".kmg-duel-result", { timeout: 5000 });
+  now = await game("duel");
+  if (now.level !== 1) note(currentRoute, `a win with the hint should stay on level 1, not ${now.level}`);
+  if (!/hint/i.test((await p.locator(".kmg-duel-result").textContent()) ?? "")) note(currentRoute, "a win with the hint should say so");
+
+  // A typed level: an illegal number is refused with a reason, a legal one is played.
+  await setLevel(3);
+  await p.waitForSelector(".kmg-duel-typed");
+  const startTotal = Number(await p.locator(".kmg-duel-now strong").textContent());
+  await p.locator(".kmg-numinput").fill("999");
+  await p.locator(".kmg-duel-say").click();
+  if (!/mag niet/.test((await p.locator(".kmg-duel-note").textContent().catch(() => "")) ?? "")) note(currentRoute, "an illegal number should be refused with a reason");
+  if (Number(await p.locator(".kmg-duel-now strong").textContent()) !== startTotal) note(currentRoute, "an illegal number must not move the count");
+  const range = (((await p.locator(".kmg-duel-range").textContent()) ?? "").match(/\d+/g) ?? []).map(Number);
+  await p.locator(".kmg-numinput").fill(String(range[0]));
+  await p.locator(".kmg-duel-say").click();
+  if (Number(await p.locator(".kmg-duel-now strong").textContent()) !== range[0]) note(currentRoute, "a legal number should move the count");
+  await p.waitForSelector(".kmg-duel-typed", { timeout: 5000 }).catch(() => note(currentRoute, "the computer never replied in the typed game"));
+  if ((await p.locator(".kmg-duel-history li").count()) < 2) note(currentRoute, "the computer's reply should join the history");
+
+  // From level 5 the child chooses who starts - and the choice is a division:
+  // if the target divides exactly by (biggest step + 1), the computer must begin.
+  await setLevel(5);
+  await p.waitForSelector(".kmg-duel-starter");
+  if ((await sideways()) > 1) note(currentRoute, `Telduel level 5 scrolls sideways on a phone by ${await sideways()}px`);
+  {
+    const [, biggest, target] = (((await p.locator(".kmg-duel-rule").textContent()) ?? "").match(/\d+/g) ?? []).map(Number);
+    const gap = biggest + 1;
+    await p.locator(target % gap === 0 ? ".kmg-duel-second" : ".kmg-duel-first").click();
+    for (let turn = 0; turn < 40 && !(await p.locator(".kmg-duel-result").count()); turn++) {
+      await p.waitForSelector(".kmg-duel-say, .kmg-duel-result", { timeout: 6000 }).catch(() => note(currentRoute, "level 5 never gave the turn back"));
+      if (await p.locator(".kmg-duel-result").count()) break;
+      const total = Number(await p.locator(".kmg-duel-now strong").textContent());
+      const step = (target - total) % gap || 1;
+      await p.locator(".kmg-numinput").fill(String(total + step));
+      await p.locator(".kmg-duel-say").click();
+      await p.waitForTimeout(80);
+    }
+    if (!(await p.locator(".kmg-duel-result.kmg-banner-ok").count())) note(currentRoute, `a child who does the division and picks the right start must win level 5 (target ${target}, gap ${gap})`);
+    if (!(await game("duel")).feats.includes("duel_hard")) note(currentRoute, "winning level 5 without the hint should record the duel feat");
+    if (!(await p.evaluate(async () => (await import("./js/state.js")).state.badges.includes("duel_win")))) note(currentRoute, "the Telduel badge should be earned with that feat");
+  }
+  await setLevel(5);
+  await p.waitForSelector(".kmg-duel-starter");
+  await p.locator(".kmg-duel-second").click();
+  await p.waitForSelector(".kmg-duel-history li", { timeout: 4000 }).catch(() => note(currentRoute, "when the computer starts it should make the first move"));
+  await setLevel(7);
+  await p.waitForSelector(".kmg-duel-starter");
+  if (!/behalve|nooit/.test((await p.locator(".kmg-duel-rule").textContent()) ?? "")) note(currentRoute, "level 7 should name the forbidden step");
+  console.log("  telduel: won level 0 by the division, a hinted win stayed, typed and choose-the-start levels play");
+
+  // ---- Weegpuzzel --------------------------------------------------------
+  await open("weegpuzzel");
+  await setLevel(1);
+  await p.waitForSelector(".kmg-weeg-scale");
+  if ((await sideways()) > 1) note(currentRoute, `Weegpuzzel scrolls sideways on a phone by ${await sideways()}px`);
+
+  /** Read the scales off the page (their aria-labels) and weigh the asked fruit by trying every weight. */
+  const solveWeeg = async () => {
+    const { labels, question } = await p.evaluate(() => ({
+      labels: [...document.querySelectorAll(".kmg-weeg-scale:not(.is-question) svg")].map((svg) => svg.getAttribute("aria-label")),
+      question: document.querySelector(".kmg-question-text").textContent,
+    }));
+    const scales = labels.map((label) =>
+      label
+        .replace(/^\S+\s/, "")
+        .split(" = ")
+        .map((side) => side.split(" + ").map((token) => (/^\d+$/.test(token) ? { grams: Number(token) } : { fruit: [...token][0], count: [...token].length }))),
+    );
+    const fruit = [...new Set(scales.flat(2).filter((t) => t.fruit).map((t) => t.fruit))];
+    const asked = question.match(/\p{Extended_Pictographic}/u)?.[0];
+    // A "total" question has a scale with a ? on it: the answer is what its left pan weighs.
+    const totalLabel = await p.evaluate(() => document.querySelector(".kmg-weeg-scale.is-question svg")?.getAttribute("aria-label") ?? null);
+    const totalSide = totalLabel
+      ? totalLabel.replace(/^\S+\s/, "").split(" = ")[0].split(" + ").map((token) => ({ fruit: [...token][0], count: [...token].length }))
+      : null;
+    const weights = Array(fruit.length).fill(1);
+    const weigh = (side) => side.reduce((sum, t) => sum + (t.grams ?? t.count * weights[fruit.indexOf(t.fruit)]), 0);
+    let answer = null;
+    const go = (i) => {
+      if (answer != null) return;
+      if (i === fruit.length) {
+        if (scales.every(([l, r]) => weigh(l) === weigh(r))) answer = totalSide ? weigh(totalSide) : weights[fruit.indexOf(asked)];
+        return;
+      }
+      for (let w = 1; w <= 40 && answer == null; w++) {
+        weights[i] = w;
+        go(i + 1);
+      }
+    };
+    go(0);
+    return { answer, scales: scales.length, asked };
+  };
+
+  const wBefore = await game("weeg");
+  // Wrong first: the worked solution must appear, on several lines.
+  await p.locator(".kmg-numinput").fill("9999");
+  await p.locator(".kmg-actions .kmg-btn-primary").first().click();
+  await p.waitForSelector(".kmg-banner-bad", { timeout: 4000 });
+  const tip = (await p.locator(".kmg-banner-tip").innerText()) ?? "";
+  if (!/→/.test(tip) || !/ g/.test(tip) || tip.split("\n").length < 3) note(currentRoute, `a wrong Weegpuzzel answer should show the worked solution on several lines: "${tip}"`);
+  if (/undefined|NaN|weeg\./.test(tip)) note(currentRoute, `junk in the worked solution: "${tip}"`);
+  await p.locator(".kmg-actions .kmg-btn", { hasText: /Volgende/ }).click();
+  await p.waitForSelector(".kmg-weeg-scale");
+  const solved = await solveWeeg();
+  if (solved.answer == null) note(currentRoute, "could not solve the Weegpuzzel read off the screen");
+  else {
+    await p.locator(".kmg-numinput").fill(String(solved.answer));
+    await p.locator(".kmg-actions .kmg-btn-primary").first().click();
+    await p.waitForSelector(".kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, `the right weight (${solved.answer} g) was not accepted`));
+  }
+  const wNow = await game("weeg");
+  if (wNow.answered !== wBefore.answered + 2) note(currentRoute, `two answers should be logged: ${wBefore.answered} -> ${wNow.answered}`);
+  if (!(wNow.score > wBefore.score)) note(currentRoute, "a right Weegpuzzel answer paid no points");
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "weegpuzzel.png"), fullPage: true });
+
+  // The top level: four kinds of fruit, a "?" scale, and it still fits a phone.
+  await setLevel(7);
+  await p.waitForSelector(".kmg-weeg-scale.is-question");
+  if ((await p.locator(".kmg-weeg-scale").count()) < 5) note(currentRoute, "level 7 should show four scales and the question scale");
+  if ((await sideways()) > 1) note(currentRoute, `Weegpuzzel level 7 scrolls sideways on a phone by ${await sideways()}px`);
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "weegpuzzel-l7.png"), fullPage: true });
+  // Solve it: four kinds of fruit, asked as a total - records the feat and earns the badge.
+  const top = await solveWeeg();
+  if (top.answer == null) note(currentRoute, "could not solve the level-7 Weegpuzzel read off the screen");
+  else {
+    await p.locator(".kmg-numinput").fill(String(top.answer));
+    await p.locator(".kmg-actions .kmg-btn-primary").first().click();
+    await p.waitForSelector(".kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, `the right total (${top.answer} g) was not accepted at level 7`));
+    if (!(await game("weeg")).feats.includes("weeg_four")) note(currentRoute, "solving a four-fruit puzzle should record the feat");
+    if (!(await p.evaluate(async () => (await import("./js/state.js")).state.badges.includes("weeg_four")))) note(currentRoute, "the Weegpuzzel badge should be earned with that feat");
+  }
+  console.log(`  weegpuzzel: a wrong answer showed the worked solution, a puzzle read off the screen was solved, level 7 fits a phone`);
+
+  // ---- Kapotte Rekenmachine ---------------------------------------------
+  await open("rekenmachine");
+  if ((await sideways()) > 1) note(currentRoute, `the calculator scrolls sideways on a phone by ${await sideways()}px`);
+
+  /** The shortest route from the keys and numbers on screen, using the game's own search. */
+  const routeOnScreen = () =>
+    p.evaluate(async () => {
+      const m = await import("./js/games/machine.js");
+      const level = (await import("./js/state.js")).getLevel("machine");
+      const rules = m.LEVEL_RULES[level];
+      const [start, target] = ((document.querySelector(".kmg-machine-goal").textContent ?? "").match(/-?\d+/g) ?? []).map(Number);
+      const buttons = [...document.querySelectorAll(".kmg-machine-key")].map((key) => {
+        const kind = key.dataset.kind;
+        return kind === "square" ? { kind } : { kind, n: Number(key.textContent.match(/\d+/)[0]) };
+      });
+      const lims = { lo: rules.lo, hi: rules.hi };
+      return { start, target, route: m.shortestRoute(buttons, lims, start, target), count: buttons.length };
+    });
+
+  const mBefore = await game("machine");
+  const first = await routeOnScreen();
+  if (!first.route || first.route.length < 2) note(currentRoute, `no route found on screen: ${JSON.stringify(first)}`);
+  // Undo and reset work, and cost nothing.
+  await p.locator(".kmg-machine-key").nth(first.route[0]).click();
+  if (!/Gedrukt: 1/.test((await p.locator(".kmg-machine-count").textContent()) ?? "")) note(currentRoute, "one press should count as one");
+  await p.locator(".kmg-machine-undo").click();
+  if (!/Gedrukt: 0/.test((await p.locator(".kmg-machine-count").textContent()) ?? "")) note(currentRoute, "undo should take the press back");
+  // The hint lights the next key, and the dead-end warning shows when the target slips away.
+  await p.locator(".kmg-machine-hint").click();
+  if ((await p.locator(".kmg-machine-key.is-hint").count()) !== 1) note(currentRoute, "the hint should light exactly one key");
+  // A hint was used: solve it anyway, and the level must stay (a hinted solve is practice).
+  for (const index of first.route) await p.locator(".kmg-machine-key").nth(index).click();
+  await p.waitForSelector(".kmg-machine-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "pressing the shortest route should solve it"));
+  if (!/⭐⭐⭐/.test((await p.locator(".kmg-machine-stars").textContent().catch(() => "")) ?? "")) note(currentRoute, "the shortest route should earn three stars");
+  let mNow = await game("machine");
+  if (mNow.level !== 0) note(currentRoute, `a solve that used the hint should stay on level 0, not ${mNow.level}`);
+  if (!(mNow.score > mBefore.score)) note(currentRoute, "a solved calculator puzzle paid no points");
+  // Now one with no hint: level 0 is mastered.
+  await p.locator(".kmg-machine-new").click();
+  await p.waitForSelector(".kmg-machine-key");
+  const second = await routeOnScreen();
+  for (const index of second.route) await p.locator(".kmg-machine-key").nth(index).click();
+  await p.waitForSelector(".kmg-machine-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "the second route was not accepted"));
+  mNow = await game("machine");
+  if (mNow.level !== 1 || !mNow.cleared.includes(0)) note(currentRoute, `a par solve without a hint should master level 0: ${JSON.stringify(mNow)}`);
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "rekenmachine-solved.png"), fullPage: true });
+
+  // Overshooting says so. Press the biggest key until the target is behind us.
+  await setLevel(0);
+  await p.waitForSelector(".kmg-machine-key:not([disabled])");
+  const target0 = Number(((await p.locator(".kmg-machine-target").textContent()) ?? "").replace(/\D/g, ""));
+  let dead = false;
+  for (let i = 0; i < 12 && !dead; i++) {
+    const keys = await p.locator(".kmg-machine-key:not([disabled])").count();
+    if (!keys) break;
+    await p.locator(".kmg-machine-key").nth(1).click(); // the big + key at level 0
+    const shown = Number(await p.locator(".kmg-machine-now").textContent());
+    dead = /kom je niet meer/.test((await p.locator(".kmg-machine-note").textContent().catch(() => "")) ?? "");
+    if (shown > target0) break;
+  }
+  const finalShown = Number(await p.locator(".kmg-machine-now").textContent().catch(() => "0"));
+  if (finalShown > target0 && !dead) note(currentRoute, "going past the target should show the dead-end warning");
+  await setLevel(4);
+  await p.waitForSelector(".kmg-machine-key");
+  const four = await routeOnScreen();
+  for (const index of four.route) await p.locator(".kmg-machine-key").nth(index).click();
+  await p.waitForSelector(".kmg-machine-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "the level-4 route was not accepted"));
+  if (!(await game("machine")).feats.includes("machine_par")) note(currentRoute, "par without the hint at level 4 should record the feat");
+  if (!(await p.evaluate(async () => (await import("./js/state.js")).state.badges.includes("machine_par")))) note(currentRoute, "the calculator badge should be earned with that feat");
+  await setLevel(7);
+  if ((await sideways()) > 1) note(currentRoute, `the calculator at level 7 scrolls sideways on a phone by ${await sideways()}px`);
+  if ((await p.locator(".kmg-machine-key").count()) !== 5) note(currentRoute, "level 7 should have five keys");
+  console.log(`  rekenmachine: the shortest route read off the screen solved it for three stars, a hinted solve stayed, par without a hint mastered level 0`);
+
+  // ---- Getallenbouwer ----------------------------------------------------
+  await open("getallenbouwer");
+  if ((await sideways()) > 1) note(currentRoute, `the card game scrolls sideways on a phone by ${await sideways()}px`);
+  const bBefore = await game("bouw");
+
+  /** The merges that make the target from the cards on screen, using the game's own search. */
+  const pathOnScreen = () =>
+    p.evaluate(async () => {
+      const b = await import("./js/games/bouw.js");
+      const level = (await import("./js/state.js")).getLevel("bouw");
+      const values = [...document.querySelectorAll(".kmg-bouw-card")].map((c) => Number(c.textContent));
+      const target = Number(document.querySelector(".kmg-bouw-target strong").textContent);
+      return { values, target, path: b.findPath(values, target, b.LEVEL_RULES[level].ops) };
+    });
+  const merge = async (a, b, op) => {
+    const cards = p.locator(".kmg-bouw-card:not([disabled])");
+    const texts = await cards.allTextContents();
+    const i = texts.findIndex((text) => Number(text) === a);
+    const j = texts.findIndex((text, k) => k !== i && Number(text) === b);
+    await cards.nth(i).click();
+    await p.locator(`.kmg-bouw-op[data-op="${op}"]`).click();
+    await cards.nth(j).click();
+  };
+
+  // Not allowed: a subtraction that would reach 0 or less is refused, with a reason.
+  {
+    const { values } = await pathOnScreen();
+    const sorted = [...values].sort((x, y) => x - y);
+    const small = sorted[0];
+    const big = sorted.at(-1);
+    await merge(small, big, "−");
+    if (!/geeft geen getal boven nul/.test((await p.locator(".kmg-bouw-note").textContent().catch(() => "")) ?? "")) note(currentRoute, "taking a bigger number from a smaller one should be refused with a reason");
+    if ((await p.locator(".kmg-bouw-card").count()) !== values.length) note(currentRoute, "a refused merge must not change the cards");
+    await p.locator(".kmg-bouw-card.is-selected").click().catch(() => {});
+  }
+  // The hint glows two cards and an operation.
+  await p.locator(".kmg-bouw-hint").click();
+  if ((await p.locator(".kmg-bouw-card.is-hint").count()) !== 2) note(currentRoute, `the hint should light two cards, lit ${await p.locator(".kmg-bouw-card.is-hint").count()}`);
+  if ((await p.locator(".kmg-bouw-op.is-hint").count()) !== 1) note(currentRoute, "the hint should light one operation");
+  // Undo and restart.
+  const plan = await pathOnScreen();
+  if (!plan.path) note(currentRoute, `no path found on screen: ${JSON.stringify(plan)}`);
+  else {
+    await merge(plan.path[0].a, plan.path[0].b, plan.path[0].op);
+    if ((await p.locator(".kmg-bouw-card").count()) !== plan.values.length - 1) note(currentRoute, "a merge should replace two cards with one");
+    await p.locator(".kmg-bouw-undo").click();
+    if ((await p.locator(".kmg-bouw-card").count()) !== plan.values.length) note(currentRoute, "undo should bring the two cards back");
+    for (const step of plan.path) await merge(step.a, step.b, step.op);
+    await p.waitForSelector(".kmg-bouw-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "building the target was not accepted"));
+    const expr = (await p.locator(".kmg-bouw-expr").textContent().catch(() => "")) ?? "";
+    if (!new RegExp(`= ${plan.target}$`).test(expr.trim())) note(currentRoute, `the solution should be written out ending in "= ${plan.target}": "${expr}"`);
+    if (/undefined|NaN/.test(expr)) note(currentRoute, `junk in the written solution: "${expr}"`);
+  }
+  let bNow = await game("bouw");
+  if (bNow.level !== 0) note(currentRoute, `a solve that used the hint should stay on level 0, not ${bNow.level}`);
+  if (!(bNow.score > bBefore.score)) note(currentRoute, "a built target paid no points");
+  // Without a hint, level 0 is mastered.
+  await p.locator(".kmg-bouw-new").click();
+  await p.waitForSelector(".kmg-bouw-card");
+  const clean = await pathOnScreen();
+  for (const step of clean.path) await merge(step.a, step.b, step.op);
+  await p.waitForSelector(".kmg-bouw-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "the second hand was not accepted"));
+  bNow = await game("bouw");
+  if (bNow.level !== 1 || !bNow.cleared.includes(0)) note(currentRoute, `a clean build should master level 0: ${JSON.stringify(bNow)}`);
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "getallenbouwer-solved.png"), fullPage: true });
+
+  // Level 5 is "make 24" with only one or two solutions: a clean build records the feat.
+  await setLevel(5);
+  await p.waitForSelector(".kmg-bouw-card");
+  const twentyFour = await pathOnScreen();
+  if (twentyFour.target !== 24) note(currentRoute, `level 5 should ask for 24, asked ${twentyFour.target}`);
+  for (const step of twentyFour.path ?? []) await merge(step.a, step.b, step.op);
+  await p.waitForSelector(".kmg-bouw-result.kmg-banner-ok", { timeout: 4000 }).catch(() => note(currentRoute, "the level-5 hand was not built"));
+  if (!/solutions|manieren/.test((await p.locator(".kmg-bouw-result ~ .kmg-caption").first().textContent().catch(() => "")) ?? "")) note(currentRoute, "level 5 should say how many ways there are to make 24");
+  if (!(await game("bouw")).feats.includes("bouw_hard")) note(currentRoute, "a clean level-5 build should record the feat");
+  if (!(await p.evaluate(async () => (await import("./js/state.js")).state.badges.includes("bouw_hard")))) note(currentRoute, "the card-game badge should be earned with that feat");
+
+  // The biggest hand still fits a phone: six cards, four operations.
+  await setLevel(7);
+  await p.waitForSelector(".kmg-bouw-card");
+  if ((await p.locator(".kmg-bouw-card").count()) !== 6) note(currentRoute, "level 7 should deal six cards");
+  if ((await p.locator(".kmg-bouw-op").count()) !== 4) note(currentRoute, "level 7 should offer four operations");
+  if ((await sideways()) > 1) note(currentRoute, `the card game at level 7 scrolls sideways on a phone by ${await sideways()}px`);
+  if (shotDir) await p.screenshot({ path: path.join(shotDir, "getallenbouwer-l7.png"), fullPage: true });
+  console.log(`  getallenbouwer: a refused subtraction explained itself, a hinted build stayed, a clean build mastered level 0, level 7 fits a phone`);
   await ctx.close();
 }
 
