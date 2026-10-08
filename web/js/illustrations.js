@@ -1325,6 +1325,114 @@ export function sterrenpadIllustration() {
   </svg>`;
 }
 
+
+/** 🎲 Telduel: a staircase of counting steps, the safe ones lit, a flag on top and a die */
+export function duelIllustration() {
+  const id = uid("due");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Telduel">
+    ${animWrap(id, `
+      @keyframes ${id}_tumble { 0% { transform: rotate(-12deg) translateY(0); } 50% { transform: rotate(10deg) translateY(-6px); } 100% { transform: rotate(-12deg) translateY(0); } }
+      #${id} .die { animation: ${id}_tumble 2.6s ease-in-out infinite; transform-origin: 128px 52px; }
+    `)}
+    <g stroke="#5d4037" stroke-width="3" stroke-linejoin="round">
+      <rect x="14" y="120" width="26" height="26" fill="#ffe0b2"/>
+      <rect x="40" y="104" width="26" height="42" fill="#c8e6c9"/>
+      <rect x="66" y="88" width="26" height="58" fill="#ffe0b2"/>
+      <rect x="92" y="72" width="26" height="74" fill="#c8e6c9"/>
+      <rect x="118" y="56" width="26" height="90" fill="#ffe0b2"/>
+    </g>
+    <g font-family="sans-serif" font-weight="900" font-size="14" fill="#3e2723" text-anchor="middle">
+      <text x="27" y="138">2</text><text x="53" y="130">6</text><text x="79" y="122">9</text><text x="105" y="114">10</text>
+    </g>
+    <g class="anim-sparkle" style="transform-origin:53px 98px;"><text x="53" y="100" text-anchor="middle" font-size="16">✨</text></g>
+    <g class="anim-sparkle" style="transform-origin:105px 66px;"><text x="105" y="68" text-anchor="middle" font-size="16">✨</text></g>
+    <g class="anim-bob" style="transform-origin:131px 40px;"><text x="131" y="48" text-anchor="middle" font-size="26">🏁</text></g>
+    <g class="die">
+      <rect x="22" y="30" width="34" height="34" rx="8" fill="#ffffff" stroke="#5d4037" stroke-width="3"/>
+      <circle cx="32" cy="40" r="3.5" fill="#e64a19"/><circle cx="46" cy="54" r="3.5" fill="#e64a19"/><circle cx="39" cy="47" r="3.5" fill="#e64a19"/>
+    </g>
+    <text x="74" y="62" font-size="22" class="anim-float" style="transform-origin:74px 52px;">🤖</text>
+  </svg>`;
+}
+
+/** ⚖️ Weegpuzzel: a balance scale with fruit that gently settles */
+export function weegIllustration() {
+  const id = uid("wee");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Weegpuzzel">
+    ${animWrap(id, `
+      @keyframes ${id}_rock { 0% { transform: rotate(-6deg); } 50% { transform: rotate(5deg); } 100% { transform: rotate(-6deg); } }
+      #${id} .beam { animation: ${id}_rock 4s ease-in-out infinite; transform-origin: 80px 46px; }
+    `)}
+    <polygon points="62,146 98,146 88,132 72,132" fill="#5d4037"/>
+    <line x1="80" y1="46" x2="80" y2="136" stroke="#5d4037" stroke-width="6" stroke-linecap="round"/>
+    <g class="beam">
+      <line x1="26" y1="46" x2="134" y2="46" stroke="#5d4037" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="80" cy="46" r="8" fill="#ffb74d" stroke="#5d4037" stroke-width="3"/>
+      <g>
+        <line x1="34" y1="46" x2="12" y2="96" stroke="#5d4037" stroke-width="2"/><line x1="34" y1="46" x2="56" y2="96" stroke="#5d4037" stroke-width="2"/>
+        <path d="M 10 96 Q 34 120 58 96 Z" fill="#ffb74d" stroke="#5d4037" stroke-width="3" stroke-linejoin="round"/>
+        <text x="20" y="94" font-size="24">🍎</text><text x="34" y="94" font-size="24">🍎</text>
+      </g>
+      <g>
+        <line x1="126" y1="46" x2="104" y2="96" stroke="#5d4037" stroke-width="2"/><line x1="126" y1="46" x2="148" y2="96" stroke="#5d4037" stroke-width="2"/>
+        <path d="M 102 96 Q 126 120 150 96 Z" fill="#ffb74d" stroke="#5d4037" stroke-width="3" stroke-linejoin="round"/>
+        <rect x="108" y="76" width="34" height="20" rx="5" fill="#cfd8dc" stroke="#5d4037" stroke-width="2"/>
+        <text x="125" y="91" text-anchor="middle" font-size="12" font-weight="900" fill="#3e2723" font-family="sans-serif">12 g</text>
+      </g>
+    </g>
+    <text x="126" y="30" text-anchor="middle" font-size="22" class="anim-sparkle" style="transform-origin:126px 24px;">❓</text>
+  </svg>`;
+}
+
+/** 🧮 Kapotte Rekenmachine: a calculator with most keys dimmed and a spanner */
+export function machineIllustration() {
+  const id = uid("mac");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kapotte Rekenmachine">
+    ${animWrap(id, `
+      @keyframes ${id}_blink { 0%, 55%, 100% { opacity: 1; } 60%, 70% { opacity: 0.25; } }
+      #${id} .digits { animation: ${id}_blink 3.4s steps(1, end) infinite; }
+    `)}
+    <g class="anim-float" style="transform-origin:78px 80px;">
+      <rect x="32" y="14" width="96" height="132" rx="12" fill="#ffab91" stroke="#5d4037" stroke-width="4"/>
+      <rect x="42" y="24" width="76" height="30" rx="6" fill="#dcedc8" stroke="#5d4037" stroke-width="3"/>
+      <text class="digits" x="112" y="47" text-anchor="end" font-family="monospace" font-weight="900" font-size="22" fill="#33691e">42</text>
+      <g stroke="#5d4037" stroke-width="2.5">
+        <rect x="42" y="64" width="22" height="20" rx="5" fill="#fff"/><rect x="68" y="64" width="22" height="20" rx="5" fill="#d7ccc8" opacity="0.6"/><rect x="94" y="64" width="22" height="20" rx="5" fill="#fff"/>
+        <rect x="42" y="90" width="22" height="20" rx="5" fill="#d7ccc8" opacity="0.6"/><rect x="68" y="90" width="22" height="20" rx="5" fill="#fff"/><rect x="94" y="90" width="22" height="20" rx="5" fill="#d7ccc8" opacity="0.6"/>
+        <rect x="42" y="116" width="22" height="20" rx="5" fill="#d7ccc8" opacity="0.6"/><rect x="68" y="116" width="22" height="20" rx="5" fill="#d7ccc8" opacity="0.6"/><rect x="94" y="116" width="22" height="20" rx="5" fill="#ffe082"/>
+      </g>
+      <g font-family="sans-serif" font-weight="900" font-size="13" fill="#3e2723" text-anchor="middle">
+        <text x="53" y="79">+9</text><text x="105" y="79">×2</text><text x="79" y="105">−3</text><text x="105" y="131">🎯</text>
+      </g>
+    </g>
+    <g class="anim-wiggle" style="transform-origin:132px 120px;"><text x="132" y="134" text-anchor="middle" font-size="30">🔧</text></g>
+    <text x="22" y="40" font-size="18" class="anim-sparkle" style="transform-origin:22px 34px;">⭐</text>
+  </svg>`;
+}
+
+/** 🧱 Getallenbouwer: number cards snapping together into a bigger one */
+export function bouwIllustration() {
+  const id = uid("bou");
+  return `<svg id="${id}" class="kmg-hero-svg" viewBox="0 0 160 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Getallenbouwer">
+    ${animWrap(id, `
+      @keyframes ${id}_drop { 0% { transform: translateY(-9px); } 55%, 100% { transform: translateY(0); } }
+      #${id} .c1 { animation: ${id}_drop 2.6s ease-in-out infinite; }
+      #${id} .c2 { animation: ${id}_drop 2.6s ease-in-out 0.25s infinite; }
+    `)}
+    <g stroke="#5d4037" stroke-width="3.5" stroke-linejoin="round" font-family="sans-serif" font-weight="900" text-anchor="middle">
+      <g class="c1"><rect x="14" y="28" width="44" height="52" rx="8" fill="#fff59d"/><text x="36" y="64" font-size="30" fill="#3e2723" stroke="none">6</text></g>
+      <g class="c2"><rect x="102" y="28" width="44" height="52" rx="8" fill="#b3e5fc"/><text x="124" y="64" font-size="30" fill="#3e2723" stroke="none">4</text></g>
+      <text x="80" y="62" font-size="30" fill="#e64a19" stroke="none" class="anim-pulse" style="transform-origin:80px 54px;">×</text>
+    </g>
+    <path d="M 36 88 Q 36 104 70 108 M 124 88 Q 124 104 90 108" fill="none" stroke="#5d4037" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 6"/>
+    <g class="anim-float" style="transform-origin:80px 126px;">
+      <rect x="44" y="100" width="72" height="50" rx="10" fill="#c8e6c9" stroke="#5d4037" stroke-width="4"/>
+      <text x="80" y="137" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="30" fill="#1b5e20">24</text>
+    </g>
+    <text x="140" y="104" font-size="20" class="anim-sparkle" style="transform-origin:140px 98px;">✨</text>
+  </svg>`;
+}
+
 /** Map of gameKey -> illustration generator function */
 const ILLUSTRATIONS = {
   tafel: tafelIllustration,
@@ -1349,6 +1457,10 @@ const ILLUSTRATIONS = {
   doku: dokuIllustration,
   tactiek: tactiekIllustration,
   park: parkIllustration,
+  duel: duelIllustration,
+  weeg: weegIllustration,
+  machine: machineIllustration,
+  bouw: bouwIllustration,
   sterrenpad: sterrenpadIllustration,
   leerhapjes: leerhapjesIllustration,
   compete: competeIllustration,

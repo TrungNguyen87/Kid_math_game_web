@@ -46,6 +46,7 @@ const ROUTES = [
   "home", "leerhapjes", "tafel", "breuken", "meten", "procenten", "algebra", "meetkunde", "verhoudingen",
   "getallen", "bliksemronde", "getallenjacht", "logica", "code", "lezen", "woorden", "spelling",
   "fladdervogel", "sprongheld", "lavatoren", "turbokart", "rekendoku", "tafeltactiek", "pretparkbaas",
+  "telduel", "weegpuzzel", "rekenmachine", "getallenbouwer",
   "sterrenpad", "compete", "rewards", "uitleg", "dashboard",
 ];
 const TYPES = {

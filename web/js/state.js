@@ -62,14 +62,24 @@ export const GAME_KEYS = [
   "doku",
   "tactiek",
   "park",
+  // Round 20: four thinking games for the higher levels - a counting duel
+  // against the computer, balance-scale deduction, a broken calculator and
+  // a card-building game.
+  "duel",
+  "weeg",
+  "machine",
+  "bouw",
 ];
 
 /** The reading and language games - they feed the reading counters and quest. */
 export const READING_GAMES = new Set(["lezen", "woorden", "spelling"]);
 /** The arcade games - one run is a round, like the timed games. */
 export const ARCADE_GAMES = new Set(["vlieg", "sprong", "toren", "kart"]);
-/** The puzzle and strategy games (round 19) - one puzzle, match or day is a round. */
-export const PUZZLE_GAMES = new Set(["doku", "tactiek", "park"]);
+/**
+ * The puzzle and strategy games (round 19; four more in round 20) - one
+ * puzzle, match or day is a round.
+ */
+export const PUZZLE_GAMES = new Set(["doku", "tactiek", "park", "duel", "weeg", "machine", "bouw"]);
 
 /**
  * Bonus coins for mastering a level for the first time - see clearLevel().

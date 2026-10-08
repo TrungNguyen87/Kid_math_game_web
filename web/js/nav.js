@@ -54,6 +54,11 @@ export const NAV = [
   { path: "rekendoku", key: "nav.doku", icon: "🧩", group: "puzzel", game: "doku", load: () => import("./games/doku.js") },
   { path: "tafeltactiek", key: "nav.tactiek", icon: "♟️", group: "puzzel", game: "tactiek", load: () => import("./games/tactiek.js") },
   { path: "pretparkbaas", key: "nav.park", icon: "🎡", group: "puzzel", game: "park", load: () => import("./games/park.js") },
+  // Round 20: thinking games where the hard sums are the way to win.
+  { path: "telduel", key: "nav.duel", icon: "🎲", group: "puzzel", game: "duel", load: () => import("./games/duel.js") },
+  { path: "weegpuzzel", key: "nav.weeg", icon: "⚖️", group: "puzzel", game: "weeg", load: () => import("./games/weeg.js") },
+  { path: "rekenmachine", key: "nav.machine", icon: "🧮", group: "puzzel", game: "machine", load: () => import("./games/machine.js") },
+  { path: "getallenbouwer", key: "nav.bouw", icon: "🧱", group: "puzzel", game: "bouw", load: () => import("./games/bouw.js") },
 
   // No `game` key on purpose: it is not part of the curriculum (GAME_KEYS),
   // so it does not affect badges or the home page's overall-level bar, and a

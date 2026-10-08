@@ -30,6 +30,8 @@ const TOPICS = [
   ["puzzel", "🧩"],
   ["geld", "💶"],
   ["sterrenpad", "🌟"],
+  // Round 20: the four thinking games.
+  ["denk", "🧠"],
 ];
 
 export function render(container) {

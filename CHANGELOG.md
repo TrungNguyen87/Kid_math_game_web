@@ -5,6 +5,135 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added (round 20 - four thinking games for the high levels)
+
+The request: the arcade games (Fladdervogel and friends) only suit low-level
+maths - difficult calculation is hard to combine with a reflex game. Think of
+something more creative for the high levels: puzzles, strategy, and logic
+games where the hard sums are the point.
+
+Four new games (26 in all; each has levels 0-7, goes through `settleAnswer()`,
+the level-replay guard, quests, badges, the mastery log and the star road;
+none has a clock). They sit in the *Puzzel & strategie* menu group.
+
+- 🎲 **Telduel / Count Duel** (strategy): count up against the computer;
+  whoever says the target wins. It looks like luck and is a division: the
+  *safe totals* are always (biggest step + 1) apart, and the remainder of
+  target ÷ (biggest step + 1) is what to say first. Levels 0-4 are a race to
+  10-15 up to 80-120 with a computer that slips less and less; **from level 5
+  the child chooses who starts** (a target that divides exactly means the
+  computer must begin - so the choice is a calculation); level 6 flips the
+  rule (whoever says it *loses*), level 7 forbids one step ("1 to 12, but
+  never 6"), which breaks the pattern into pairs. Every position is solved
+  exactly (`analyse()`), so the computer can play perfectly, 💡 lists the
+  safe totals (and a win with it pays half and stays on the level), and after
+  a match the explanation does the division with that match's own numbers.
+- ⚖️ **Weegpuzzel / Balance Puzzles** (logic): every scale is in balance and
+  the fruit's weights are hidden; read the scale with one unknown, put what
+  you know into the next. One scale (🍎🍎🍎 = 18 g) up to four fruit over four
+  scales (and a "?" scale for a total), a "put one scale into another" step from level 5 (🍎 = 🍌🍌 + 4 g),
+  and from level 4 the question can be "what do these weigh together?" with a
+  "?" scale. A wrong answer shows the worked solution as lines of fruit and
+  numbers on the scales just seen (`① 27 = 🍇 + 2 × 10  →  🍇 = 7 g`).
+- 🧮 **Kapotte Rekenmachine / Broken Calculator** (planning): only a few
+  keys work (+9, ×2, −3, ÷4, x²); turn the display into the target in as few
+  presses as possible - **par** is the exact shortest route (a breadth-first
+  search). Levels 6-7 go below zero and add a square key; ÷ only works on
+  a number it divides exactly. ↩️ is free, 🚧 appears by itself when the target
+  can no longer be reached, 💡 lights the next key. Par or one over without a
+  hint masters the level; stars (1-3) pay more for fewer presses.
+- 🧱 **Getallenbouwer / Number Builder** (puzzle): tap a card, a sign, a second
+  card - they become one new card; build the target. Levels 0-3 are three or
+  four cards with + − then × then ÷; levels 4-5 are the classic **make 24**
+  (level 5 only with hands that have one or two solutions, found by
+  enumerating every way to combine them); levels 6-7 are the quiz-show number
+  round (four small cards and one or two big ones - 25, 50, 75, 100 - and a
+  three-digit target). Whole numbers above zero only. The winning card
+  remembers how it was built, so the page writes the child's own solution
+  down with the brackets where they belong (`(6 − 3) × 8 = 24`).
+
+Shared behaviour: every game ends a round with `adaptAfterGame()` (a win
+masters the level, a win with the hint or a slow solve stays, two losses in a
+row step down); every game says *why* after a loss or a wrong answer, using
+the numbers of that very puzzle; none can be farmed (the replay guard and the
+star road apply unchanged).
+
+**Everything else**
+
+- `state.js`: `GAME_KEYS` +4 (`duel`, `weeg`, `machine`, `bouw`), all in
+  `PUZZLE_GAMES`; a profile saved before this round opens with the four at
+  level 0. `nav.js`: four routes (`#/telduel`, `#/weegpuzzel`,
+  `#/rekenmachine`, `#/getallenbouwer`).
+- 4 more badges (39 → 43), each earned by a one-off feat recorded only by real
+  play (`duel_hard`: win level 5+ without the hint; `weeg_four`: solve a
+  four-fruit puzzle; `machine_par`: par without a hint at level 4+;
+  `bouw_hard`: a clean build at level 5+) - deliberately *not* by picking a
+  level (see the session log).
+- `games/common.js`: `typedAnswerGame()` takes an optional `onAnswered`
+  hook (called after the answer is settled) - Weegpuzzel's feat.
+- CSS: `.kmg-banner-tip` keeps line breaks (`white-space: pre-line`) so the
+  Weegpuzzel's worked solution reads as lines; no other tip has one.
+- Uitleg: a "Denkspellen" topic for the four. Four new animated hero
+  illustrations. 151 new translation keys per language (1334 → 1485).
+  `web/sw.js` `PRECACHE`: 4 new files (72). README: the four games, the new
+  counts, why these games.
+
+Tests:
+
+- **`test_brain.mjs`** (45): Telduel - `analyse()` against plain recursion on
+  300 random rule sets (races, misère, forbidden steps), the classic safe
+  totals pinned (`[2, 6, 10]`, `1, 12, 23 … 100`, `[1, 5, 9]` misère,
+  `[6, 12, 25, 31, 44, 50]` for "1-12 never 6"), a child who begins always
+  has a winning first move, choosing who starts matters at levels 5-7, a
+  computer with `slip: 0` never plays a losing step when a winning one
+  exists, a child who does the sum and picks the right start wins 100% at
+  every level, every match ends, and a casual child (right 8 times in 10)
+  does worse level by level. Weegpuzzel - every scale balances, every pan
+  fits, no fruit on both pans of a scale, plain reasoning solves every puzzle,
+  **brute force over every possible weight finds exactly one answer**, levels
+  below 5 need no substitution and levels 5+ do, the worked solution is
+  junk-free and gives every weight, the drawing is well-formed. Rekenmachine -
+  every key's rules, **par checked against an independent depth-limited
+  search**, no key undoes another, no one-key routes, the groep 8 levels go
+  below zero. Getallenbouwer - the combine rules, brackets only where needed
+  (and the text evaluates to the target), every hand can make its target with
+  its own cards and level's operations, 24-levels count distinct solutions
+  (level 5: one or two, and no shortcut with fewer cards), the hint follows the
+  recipe step by step **even with equal cards**, no pointless `× 2 ÷ 2` steps.
+  All four - both languages have every key, a feat earns exactly its badge, an
+  older profile opens with level 0.
+- **`smoke.mjs`**: 33 routes; each game **played from what is on the screen**:
+  Telduel won by the division at level 0 (a hinted win stays), a typed level
+  refuses an illegal number with a reason, level 5 won by choosing the start
+  from the target; a Weegpuzzel read off the scales' labels and solved by
+  brute force (a wrong answer first shows the worked solution), a level-7
+  four-fruit total solved; the calculator solved by the game's own search
+  (three stars, a hinted solve stays, par masters level 0, overshooting shows
+  the dead-end warning, par at level 4 earns the badge); a card hand built by
+  the game's own search (a refused subtraction explains itself, undo, hint
+  lights two cards and a sign, a clean build masters level 0, a level-5
+  build earns the badge); no sideways scroll at 390 px.
+- **`pages-sim.mjs`**: 33 routes under the Pages sub-path.
+
+Verified: `npm test` 258/258 (213 before; +45); `npm run lint`; `node --check`
+on all 65 files under `web/js` and `sw.js`; `npm run check:precache` 72/72;
+`npm run test:smoke` clean in three runs in a row on a freshly started
+server; `npm run test:pages`; the workflow's `BUILD_ID` stamp and
+`check_precache.py` on a scratch copy of `web/` and `tools/` (73 files
+shipped); a sweep of 224 page states (4 games × 8 levels × NL/EN × phone
+360×640 / desktop × light/dark, every expander open): no `undefined`, `NaN`,
+raw key or `{placeholder}`, nothing past the viewport. Proved to fail
+without the code, then restored (16 unit-level mutations, 14 caught by the
+right test as written; the other two are equivalent mutants - see the
+session log):
+the first-player guarantee, the computer's winning step, the misère terminal,
+the misère winner, a known fruit on one pan, the pan size limit, breadth-first
+par, "no key undoes another", ÷ only when exact, expression-matched hints
+(this one was a real bug, below), a subtraction may not reach 0, no pointless
+steps, "24 needs every card", brackets only where needed; and two more in
+the browser: the `onAnswered` hook (feat and badge) and "a hinted Telduel
+win stays".
+
 ### Added (round 19 - five new games, the star road, and an invitation to climb wherever a child practises)
 
 The request: more kinds of interactive games like round 18's arcade games -

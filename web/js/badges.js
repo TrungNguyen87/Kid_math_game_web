@@ -7,7 +7,8 @@
  * and chests, the collection, the buddy, and lifetime points. Round 18
  * added ten more for groep 8 (levels 6 and 7), mastering levels, reading,
  * the arcade games and the learning bites. Round 19 added eight: the star
- * road, and one feat in each of the five new games.
+ * road, and one feat in each of the five new games. Round 20 added four more,
+ * one feat in each of the thinking games.
  *
  * checkNewBadges() is called once per answered question, after that
  * question's score/level/streak updates have landed, and returns whatever
@@ -75,6 +76,11 @@ export const BADGE_DEFS = [
   ["tactiek_win", "♟️", () => state.feats.has("tactiek_win_hard")],
   ["park_6", "🎡", () => state.feats.has("park_6")],
   ["park_all", "🎢", () => state.feats.has("park_all")],
+  // Round 20: a feat in each of the four thinking games.
+  ["duel_win", "🎲", () => state.feats.has("duel_hard")],
+  ["weeg_four", "⚖️", () => state.feats.has("weeg_four")],
+  ["machine_par", "🧮", () => state.feats.has("machine_par")],
+  ["bouw_hard", "🧱", () => state.feats.has("bouw_hard")],
 ];
 
 export const BADGE_IDS = BADGE_DEFS.map((b) => b[0]);

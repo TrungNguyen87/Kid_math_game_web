@@ -45,6 +45,9 @@ import {
  *   (the reading games explain the reading skill the question was about)
  * @param {Function} [config.settleExtras] (problem) => extra settleAnswer()
  *   options, e.g. { wordsRead } for a reading text
+ * @param {Function} [config.onAnswered]  (problem, isCorrect, level) => void,
+ *   called once the answer has been settled - for a game that records its own
+ *   one-off feat (a badge) on a particular kind of question
  */
 export function typedAnswerGame(config) {
   const {
@@ -61,6 +64,7 @@ export function typedAnswerGame(config) {
     points = (level) => 5 * (level + 1),
     tipFor = null,
     settleExtras = () => ({}),
+    onAnswered = null,
   } = config;
 
   return function render(container) {
@@ -152,6 +156,7 @@ export function typedAnswerGame(config) {
         burstFrom: isCorrect ? bar.check : null,
         ...settleExtras(problem),
       });
+      onAnswered?.(problem, isCorrect, level);
 
       if (isCorrect) {
         const practiceOnly = pointsAwarded < earned;

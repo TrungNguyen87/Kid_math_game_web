@@ -1,6 +1,6 @@
 # Reken- & Leesspellen voor Groep 6, 7 & 8
 
-Twenty-two maths, reading, arcade, puzzle and strategy games for Dutch
+Twenty-six maths, reading, arcade, puzzle and strategy games for Dutch
 primary-school children aged roughly 9–12 (groep 6, 7 and 8), in Dutch and
 English, with eight difficulty levels each — the top two at groep 8 level —
 plus one-minute learning bites, a star road of rewards for climbing, and a
@@ -40,11 +40,25 @@ opened. Nothing a child types or answers ever leaves their device.
 | 🧩 | **Rekendoku** | Puzzle: a cage logic puzzle (3×3 to 6×6) solved with +, −, × and :, with a 💡 tip that lists what fits a cage |
 | ♟️ | **Tafeltactiek** | Strategy: a times-table board game against the computer — move a clip, claim the product, four in a row |
 | 🎡 | **Pretparkbaas** | Tycoon: build a theme park that stays yours, with money maths from change to payback time |
+| 🎲 | **Telduel** | Strategy: count up against the computer — whoever says the target wins. The winning idea is a division: safe totals are a fixed distance apart, and the remainder says what to say first. Later levels flip the rule (whoever says it *loses*) and forbid a step |
+| ⚖️ | **Weegpuzzel** | Logic: every scale is in balance, the fruit's weights are hidden. Read one scale, substitute into the next — algebra without letters, up to four fruit over four scales |
+| 🧮 | **Kapotte Rekenmachine** | Planning: only a few calculator keys work; reach the target in as few presses as possible (*par*). Work backwards, use inverse operations, mind that ÷ only divides exactly |
+| 🧱 | **Getallenbouwer** | Puzzle: combine cards with + − × : to build the target — "make 24" and the quiz-show number round, with the brackets written out for you |
 
 Plus **🌟 Sterrenpad**, the star road (see below); **🍪 Leerhapjes**, 24 one-minute lessons with a three-question check and a
 card album; **📖 Uitleg Concepten**, a reference a child can open mid-game; and
 **📊 Ouder Dashboard** — accuracy per game, questions per day, the levels
 mastered and when, the full log and a CSV export.
+
+**The four thinking games (round 20) are made for the high levels.** The
+arcade games ask for quick reading and a tap, which suits easy sums; hard
+calculation does not fit a reflex game. Here the maths *is* the mechanic and
+there is no clock: Telduel is won by dividing (and by working backwards from
+the end), a Weegpuzzel by substituting one scale into another, the broken
+calculator by finding the shortest route, the card game by seeing structure
+and bracketing it. Each has a 💡 that costs something (a win with it stays on
+the level), and each says *why* after a loss or a wrong answer, using the
+numbers of that very puzzle.
 
 Every game has eight levels, 0-7. Levels 6 and 7 (*Kampioen* and *Legende*)
 are groep 8: fractions times fractions, circles, litres, VAT and interest,
@@ -68,7 +82,7 @@ On top of that:
 - **Three daily quests** (a bit of effort, a bit of skill, a bit of variety),
   each paying bonus coins. Finish all three and the day's **treasure chest**
   opens: more coins plus one of 12 treasures that can never be bought.
-- A **days-in-a-row** streak and **39 badges**.
+- A **days-in-a-row** streak and **43 badges**.
 - **The star road (Sterrenpad)**: mastering a level earns stars — one for
   the easy levels, up to four at groep 8 — and a road of rewards is claimed
   with them, twelve of which can never be bought. Replaying a mastered level

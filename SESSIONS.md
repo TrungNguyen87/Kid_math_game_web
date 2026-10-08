@@ -9,6 +9,193 @@ rediscover them.
 
 ---
 
+## Session 19 — 8 October 2026
+
+**Branch:** `ccr-b3d4a820-h6wdov`
+
+### Asked
+
+1. (Standing instruction) read the changelog and memory first.
+2. The arcade games - Fladdervogel and its kind - "only suit low-level maths;
+   difficult calculation is hard to combine" with them. Think of something more
+   creative for the **high levels**: puzzles, strategy games, and logic games
+   can be combined.
+
+### Read first: what already existed
+
+Round 19 had a cage puzzle (Rekendoku), a board game (Tafeltactiek) and a
+tycoon (Pretparkbaas). The new games had to be different in *kind*, not another
+skin on those: so none of them is an arcade game, none has a clock, and in
+each of them the hard sum is the way to win rather than a gate in front of a
+reflex.
+
+### Decided: four games, four different kinds of thinking
+
+| Game | The thinking | Where the hard maths is |
+|---|---|---|
+| 🎲 Telduel | backward induction ("what must I say so the other can no longer win?") | the division target ÷ (biggest step + 1) and its remainder; at level 6-7 the same idea shifted or broken |
+| ⚖️ Weegpuzzel | deduction by substitution | undoing sums on scales: `27 = 🍇 + 2 × 10`, then "put 🍎 = 🍌🍌 into the next scale" |
+| 🧮 Kapotte Rekenmachine | planning a shortest route backwards, with inverse operations | multi-step mental arithmetic with ÷ that only works exactly, negatives, squares |
+| 🧱 Getallenbouwer | seeing structure in numbers; the order of operations | 24 = 3 × 8 = 4 × 6 = 30 − 6; brackets; three-digit targets from a big card |
+
+Every game has real change at the top, not just bigger numbers: Telduel
+turns into "the child chooses who starts" (level 5), the misère rule (6) and a
+forbidden step (7); Weegpuzzel adds substitution (5) and four fruit (6-7);
+the calculator adds negatives and a square key (6-7); the card game goes from
+three cards to the quiz-show round (6-7).
+
+**Exact, so the games can be honest.** Each game is small enough to be solved
+completely, and that is what everything else leans on:
+
+- Telduel: `analyse()` is a dynamic program over the totals. The computer can
+  therefore play perfectly (its `slip` is the only thing that makes it
+  beatable at the low levels), the 💡 can list the real safe totals, and a loss
+  can say what the winning plan was *for that match's numbers*.
+- Weegpuzzel: a puzzle is built *from* its true weights out of three "families"
+  of scales (anchor, chain, swap), then `solvePuzzle()` re-derives the weights
+  from the *displayed* scales using only what a child may do (read a scale with
+  one unknown; put a lone-fruit scale into another). A puzzle that solver
+  cannot finish is thrown away, so every puzzle is solvable by plain reasoning,
+  and the solver's steps *are* the explanation shown after a wrong answer -
+  nothing is hand-written per puzzle, and the lines are language-neutral
+  (fruit and numbers).
+- Rekenmachine: the numbers a puzzle can pass through are bounded (a thousand
+  or so), so one breadth-first search gives the exact par, the exact next key
+  from wherever the child has got to, and the free "you can no longer reach it"
+  warning.
+- Getallenbouwer: levels 0-5 enumerate every way to combine a hand (a few
+  thousand), so "make 24 with one or two solutions" is a measured property;
+  levels 6-7 build the target by random play so a solution always exists.
+
+**A hint costs something, in the same way everywhere**: a win with the hint
+stays on the level (`adaptAfterGame(..., "draw")`) and pays half. Giving up is
+a loss. This is the Rekendoku rule from round 19, kept so children meet one
+rule, not four.
+
+**Telduel levelling, tuned by simulation.** A child who is right 8 times in 10
+(a fair picture of "has seen the pattern, still slips") wins 78 → 73 → 65 → 54
+→ 37% at levels 0-4, then 25, 14 and 27% at 5, 6, 7; a child who does the sum
+wins 100% with the right start (65-75% if they always begin, which is why the
+choice of who starts matters at 5-7); a child who plays at random wins 30% at
+level 0 and about 0% from level 6.
+
+### Found along the way
+
+- **A real bug in my own hint, caught by a test.** The card game's hint first
+  matched cards *by number*. With the hand 7, 4, 7, 4 and the recipe
+  `7 + 4 × (7 + 4)`, after `7 + 4 = 11` the leftover 7 and 4 still looked
+  mergeable - but they are reserved for later steps - so the hint repeated
+  `7 + 4` and the recipe ran dry. The test that followed the hint step by step
+  to the end failed on `level 4: ran out of recipe at 5,5`. The fix matches a
+  card by *what it is made of* (every card carries the expression it was built
+  from; `nextRecipeMerge(recipe, nodes)` walks the recipe tree and consumes
+  matching cards). If the child has gone another way nothing matches and the
+  page falls back to a bounded search. Without that test a child with two equal
+  cards would have been told "I can't find a way from here" on a solvable hand.
+- **My first Telduel level 7 was easier than level 6.** I started with step
+  *sets* ("1, 3 or 4"). Measuring the safe totals showed ~25-30% of totals are
+  safe in such sets against ~8% in a plain race, so a *random* child won 17%
+  against a perfect computer. Replaced with "1 to 12, but never 6": ~11% safe,
+  the safe totals come in pairs (offsets 0 and 6, 19 and 25, 38 and 44), and the
+  random child now wins 0%. **Measure the density before believing a variant is
+  harder.**
+- **Reading samples catches what tests cannot.** Two ugly-but-valid things
+  only showed in printed samples: a chain scale with the *same* fruit on both
+  pans (`🍌 + 6 = 🍌🍌 + 🍎`, true but confusing - now a test), and quiz-show
+  hands whose "solution" was `100 × 2 ÷ 2 + 6 + 50` (now rejected, now a test).
+  The worked solution also showed known fruit merged into one number
+  (`🍓 + 10 = 24`); it now shows the sum (`🍓 + 10 = 3 × 8`) so a child can see
+  where 24 came from.
+- **An infinite pulse made a hinted key "not stable" for Playwright - the
+  same lesson as session 18**, and I applied it only after the failure. The
+  hint glow is now static (a ring), which is also kinder to a child. New CSS
+  with an `infinite` animation on something a child or a test must tap is the
+  thing to grep for.
+- **Two of my 16 revert-to-fail mutations were not caught, and both are
+  equivalent mutants, not test gaps**: Weegpuzzel's "the solver's weights equal
+  the real ones" never fires (0 rejections in 24,000 puzzles - the generator is
+  constructive), and the card game's "target is not already a card" cannot fire
+  at levels 6-7 (their targets start at 100 and 101; no card is above 100). I
+  mutated the live path of the second (levels 0-3, where ranges overlap the
+  cards) and the test caught it. Both guards stay as defence against future
+  edits to the level data, but **a change to those ranges or families needs a
+  matching test**.
+- **A pre-existing quirk, not touched**: tapping a level in the picker earns the
+  *Level 5*, *Groep 8* and *Legende* badges, because they check `getLevel()`
+  rather than mastery (`badges.js anyLevelAtLeast`); a child can tap "7" and
+  collect three badges. It goes against the "nothing can be farmed" rule of the
+  rest of the app, but fixing it would change which badges existing players
+  hold, so it needs the owner's decision. The four new badges avoid it: they
+  come from one-off feats recorded only by real play.
+- Screenshots of a result are useless while the level-up card and the badge
+  toasts (4+ s) cover the page: wait them out before looking.
+
+### Verification
+
+- `npm test`: 258/258 (213 before; +45 in `test_brain.mjs`).
+- Revert-to-fail, per CLAUDE.md, each failing for the right reason and passing
+  once restored (a script applies one mutation at a time, runs the tests,
+  restores the file): the first-player guarantee, the computer's winning step,
+  the misère terminal and winner, a known fruit on one pan, the pan size limit,
+  breadth-first par, no key that undoes another, ÷ only when exact,
+  expression-matched hints, a subtraction may not reach 0, no pointless steps,
+  "24 needs every card", brackets only where needed; in the browser, the
+  `onAnswered` hook (feat and badge) and "a hinted win stays on the level".
+  Not caught: the two equivalent mutants above.
+- `npm run lint`; `node --check` on all 65 files under `web/js` and `sw.js`;
+  `npm run check:precache` 72/72.
+- `npm start` + `npm run test:smoke`: 33 routes and every scenario, clean in
+  three runs in a row on a freshly started server (it plays each new game from
+  what is on the screen; see the CHANGELOG).
+- `npm run test:pages`: 33 routes under `/Kid_math_game_web/`, stamped cache,
+  offline reload.
+- The workflow's two steps (`sed` BUILD_ID stamp, `check_precache.py`) on a
+  scratch copy of `web/` and `tools/`: pass, 73 files shipped.
+- A sweep of 224 page states (4 games × 8 levels × NL/EN × phone 360×640 and
+  desktop × light/dark, every expander open): no `undefined`/`NaN`/raw key/
+  `{placeholder}`, nothing past the viewport.
+- Screenshots checked by eye at 390×844 (all four, several levels, wrong and
+  lost states, EN and dark) and the home page's puzzle group at desktop.
+
+### Still open
+
+- **Numbers without telemetry**, as every round: the computer's slip per level,
+  the Telduel target ranges (a level-5 match is ~10 typed turns), the par
+  ranges and number ranges of the calculator, the make-24 solution windows
+  (level 4: 3-60, level 5: 1-2), the Weegpuzzel weight ranges, and all the
+  points. The simulations prove reachability and a sensible curve, not how it
+  feels to an eleven-year-old. **Watch a child play Telduel at level 5-6**:
+  they must find the division unaided, and two losses in a row step the level
+  down; the 💡 and the after-match explanation are the way out, but if
+  children bounce there the slip at level 5 (0.04) is the first thing to raise.
+- Levels 6-7 of the card game come from random play and carry no difficulty
+  rating: some hands will be close to trivial (a target that is two cards
+  multiplied), some very hard. Levels 0-5 are measured; these are not.
+- The card game's hint searches with a budget (150,000 states). On a solvable
+  hand that is too big to finish, "I can't find a way from here" would be
+  wrong; a typical 6-card hand takes ~4 ms, so it has not been seen.
+- The calculator warns for free when the target is out of reach; the card
+  game deliberately does not (it would reveal every wrong merge). Whether the
+  calculator's warning makes backwards thinking too easy is a judgement call.
+- **The badge quirk above** (picking a level earns the level badges) needs a
+  decision.
+- `FEATURED_POOL` is unchanged on purpose: adding Weegpuzzel (the only new game
+  where one answer is one question) would change `hash % n` and re-roll
+  everyone's featured game on deploy day, as session 18 noted for the park.
+- The ultra 3D Champion is further away again: 26 games at level 7. The star
+  road gains 64 possible stars (416 in all); its top tier is still 200.
+- All copy (NL and EN) is a first draft by a non-teacher, like the reading
+  texts; the Telduel explanations and the Weegpuzzel/calculator tips deserve a
+  teacher's eye.
+- The typed number pad takes a lot of a phone's height (as in every typed game);
+  Telduel at levels 3+ shows the counter above it so the child can still see it.
+- The top bar truncates "Kapotte Rekenmach…" at 390 px (the page heading
+  shows it whole), as it already does for other long names.
+- Race Mode (online) still only runs self-hosted; nothing changed there.
+- Still carried over: the GitHub Actions Node 20 deprecation warning.
+
+---
+
 ## Session 18 — 26 September 2026
 
 **Branch:** `claude/interactive-games-progression-nyygu8`
